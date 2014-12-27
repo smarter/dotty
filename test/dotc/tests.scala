@@ -110,6 +110,7 @@ class tests extends CompilerTest {
   @Test def neg_t2660_ambi = compileFile(negDir, "t2660", xerrors = 2)
   @Test def neg_t2994 = compileFile(negDir, "t2994", xerrors = 2)
   @Test def neg_subtyping = compileFile(negDir, "subtyping", xerrors = 2)
+  @Test def neg_anon_class_subtyping = compileFile(negDir, "anon-class-subtyping", xerrors = 1)
   @Test def neg_variances = compileFile(negDir, "variances", xerrors = 2)
   @Test def neg_badAuxConstr = compileFile(negDir, "badAuxConstr", xerrors = 2)
   @Test def neg_typetest = compileFile(negDir, "typetest", xerrors = 1)
