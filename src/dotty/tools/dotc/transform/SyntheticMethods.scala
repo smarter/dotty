@@ -49,7 +49,11 @@ class SyntheticMethods extends MiniPhaseTransform with IdentityDenotTransformer 
    */
   def syntheticMethods(clazz: ClassSymbol)(implicit ctx: Context): List[Tree] = {
     val clazzType = clazz.typeRef
-    lazy val accessors = clazz.caseAccessors
+    lazy val accessors =
+      if (isDerivedValueClass(clazz))
+        clazz.paramAccessors
+      else
+        clazz.caseAccessors
 
     val symbolsToSynthesize: List[Symbol] =
       if (clazz.is(Case)) caseSymbols
