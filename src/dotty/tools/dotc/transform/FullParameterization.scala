@@ -176,6 +176,12 @@ trait FullParameterization {
           } else EmptyTree
         }
         tree match {
+          case Return(expr, from) =>
+            val rewired = rewiredTarget(from, derived)
+            if (rewired.exists)
+              Return(expr, Ident(rewired.termRef))
+            else
+              EmptyTree
           case Ident(_) => rewireCall(thisRef)
           case Select(qual, _) => rewireCall(qual)
           case tree @ TypeApply(fn, targs1) =>
