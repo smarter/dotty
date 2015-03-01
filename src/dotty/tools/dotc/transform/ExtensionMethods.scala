@@ -19,7 +19,7 @@ import util.Positions._
 import Decorators._
 
 /**
- * Perform Step 1 in the inline classes SIP: Creates extension methods for all
+ * Perform Step 1 and 2 in the value classes SIP: Creates extension methods for all
  * methods in a value class, except parameter or super accessors, or constructors.
  */
 class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with FullParameterization { thisTransformer =>
@@ -181,4 +181,39 @@ class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with Ful
       cpy.DefDef(tree)(rhs = atGroupEnd(forwarder(extensionMeth, tree)(_)))
     } else tree
   }
+
+  /** Implement Step 2 of SIP-15: rerouting calls.
+   *  Note that this is different from Scala 2 which did the rerouting much later in
+   *  the PostErasure phase.
+   *  TODO: avoid code duplication with fullyParameterizedDef#rewireTree
+   */
+  private def rewire(select: Select, targs: List[Tree])(implicit ctx: Context): Tree = {
+    val Select(qual, _) = select
+    val origMeth = select.symbol
+    if (isMethodWithExtension(origMeth)) {
+      val extensionMeth = extensionMethod(origMeth)
+      val origClass = origMeth.enclosingClass.asClass
+      val base = qual.tpe.baseTypeWithArgs(origClass)
+      assert(base.exists)
+      ref(extensionMeth)
+        .appliedToTypeTrees(targs ++ base.argInfos.map(TypeTree(_)))
+        .appliedTo(qual)
+    } else EmptyTree
+  }
+
+  override def transformTypeApply(tree: TypeApply)(implicit ctx: Context, info: TransformerInfo): Tree =
+    tree match {
+      case TypeApply(sel @ Select(_,_), args) =>
+        rewire(sel, args) orElse tree
+      case _ =>
+        tree
+    }
+
+  override def transformSelect(tree: Select)(implicit ctx: Context, info: TransformerInfo): Tree =
+    tree.tpe.widen match {
+      case tp: PolyType =>
+        tree // The rewiring will be handled by transformTypeApply
+      case tp =>
+        rewire(tree, Nil) orElse tree
+    }
 }
