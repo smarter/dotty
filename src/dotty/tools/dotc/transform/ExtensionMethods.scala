@@ -181,4 +181,56 @@ class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with Ful
       cpy.DefDef(tree)(rhs = atGroupEnd(forwarder(extensionMeth, tree)(_)))
     } else tree
   }
+
+  //TODO: avoid code duplication with fullyParameterizedDef#rewireTree
+  private def rewire(select: Select, targs: List[Tree])(implicit ctx: Context): Tree = {
+    val Select(qual, _) = select
+    val origMeth = select.symbol
+    if (isMethodWithExtension(origMeth)) {
+      val extensionMeth = extensionMethod(origMeth)
+      val origClass = origMeth.enclosingClass.asClass
+
+      val base = qual.tpe.baseTypeWithArgs(origClass)
+      assert(base.exists)
+      ref(extensionMeth)
+        .appliedToTypeTrees(targs ++ base.argInfos.map(TypeTree(_)))
+        .appliedTo(qual)
+    } else EmptyTree
+  }
+
+  override def transformTypeApply(tree: TypeApply)(implicit ctx: Context, info: TransformerInfo): Tree =
+    tree match {
+      case TypeApply(sel @ Select(_,_), args) =>
+        rewire(sel, args) orElse tree
+      case _ =>
+        tree
+    }
+
+  override def transformSelect(tree: Select)(implicit ctx: Context, info: TransformerInfo): Tree =
+    tree.tpe.widen match {
+      case tp: PolyType =>
+        tree // The rewiring will be handled by transformTypeApply
+      case tp =>
+        rewire(tree, Nil) orElse tree
+    }
+
+  // We cannot do the rewiring using transformApply or we will miss the uses of parameterless defs
+  /*
+  override def transformApply(tree: Apply)(implicit ctx: Context, info: TransformerInfo): Tree = tree.fun match {
+    case TypeApply(sel @ Select(_,_), args) =>
+      val rewired = rewire(sel, args)
+      if (!rewired.isEmpty)
+        tpd.cpy.Apply(tree)(rewired, tree.args)
+      else
+        tree
+    case sel: Select =>
+      val rewired = rewire(sel, Nil)
+      if (!rewired.isEmpty)
+        tpd.cpy.Apply(tree)(rewired, tree.args)
+      else
+        tree
+    case _ =>
+      tree
+  }
+  */
 }
