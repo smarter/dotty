@@ -61,7 +61,8 @@ class ElimRepeated extends MiniPhaseTransform with InfoTransformer with Annotati
   override def transformApply(tree: Apply)(implicit ctx: Context, info: TransformerInfo): Tree = {
     val args1 = tree.args.map { 
       case arg: Typed if isWildcardStarArg(arg) =>
-        if (tree.fun.symbol.is(JavaDefined) && arg.expr.tpe.derivesFrom(defn.SeqClass)) 
+        val javaFun = atGroupEnd { implicit ctx => tree.fun.symbol is JavaDefined }
+        if (javaFun && arg.expr.tpe.derivesFrom(defn.SeqClass))
           seqToArray(arg.expr)
         else arg.expr
       case arg => arg
