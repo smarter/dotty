@@ -503,6 +503,10 @@ object Symbols {
             ctx.classOfId(id) = this
             id
         }
+        if (this eq defn.ObjectClass) {
+          println("Object superId: " + id)
+          println("runId: " + ctx.runId)
+        }
         superIdHint = id
         id
       }

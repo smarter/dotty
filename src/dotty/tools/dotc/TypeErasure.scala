@@ -393,6 +393,7 @@ class TypeErasure(isJava: Boolean, isSemi: Boolean, isConstructor: Boolean, wild
   private def sigName(tp: Type)(implicit ctx: Context): TypeName = tp match {
     case tp: TypeRef =>
       val sym = tp.symbol
+      sym.derivesFrom(defn.AnyValClass) // sym.isDerivedValueClass will call this line once it's fixed
       if (!sym.isClass) sigName(tp.info)
       else if (sym.isDerivedValueClass) sigName(eraseDerivedValueClassRef(tp))
       else normalizeClass(sym.asClass).fullName.asTypeName
