@@ -139,6 +139,19 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling wi
   }
 
   private def firstTry(tp1: Type, tp2: Type): Boolean = tp2 match {
+    // FIXME: This is needed because sometimes (underlying1 ne underlying2)
+    // but (underyling1 =:= underlying2). I don't know if there's a better
+    // solution.
+    case TypeErasure.ErasedValueType(cls2, underlying2) =>
+      def compareErasedValueType = {
+        tp1 match {
+          case TypeErasure.ErasedValueType(cls1, underlying1) =>
+            (cls1 eq cls2) && (underlying1 =:= underlying2)
+          case _ =>
+            secondTry(tp1, tp2)
+        }
+      }
+      compareErasedValueType
     case tp2: NamedType =>
       def compareAlias(info1: Type) = tp2.info match {
         case info2: TypeAlias => isSubType(tp1, info2.alias)
