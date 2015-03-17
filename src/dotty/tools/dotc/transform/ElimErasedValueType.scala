@@ -2,7 +2,7 @@ package dotty.tools.dotc
 package transform
 
 import ast.{Trees, tpd}
-import core._
+import core._, core.Decorators._
 import TreeTransforms._, Phases.Phase
 import Types._, Contexts._, Constants._, Names._, NameOps._, Flags._, DenotTransformers._
 import SymDenotations._, Symbols._, StdNames._, Annotations._, Trees._, Scopes._, Denotations._
@@ -42,6 +42,16 @@ class ElimErasedValueType extends MiniPhaseTransform with DenotTransformer {
       case ref: SymDenotation => ref.copySymDenotation(info = info1)
       case _ => ref.derivedSingleDenotation(ref.symbol, info1)
     }
+  }
+
+  override def checkPostCondition(tree: tpd.Tree)(implicit ctx: Context) = {
+    val tp = tree.tpe
+    val erased = elimErasedValueType(tp)
+    assert(tp eq erased,
+      i"The type $tp of tree $tree contains ErasedValueType, it should have been erased to $erased by ElimErasedValueType.")
+    val name = tree.symbol.name
+    assert(name != nme.UNDERLYING2EVT && name != nme.EVT2UNDERLYING,
+      i"The symbol '${tree.symbol}' of tree $tree should not exist after phase ElimErasedValueType.")
   }
 
   // FIXME: Is using a TypeMap here the best solution?
