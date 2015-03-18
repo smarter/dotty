@@ -254,16 +254,28 @@ object Erasure extends TypeTestsCasts{
   class Typer extends typer.ReTyper with NoChecking {
     import Boxing._
 
-    def erasedType(tree: untpd.Tree)(implicit ctx: Context): Type = tree.typeOpt match {
-      case tp: TermRef if tree.isTerm => erasedRef(tp)
-      case tp => erasure(tp)
+    def erasedType(tree: untpd.Tree, isSemi: Boolean = true)(implicit ctx: Context): Type =
+      tree.typeOpt match {
+        case tp: TermRef if tree.isTerm => erasedRef(tp)
+        case tp => erasure(tp, isSemi)
+      }
+
+    def promote(tree: untpd.Tree, isSemi: Boolean)(implicit ctx: Context): tree.ThisTree[Type] = {
+      assert(tree.hasType)
+      val erased = erasedType(tree, isSemi)
+      ctx.log(s"promoting ${tree.show}: ${erased.showWithUnderlying()}")
+      tree.withType(erased)
     }
 
     override def promote(tree: untpd.Tree)(implicit ctx: Context): tree.ThisTree[Type] = {
-      assert(tree.hasType)
-      val erased = erasedType(tree)
-      ctx.log(s"promoting ${tree.show}: ${erased.showWithUnderlying()}")
-      tree.withType(erased)
+      promote(tree, true)
+    }
+
+    override def typedTypeTree(tree: untpd.TypeTree, pt: Type)(implicit ctx: Context): TypeTree = {
+      // When erasing most TypeTrees we should not semi-erase value types.
+      // This is not the case for DefDef.tpt and ValDef.tpt but they are already
+      // handled separately inside typedDefDef and typedValDef.
+      promote(tree, isSemi = false)
     }
 
     override def typedLiteral(tree: untpd.Literal)(implicit ctc: Context): Literal =
@@ -330,7 +342,7 @@ object Erasure extends TypeTestsCasts{
           assert(sym.isConstructor, s"${sym.showLocated}")
           select(qual, defn.ObjectClass.info.decl(sym.name).symbol)
         }
-        else if (qualIsPrimitive && !symIsPrimitive || qual.tpe.isErasedValueType)
+        else if (qualIsPrimitive && !symIsPrimitive || qual.tpe.widenDealias.isErasedValueType)
           recur(box(qual))
         else if (!qualIsPrimitive && symIsPrimitive)
           recur(unbox(qual, sym.owner.typeRef))
@@ -349,7 +361,7 @@ object Erasure extends TypeTestsCasts{
     }
 
     override def typedSelectFromTypeTree(tree: untpd.SelectFromTypeTree, pt: Type)(implicit ctx: Context) =
-      untpd.Ident(tree.name).withPos(tree.pos).withType(erasedType(tree))
+      untpd.Ident(tree.name).withPos(tree.pos).withType(erasedType(tree, isSemi = false))
 
     override def typedThis(tree: untpd.This)(implicit ctx: Context): Tree =
       if (tree.symbol == ctx.owner.enclosingClass || tree.symbol.isStaticOwner) promote(tree)
