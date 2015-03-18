@@ -7,6 +7,7 @@ import Symbols._
 import SymDenotations._
 import Contexts._
 import Flags._
+import StdNames._
 
 /** Methods that apply to user-defined value classes */
 object ValueClasses {
@@ -32,6 +33,11 @@ object ValueClasses {
       .find(d => d.isTerm && d.symbol.is(ParamAccessor))
       .map(_.symbol)
       .getOrElse(NoSymbol)
+
+  def underlying2evtSym(d: ClassDenotation)(implicit ctx: Context): Symbol =
+    d.linkedClass.info.decl(nme.UNDERLYING2EVT).symbol
+  def evt2underlyingSym(d: ClassDenotation)(implicit ctx: Context): Symbol =
+    d.linkedClass.info.decl(nme.EVT2UNDERLYING).symbol
 
   /** The unboxed type that underlies a derived value class */
   def underlyingOfValueClass(d: ClassDenotation)(implicit ctx: Context): Type =

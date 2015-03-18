@@ -14,13 +14,24 @@ import core._
 import Phases.Phase
 import Types._, Contexts._, Constants._, Names._, NameOps._, Flags._, DenotTransformers._
 import SymDenotations._, Symbols._, StdNames._, Annotations._, Trees._, Scopes._, Denotations._
+import TypeErasure.{ erasure, ErasedValueType }
 import TypeUtils._
 import util.Positions._
 import Decorators._
+import SymUtils._
 
 /**
  * Perform Step 1 and 2 in the value classes SIP: Creates extension methods for all
  * methods in a value class, except parameter or super accessors, or constructors.
+ *
+ * Additionally, for a value class V, let U be the underlying type after erasure. We add
+ * to the companion object of V two cast methods:
+ *   def underlying2evt$(x0: U): ErasedValueType(V, U)
+ *   def evt2underlying$(x0: V): ErasedValueType(U, V)
+ * The casts are used in Erasure to make it typecheck, they are then removed
+ * in ElimErasedValueType.
+ * This is different from the implementation of value classes in Scala 2
+ * (see SIP-15) which used `asInstanceOf` which does not typecheck.
  */
 class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with FullParameterization { thisTransformer =>
 
@@ -34,15 +45,28 @@ class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with Ful
   override def transform(ref: SingleDenotation)(implicit ctx: Context): SingleDenotation = ref match {
     case ref: ClassDenotation if ref is ModuleClass =>
       ref.linkedClass match {
-        // In Scala 2, extension methods are added before pickling so we should not generate them again
-        case origClass: ClassSymbol if isDerivedValueClass(origClass) && !(origClass is Scala2x) =>
+        case origClass: ClassSymbol if isDerivedValueClass(origClass) =>
           val cinfo = ref.classInfo
           val decls1 = cinfo.decls.cloneScope
           ctx.atPhase(thisTransformer.next) { implicit ctx =>
-            for (decl <- origClass.classInfo.decls) {
-              if (isMethodWithExtension(decl))
-                decls1.enter(createExtensionMethod(decl, ref.symbol))
+            // In Scala 2, extension methods are added before pickling so we should
+            // not generate them again.
+            if (!(origClass is Scala2x)) {
+              for (decl <- origClass.classInfo.decls) {
+                if (isMethodWithExtension(decl))
+                  decls1.enter(createExtensionMethod(decl, ref.symbol))
+              }
             }
+
+            val sym = ref.symbol
+            val underlying = erasure(underlyingOfValueClass(origClass))
+            val evt = ErasedValueType(origClass, underlying)
+            val underlying2evtSym = ctx.newSymbol(sym, nme.UNDERLYING2EVT, Method,
+              MethodType(List(nme.x_0), List(underlying), evt))
+            val evt2underlyingSym = ctx.newSymbol(sym, nme.EVT2UNDERLYING, Method,
+              MethodType(List(nme.x_0), List(evt), underlying))
+            decls1.enter(underlying2evtSym)
+            decls1.enter(evt2underlyingSym)
           }
           if (decls1.isEmpty) ref
           else ref.copySymDenotation(info = cinfo.derivedClassInfo(decls = decls1))
