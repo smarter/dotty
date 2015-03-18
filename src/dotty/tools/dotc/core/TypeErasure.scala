@@ -3,6 +3,7 @@ package dotc
 package core
 
 import Symbols._, Types._, Contexts._, Flags._, Names._, StdNames._, Decorators._, Flags.JavaDefined
+import Uniques.unique
 import dotc.transform.ExplicitOuter._
 import typer.Mode
 import util.DotClass
@@ -51,8 +52,17 @@ object TypeErasure {
       false
   }
 
-  case class ErasedValueType(cls: ClassSymbol, underlying: Type) extends CachedGroundType {
+  abstract case class ErasedValueType(cls: ClassSymbol, underlying: Type)
+  extends CachedGroundType with ValueType {
     override def computeHash = doHash(cls, underlying)
+  }
+
+  final class CachedErasedValueType(cls: ClassSymbol, underlying: Type) extends ErasedValueType(cls, underlying)
+
+  object ErasedValueType {
+    def apply(cls: ClassSymbol, underlying: Type)(implicit ctx: Context) = {
+      unique(new CachedErasedValueType(cls, underlying))
+    }
   }
 
   private def erasureIdx(isJava: Boolean, isSemi: Boolean, isConstructor: Boolean, wildcardOK: Boolean) =
