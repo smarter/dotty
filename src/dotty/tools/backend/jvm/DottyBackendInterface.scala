@@ -478,12 +478,11 @@ class DottyBackendInterface()(implicit ctx: Context) extends BackendInterface{
     def originalOwner: Symbol = {
       try {
         if (sym.exists) {
-          val original = toDenot(sym).initial
-          val validity = original.validFor
-          val shiftedContext = ctx.withPhase(validity.phaseId)
-          val r = toDenot(sym)(shiftedContext).maybeOwner
-          if(r is Flags.Package) NoSymbol
-          else r
+          ctx.atInitialPhaseOf(toDenot(sym)) { implicit ctx =>
+            val r = toDenot(sym).maybeOwner
+            if (r is Flags.Package) NoSymbol
+            else r
+          }
         } else NoSymbol
       } catch {
         case e: NotDefinedHere => NoSymbol // todo: do we have a method to tests this?

@@ -32,6 +32,13 @@ trait Phases {
 
   def atNextPhase[T](op: Context => T): T = atPhase(phase.next)(op)
 
+  /** Execute `op` at the earliest phase were `ref` was valid */
+  def atInitialPhaseOf[T](ref: SingleDenotation)(op: Context => T): T = {
+    val original = ref.initial
+    val initialId = original.validFor.phaseId
+    atPhase(initialId)(op)
+  }
+
   def atPhaseNotLaterThan[T](limit: Phase)(op: Context => T): T =
     if (!limit.exists || phase <= limit) op(this) else atPhase(limit)(op)
 

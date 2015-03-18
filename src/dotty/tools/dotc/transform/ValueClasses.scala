@@ -13,10 +13,12 @@ import StdNames._
 object ValueClasses {
 
   def isDerivedValueClass(d: SymDenotation)(implicit ctx: Context) =
-    d.isClass &&
+    ctx.atInitialPhaseOf(d) { implicit ctx =>
+      d.isClass &&
       d.derivesFrom(defn.AnyValClass) &&
       (d.symbol ne defn.AnyValClass) &&
       !d.isPrimitiveValueClass
+    }
 
   def isMethodWithExtension(d: SymDenotation)(implicit ctx: Context) =
     d.isSourceMethod &&
