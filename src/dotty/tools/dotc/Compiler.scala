@@ -60,6 +60,7 @@ class Compiler {
            new ElimByName,
            new ResolveSuper),
       List(new Erasure),
+      List(new ElimErasedValueType),
       List(new Mixin,
            new Memoize,
            new CapturedVars,
