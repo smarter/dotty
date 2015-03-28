@@ -61,6 +61,7 @@ class Compiler {
            new ResolveSuper),
       List(new Erasure),
       List(new ElimErasedValueType),
+      List(new PeepholeOptimize),
       List(new Mixin,
            new Memoize,
            new CapturedVars,

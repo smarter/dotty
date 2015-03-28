@@ -6,7 +6,7 @@ package dotty.tools.dotc
 package transform
 
 import dotty.tools.dotc.transform.TreeTransforms._
-import ValueClasses._
+import TreeExtractors._, ValueClasses._
 import dotty.tools.dotc.ast.{Trees, tpd}
 import scala.collection.{ mutable, immutable }
 import mutable.ListBuffer
@@ -239,5 +239,29 @@ class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with Ful
         tree // The rewiring will be handled by transformTypeApply
       case tp =>
         rewire(tree, Nil) orElse tree
+    }
+
+
+  override def transformApply(tree: Apply)(implicit ctx: Context, info: TransformerInfo): Tree =
+    tree match {
+      // There is no extension method for == and != because they're defined in Any,
+      // but we still want to replace them by calls to == and != on the unboxed values
+      // to take advantage of the optimizations done by PeepholeOptimization, so we do
+      // the following transform here:
+      // v1 == v2 => v1.u == v2.u
+      // v1 != v2 => v1.u != v2.u
+      case BinaryOp(v1, op, v2) if (op eq defn.Any_==) || (op eq defn.Any_!=) =>
+        val tpw1 = v1.tpe.widen
+        val tpw2 = v2.tpe.widen
+        val sym1 = tpw1.typeSymbol
+        if (isDerivedValueClass(sym1) && (tpw1 =:= tpw2)) {
+          val unboxSym = valueClassUnbox(sym1.asClass)
+          val u1 = v1.select(unboxSym)
+          val u2 = v2.select(unboxSym)
+          // == and != are overloaded in primitive value classes
+          applyOverloaded(u1, op.name.asTermName, List(u2), Nil, defn.BooleanType)
+        } else tree
+      case _ =>
+        tree
     }
 }
