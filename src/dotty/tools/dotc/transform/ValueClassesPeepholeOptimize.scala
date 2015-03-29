@@ -6,11 +6,11 @@ import core._, core.Decorators._
 import Contexts._, DenotTransformers._, TreeTransforms._, Phases.Phase
 import TreeExtractors._
 
-/** This phase performs safe peephole optimizations. */
-class PeepholeOptimize extends MiniPhaseTransform with IdentityDenotTransformer {
+/** This phase performs peephole optimizations for value classes. */
+class ValueClassesPeepholeOptimize extends MiniPhaseTransform with IdentityDenotTransformer {
   import tpd._
 
-  override def phaseName: String = "peepholeoptimize"
+  override def phaseName: String = "valueClassesPeepholeOptimize"
 
   override def runsAfter: Set[Class[_ <: Phase]] = Set(classOf[ElimErasedValueType])
 

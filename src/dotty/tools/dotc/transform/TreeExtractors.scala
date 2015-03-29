@@ -36,6 +36,7 @@ object TreeExtractors {
    *  Additionally, for a value class which is also a case class like:
    *    case class V(val underlying: X) extends AnyVal
    *  Match v._1() and extract v
+   *  This is safe because _1 cannot be user-defined for case classes.
    */
   object ValueClassUnbox {
     def unapply(t: Tree)(implicit ctx: Context): Option[Tree] = t match {

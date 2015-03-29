@@ -12,7 +12,7 @@ class ElimErasedValueType extends MiniPhaseTransform with DenotTransformer {
 
   import tpd._
 
-  override def phaseName: String = "elimerasedvaluetype"
+  override def phaseName: String = "elimErasedValueType"
 
   override def runsAfter: Set[Class[_ <: Phase]] = Set(classOf[Erasure])
 

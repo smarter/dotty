@@ -183,7 +183,9 @@ object Erasure extends TypeTestsCasts{
             else if (!(tree.tpe <:< clazz.typeRef)) {
               assert(!(tree.tpe.typeSymbol.isPrimitiveValueClass))
               val nullTree = Literal(Constant(null))
+              // "unboxing" null to underlying is equivalent to doing null.asInstanceOf[underlying]
               val unboxedNull = adaptToType(nullTree, underlying)
+
               evalOnce(tree) { t =>
                 If(t.select(defn.Object_eq).appliedTo(nullTree),
                   unboxedNull,
@@ -284,10 +286,9 @@ object Erasure extends TypeTestsCasts{
     }
 
     override def typedTypeTree(tree: untpd.TypeTree, pt: Type)(implicit ctx: Context): TypeTree = {
-      // TypeTree inside New nodes should not semi-erase value types.
+      // When erasing most TypeTrees we should not semi-erase value types.
       // This is not the case for DefDef.tpt and ValDef.tpt but they are already
       // handled separately inside typedDefDef and typedValDef.
-      // FIXME: What about other TypeTree? Is it OK to not semi-erase them?
       promote(tree, isSemi = false)
     }
 
@@ -355,7 +356,7 @@ object Erasure extends TypeTestsCasts{
           assert(sym.isConstructor, s"${sym.showLocated}")
           select(qual, defn.ObjectClass.info.decl(sym.name).symbol)
         }
-        else if (qualIsPrimitive && !symIsPrimitive || qual.tpe.widen.isErasedValueType)
+        else if (qualIsPrimitive && !symIsPrimitive || qual.tpe.widenDealias.isErasedValueType)
           recur(box(qual))
         else if (!qualIsPrimitive && symIsPrimitive)
           recur(unbox(qual, sym.owner.typeRef))

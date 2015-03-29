@@ -23,6 +23,15 @@ import SymUtils._
 /**
  * Perform Step 1 and 2 in the value classes SIP: Creates extension methods for all
  * methods in a value class, except parameter or super accessors, or constructors.
+ *
+ * Additionally, for a value class V, let U be the underlying type after erasure. We add
+ * to the companion object of V two cast methods:
+ *   def underlying2evt$(x0: U): ErasedValueType(V, U)
+ *   def evt2underlying$(x0: V): ErasedValueType(U, V)
+ * The casts are used in Erasure to make it typecheck, they are then removed
+ * in ElimErasedValueType.
+ * This is different from the implementation of value classes in Scala 2
+ * (see SIP-15) which used `asInstanceOf` which does not typecheck.
  */
 class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with FullParameterization { thisTransformer =>
 
@@ -49,14 +58,6 @@ class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with Ful
               }
             }
 
-            // For a value class V, let U be the underlying type after erasure. We add
-            // to the companion object of V two cast methods:
-            //   def underlying2evt$(x0: U): ErasedValueType(V, U)
-            //   def evt2underlying$(x0: V): ErasedValueType(U, V)
-            // The casts are used in Erasure to make it typecheck, they are then removed
-            // in ElimErasedValueType.
-            // This is different from the implementation of value classes in Scala 2
-            // (see SIP-15) which used `asInstanceOf` which does not typecheck.
             val sym = ref.symbol
             val underlying = erasure(underlyingOfValueClass(origClass))
             val evt = ErasedValueType(origClass, underlying)
@@ -246,15 +247,15 @@ class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with Ful
     tree match {
       // There is no extension method for == and != because they're defined in Any,
       // but we still want to replace them by calls to == and != on the unboxed values
-      // to take advantage of the optimizations done by PeepholeOptimization, so we do
-      // the following transform here:
+      // to take advantage of the optimizations done by ValueClassesPeepholeOptimization,
+      // so we do the following transform here:
       // v1 == v2 => v1.u == v2.u
       // v1 != v2 => v1.u != v2.u
       case BinaryOp(v1, op, v2) if (op eq defn.Any_==) || (op eq defn.Any_!=) =>
-        val tpw1 = v1.tpe.widen
-        val tpw2 = v2.tpe.widen
+        val tpw1 = v1.tpe.widenDealias
+        val tpw2 = v2.tpe.widenDealias
         val sym1 = tpw1.typeSymbol
-        if (isDerivedValueClass(sym1) && (tpw1 =:= tpw2)) {
+        if (isDerivedValueClass(sym1) && (tpw1 eq tpw2)) {
           val unboxSym = valueClassUnbox(sym1.asClass)
           val u1 = v1.select(unboxSym)
           val u2 = v2.select(unboxSym)
