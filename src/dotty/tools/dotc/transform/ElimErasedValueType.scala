@@ -89,10 +89,14 @@ class ElimErasedValueType extends MiniPhaseTransform with DenotTransformer {
     transformTypeOfTree(tree)
   override def transformSelect(tree: Select)(implicit ctx: Context, info: TransformerInfo): Tree =
     transformTypeOfTree(tree)
+
+  // Disabled to showcase the bug.
+  /*
   override def transformBlock(tree: Block)(implicit ctx: Context, info: TransformerInfo): Tree =
     transformTypeOfTree(tree)
   override def transformIf(tree: If)(implicit ctx: Context, info: TransformerInfo): Tree =
     transformTypeOfTree(tree)
+  */
   override def transformSeqLiteral(tree: SeqLiteral)(implicit ctx: Context, info: TransformerInfo): Tree =
     transformTypeOfTree(tree)
   override def transformTypeTree(tree: TypeTree)(implicit ctx: Context, info: TransformerInfo): Tree =
