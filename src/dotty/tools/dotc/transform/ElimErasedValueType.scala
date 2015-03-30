@@ -16,32 +16,35 @@ class ElimErasedValueType extends MiniPhaseTransform with DenotTransformer {
 
   override def runsAfter: Set[Class[_ <: Phase]] = Set(classOf[Erasure])
 
-  override def transform(ref: SingleDenotation)(implicit ctx: Context): SingleDenotation = {
-    val info = ref match {
-      case ref: ClassDenotation if ref is ModuleClass =>
-        ref.linkedClass match {
-          case origClass: ClassSymbol if isDerivedValueClass(origClass) =>
-            val cinfo = ref.classInfo
-            val decls1 = cinfo.decls.cloneScope
-            ctx.atPhase(this.next) { implicit ctx =>
-              // Remove synthetic cast methods introduced by ExtensionMethods,
-              // they are no longer needed after this phase.
-              decls1.unlink(cinfo.decl(nme.UNDERLYING2EVT).symbol)
-              decls1.unlink(cinfo.decl(nme.EVT2UNDERLYING).symbol)
-            }
-            cinfo.derivedClassInfo(decls = decls1)
-          case _ =>
-            ref.info
-        }
-      case _ =>
-        ref.info
-    }
-    val info1 = elimErasedValueType(info)
-    if (info1 eq ref.info) ref
-    else ref match {
-      case ref: SymDenotation => ref.copySymDenotation(info = info1)
-      case _ => ref.derivedSingleDenotation(ref.symbol, info1)
-    }
+  override def transform(ref: SingleDenotation)(implicit ctx: Context): SingleDenotation = ref match {
+    case ref: SymDenotation if (ref.name eq nme.UNDERLYING2EVT) || (ref.name eq nme.EVT2UNDERLYING) =>
+      ref // Don't change the type of the casts, they will be removed anyway
+    case _ =>
+      val info = ref match {
+        case ref: ClassDenotation if ref is ModuleClass =>
+          ref.linkedClass match {
+            case origClass: ClassSymbol if isDerivedValueClass(origClass) =>
+              val cinfo = ref.classInfo
+              val decls1 = cinfo.decls.cloneScope
+              ctx.atPhase(this.next) { implicit ctx =>
+                // Remove synthetic cast methods introduced by ExtensionMethods,
+                // they are no longer needed after this phase.
+                decls1.unlink(cinfo.decl(nme.UNDERLYING2EVT).symbol)
+                decls1.unlink(cinfo.decl(nme.EVT2UNDERLYING).symbol)
+              }
+              cinfo.derivedClassInfo(decls = decls1)
+            case _ =>
+              ref.info
+          }
+        case _ =>
+          ref.info
+      }
+      val info1 = elimErasedValueType(info)
+      if (info1 eq ref.info) ref
+      else ref match {
+        case ref: SymDenotation => ref.copySymDenotation(info = info1)
+        case _ => ref.derivedSingleDenotation(ref.symbol, info1)
+      }
   }
 
   override def checkPostCondition(tree: tpd.Tree)(implicit ctx: Context) = {
