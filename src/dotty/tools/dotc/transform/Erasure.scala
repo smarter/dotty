@@ -553,14 +553,15 @@ object Erasure extends TypeTestsCasts{
       val sel: Tree = This(newDef.symbol.owner.asClass).select(newDef.symbol.termRef)
 
       val resultType = bridge.info.widen.resultType
+      val bridgeCtx = ctx.withOwner(bridge)
       tpd.DefDef(bridge, { paramss: List[List[tpd.Tree]] =>
           val rhs = paramss.foldLeft(sel)((fun, vparams) =>
             fun.tpe.widen match {
-              case MethodType(names, types) => Apply(fun, (vparams, types).zipped.map(adapt(_, _, untpd.EmptyTree)))
+              case MethodType(names, types) => Apply(fun, (vparams, types).zipped.map(adapt(_, _, untpd.EmptyTree)(bridgeCtx)))
               case a => error(s"can not resolve apply type $a")
 
             })
-          adapt(rhs, resultType)
+          adapt(rhs, resultType)(bridgeCtx)
       })
     }
 
