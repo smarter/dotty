@@ -95,7 +95,7 @@ object Implicits {
   }
 
   /** The implicit references coming from the implicit scope of a type.
-   *  @param tp              the type determining the implicit scope
+   *  @param tp              the expected type used to filter the implicits in the implicit scope
    *  @param companionRefs   the companion objects in the implicit scope.
    */
   class OfTypeImplicits(tp: Type, val companionRefs: TermRefSet)(initctx: Context) extends ImplicitRefs(initctx) {
@@ -264,7 +264,7 @@ trait ImplicitRunInfo { self: RunInfo =>
    *                      a type variable, we need the current context, the current
    *                      runinfo context does not do.
    */
-  def implicitScope(tp: Type, liftingCtx: Context): OfTypeImplicits = {
+  def implicitScope(boundedTp: Type, wildTp: Type, liftingCtx: Context): OfTypeImplicits = {
 
     val seen: mutable.Set[Type] = mutable.Set()
 
@@ -332,7 +332,7 @@ trait ImplicitRunInfo { self: RunInfo =>
       }
     }
 
-    def ofTypeImplicits(comps: TermRefSet) = new OfTypeImplicits(tp, comps)(ctx)
+    def ofTypeImplicits(comps: TermRefSet) = new OfTypeImplicits(wildTp, comps)(ctx)
 
    /** The implicit scope of type `tp`
      *  @param isLifted    Type `tp` is the result of a `liftToClasses` application
@@ -361,7 +361,7 @@ trait ImplicitRunInfo { self: RunInfo =>
       }
     }
 
-    iscope(tp)
+    iscope(boundedTp)
   }
 
   /** A map that counts the number of times an implicit ref was picked */
@@ -463,7 +463,7 @@ trait Implicits { self: Typer =>
       case proto => proto
     }
 
-    /** The expected type where parameters and uninstantiated typevars are replaced by wildcard types */
+    val boundedProto = implicitProto(pt, wildApprox(_, new WildApproxMap(keepAllBounds = true)))
     val wildProto = implicitProto(pt, wildApprox(_))
 
     /** Search failures; overridden in ExplainedImplicitSearch */
@@ -569,11 +569,12 @@ trait Implicits { self: Typer =>
         case result: SearchSuccess => result
         case result: AmbiguousImplicits => result
         case result: SearchFailure =>
-          searchImplicits(implicitScope(wildProto).eligible, contextual = false)
+          searchImplicits(implicitScope(boundedProto, wildProto).eligible, contextual = false)
       }
     }
 
-    def implicitScope(tp: Type): OfTypeImplicits = ctx.runInfo.implicitScope(tp, ctx)
+    def implicitScope(boundedTp: Type, wildTp: Type): OfTypeImplicits =
+      ctx.runInfo.implicitScope(boundedTp, wildTp, ctx)
   }
 
   final class ExplainedImplicitSearch(pt: Type, argument: Tree, pos: Position)(implicit ctx: Context)

@@ -832,7 +832,7 @@ object Types {
      *
      *  (*) normalizes means: follow instantiated typevars and aliases.
      */
-    def lookupRefined(name: Name)(implicit ctx: Context): Type = {
+    def lookupRefined(name: Name, keepAllBounds: Boolean = false)(implicit ctx: Context): Type = /*ctx.traceIndented(i"lookupRefined($name, $keepAllBounds)", default, show = true)*/ {
       def loop(pre: Type, resolved: List[Name]): Type = pre.stripTypeVar match {
         case pre: RefinedType =>
           object instantiate extends TypeMap {
@@ -861,16 +861,20 @@ object Types {
               if (pre.refinedName ne name) loop(pre.parent, pre.refinedName :: resolved)
               else if (!pre.refinementRefersToThis) alias
               else alias match {
-                case TypeRef(RefinedThis(`pre`), aliasName) => lookupRefined(aliasName) // (1)
-                case _ => if (name == tpnme.Apply) betaReduce(alias) else NoType // (2)
+                case TypeRef(RefinedThis(`pre`), aliasName) =>
+                  lookupRefined(aliasName, keepAllBounds) // (1)
+                case _ =>
+                  if (name == tpnme.Apply) betaReduce(alias) else NoType // (2)
               }
             case _ => loop(pre.parent, resolved)
           }
         case RefinedThis(binder) =>
-          binder.lookupRefined(name)
+          binder.lookupRefined(name, keepAllBounds)
         case SkolemType(tp) =>
-          tp.lookupRefined(name)
-        case pre: WildcardType =>
+          tp.lookupRefined(name, keepAllBounds)
+        case WildcardType =>
+          WildcardType
+        case pre: WildcardType if !keepAllBounds =>
           WildcardType
         case pre: TypeRef =>
           pre.info match {
@@ -1476,10 +1480,10 @@ object Types {
       ctx.underlyingRecursions -= 1
     }
 
-    def derivedSelect(prefix: Type)(implicit ctx: Context): Type =
+    def derivedSelect(prefix: Type, keepAllBounds: Boolean = false)(implicit ctx: Context): Type =
       if (prefix eq this.prefix) this
       else {
-        val res = prefix.lookupRefined(name)
+        val res = prefix.lookupRefined(name, keepAllBounds)
         if (res.exists) res else newLikeThis(prefix)
       }
 
