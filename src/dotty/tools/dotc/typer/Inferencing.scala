@@ -180,7 +180,7 @@ trait Inferencing { this: Checking =>
       constr.println(s"interpolate undet vars in ${tp.show}, pos = ${tree.pos}, mode = ${ctx.mode}, undets = ${constraint.uninstVars map (tvar => s"${tvar.show}@${tvar.owningTree.pos}")}")
       constr.println(s"qualifying undet vars: ${constraint.uninstVars filter qualifies map (tvar => s"$tvar / ${tvar.show}")}, constraint: ${constraint.show}")
 
-      val vs = variances(tp, qualifies)
+      val vs = interpolateMap(tree, qualifies)
       var changed = false
       vs foreachBinding { (tvar, v) =>
         if (v != 0) {
@@ -221,6 +221,39 @@ trait Inferencing { this: Checking =>
   }
 
   type VarianceMap = SimpleMap[TypeVar, Integer]
+
+  private def interpolateMap(tree: Tree, include: TypeVar => Boolean)(implicit ctx: Context): VarianceMap = Stats.track("variances") {
+    var stopInstantiate = false
+    val accu = new TypeAccumulator[VarianceMap] {
+      def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
+        case MethodType(_, ptypes) =>
+          val original = variance
+          variance = 0
+          val vmap2 = foldOver(vmap, ptypes)
+          variance = original
+          apply(vmap2, t.resultType)
+        case t: TypeVar if !t.isInstantiated && (ctx.typerState.constraint contains t) && include(t) =>
+          val v = vmap(t)
+          val variance = if (stopInstantiate) 0 else this.variance
+          if (v == null) vmap.updated(t, variance)
+          else if (v == -1 && variance == 1) vmap.updated(t, 1)
+          else vmap
+        case _ =>
+          foldOver(vmap, t)
+      }
+      override def applyToPrefix(vmap: VarianceMap, t: NamedType) =
+        apply(vmap, t.prefix)
+    }
+    val emptyMap: VarianceMap = SimpleMap.Empty
+    val vmap: VarianceMap = tree match {
+      case Apply(meth, _) =>
+        accu.foldOver(emptyMap, meth.tpe.widen.firstParamTypes)
+      case _ =>
+        emptyMap
+    }
+    stopInstantiate = true
+    accu(vmap, tree.tpe.widen)
+  }
 
   /** All occurrences of type vars in this type that satisfy predicate
    *  `include` mapped to their variances (-1/0/1) in this type, where

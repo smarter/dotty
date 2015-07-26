@@ -1221,7 +1221,8 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
    *  (14) When in mode EXPRmode, apply a view
    *  If all this fails, error
    */
-  def adaptInterpolated(tree: Tree, pt: Type, original: untpd.Tree)(implicit ctx: Context): Tree = {
+  def adaptInterpolated(tree: Tree, pt: Type, original: untpd.Tree)(implicit ctx: Context): Tree =
+  ctx.traceIndented(i"adaptInterpolated(${tree}, ${pt}, ${original})", typr, show = true) /*<|<*/ {
 
     assert(pt.exists)
 
