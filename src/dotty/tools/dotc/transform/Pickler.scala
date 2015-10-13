@@ -13,6 +13,13 @@ import Symbols._
 import Flags.Module
 import util.SourceFile
 import collection.mutable
+import java.security.MessageDigest
+import java.io._
+import scala.meta.internal.ast.Source
+import ast.tpd
+
+import scala.meta.internal.hosts.dotty.contexts._
+import scala.meta._
 
 /** This phase pickles trees */
 class Pickler extends Phase {
@@ -48,8 +55,11 @@ class Pickler extends Phase {
       treePkl.pickle(tree :: Nil)
       pickler.addrOfTree = treePkl.buf.addrOfTree
       pickler.addrOfSym = treePkl.addrOfSym
-      if (unit.source.exists)
+      if (unit.source.exists) {
         pickleSourcefile(pickler, unit.source)
+        pickleScalametaSyntactic(pickler, unit.source)
+        pickleScalametaSemantic(pickler, unit.tpdTree)
+      }
       if (tree.pos.exists)
         new PositionPickler(pickler, treePkl.buf.addrOfTree).picklePositions(tree :: Nil, tree.pos)
 
@@ -69,6 +79,43 @@ class Pickler extends Phase {
     val buf = new TastyBuffer(10)
     pickler.newSection("Sourcefile", buf)
     buf.writeNat(pickler.nameBuffer.nameIndex(source.file.path).index)
+  }
+
+  private def pickleScalametaSyntactic(pickler: TastyPickler, source: SourceFile): Unit = {
+    val syntacticBuf = new TastyBuffer(20)
+    pickler.newSection("ScalametaSyntactic", syntacticBuf)
+    val text = source.content.mkString
+
+    val sha1 = MessageDigest.getInstance("SHA-1")
+    sha1.reset()
+    sha1.update(text.getBytes("UTF-8"))
+    val hash = sha1.digest().map(b => "%02X".format(b)).mkString
+
+    val dialectBytes = "Scala211".getBytes("UTF-8")
+    val hashBytes = hash.getBytes("UTF-8")
+    syntacticBuf.writeNat(dialectBytes.length)
+    syntacticBuf.writeBytes(dialectBytes, dialectBytes.length)
+    syntacticBuf.writeNat(hashBytes.length)
+    syntacticBuf.writeBytes(hashBytes, hashBytes.length)
+  }
+
+  private def pickleScalametaSemantic(pickler: TastyPickler, tree: tpd.Tree)(implicit ctx: Context): Unit = {
+    val adapter = new Adapter(null)
+    import adapter._
+    val semSource = new conversions.ScalahostAdapterReflectTree(tree).toMeta
+    println(semSource.toString)
+    println(semSource.show[Semantics])
+
+    val baos = new ByteArrayOutputStream()
+    val oos = new ObjectOutputStream(baos)
+    oos.writeObject(semSource)
+    oos.close()
+    baos.close()
+    val semanticBlob = baos.toByteArray()
+    val semanticBuf = new TastyBuffer(semanticBlob.length)
+    pickler.newSection("ScalametaSemantic", semanticBuf)
+    semanticBuf.writeNat(semanticBlob.length)
+    semanticBuf.writeBytes(semanticBlob, semanticBlob.length)
   }
 
   override def runOn(units: List[CompilationUnit])(implicit ctx: Context): List[CompilationUnit] = {

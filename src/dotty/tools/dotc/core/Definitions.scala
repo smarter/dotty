@@ -160,6 +160,7 @@ class Definitions {
     cls.info = ClassInfo(cls.owner.thisType, cls, AnyClass.typeRef :: Nil, newScope)
     completeClass(cls)
   }
+
   lazy val AnyRefAlias: TypeSymbol = newAliasType(tpnme.AnyRef, ObjectType)
 
     lazy val Object_eq = newMethod(ObjectClass, nme.eq, methOfAnyRef(BooleanType), Final)
@@ -211,6 +212,7 @@ class Definitions {
 
   lazy val NilModule = ctx.requiredModule("scala.collection.immutable.Nil")
   lazy val PredefConformsClass = ctx.requiredClass("scala.Predef." + tpnme.Conforms)
+  lazy val `Predef???Class` = ctx.requiredClass("scala.Predef." + tpnme.???)
 
 //  lazy val FunctionClass: ClassSymbol = ctx.requiredClass("scala.Function")
   lazy val SingletonClass: ClassSymbol =

@@ -71,6 +71,7 @@ class Run(comp: Compiler)(implicit ctx: Context) {
 
     ctx.println(s"result of $unit after ${squashedPhase}:")
     ctx.println(unit.tpdTree.show(ctx))
+    ctx.println(unit.tpdTree.toString)
   }
 
   def compile(sourceCode: String): Unit = {

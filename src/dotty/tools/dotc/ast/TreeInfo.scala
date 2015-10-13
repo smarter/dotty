@@ -10,6 +10,50 @@ import util.HashSet
 trait TreeInfo[T >: Untyped <: Type] { self: Trees.Instance[T] =>
   import TreeInfo._
 
+  // Copy-pasted from scalac
+  class Applied(val tree: Tree) {
+    /** The tree stripped of the possibly nested applications.
+      *  The original tree if it's not an application.
+      */
+    def callee: Tree = {
+      def loop(tree: Tree): Tree = tree match {
+        case Apply(fn, _) => loop(fn)
+        case tree         => tree
+      }
+      loop(tree)
+    }
+
+    /** The `callee` unwrapped from type applications.
+      *  The original `callee` if it's not a type application.
+      */
+    def core: Tree = callee match {
+      case TypeApply(fn, _)       => fn
+      case AppliedTypeTree(fn, _) => fn
+      case tree                   => tree
+    }
+
+    /** The type arguments of the `callee`.
+      *  `Nil` if the `callee` is not a type application.
+      */
+    def targs: List[Tree] = callee match {
+      case TypeApply(_, args)       => args
+      case AppliedTypeTree(_, args) => args
+      case _                        => Nil
+    }
+
+    /** (Possibly multiple lists of) value arguments of an application.
+      *  `Nil` if the `callee` is not an application.
+      */
+    def argss: List[List[Tree]] = {
+      def loop(tree: Tree): List[List[Tree]] = tree match {
+        case Apply(fn, args) => loop(fn) :+ args
+        case _               => Nil
+      }
+      loop(tree)
+    }
+  }
+  def dissectApplied(tree: Tree) = new Applied(tree)
+
   // Note: the <: Type constraint looks necessary (and is needed to make the file compile in dotc).
   // But Scalac accepts the program happily without it. Need to find out why.
 
