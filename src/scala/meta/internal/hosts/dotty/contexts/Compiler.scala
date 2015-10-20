@@ -1,5 +1,5 @@
 package scala.meta
-package internal.hosts.scalac
+package internal.hosts.dotty
 package contexts
 
 import java.io.File

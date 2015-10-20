@@ -1,5 +1,5 @@
 package scala.meta
-package internal.hosts.scalac
+package internal.hosts.dotty
 package converters
 
 import org.scalameta.invariants._
@@ -8,19 +8,31 @@ import scala.language.implicitConversions
 import scala.{Seq => _}
 import scala.collection.immutable.Seq
 import scala.reflect.ClassTag
-import scala.tools.nsc.{Global => ScalaGlobal}
 import scala.{meta => mapi}
 import scala.meta.internal.{ast => m}
 import scala.meta.internal.{semantic => s}
-import scala.reflect.internal.Flags._
-import scala.meta.internal.hosts.scalac.reflect._
+import scala.meta.internal.hosts.dotty.reflect._
+
+import dotty.tools.dotc.{util => dut}
+import dotty.tools.dotc.{core => dco}
+import dotty.tools.dotc.core.{Symbols => dsy}
+import dotty.tools.dotc.core.{TypeErasure => dte}
+import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.core.Decorators._
+import dotty.tools.dotc.core.{Types => dty}
+import dotty.tools.dotc.core.{Names => dna}
+import dotty.tools.dotc.ast.{Trees => dtr}
+import dotty.tools.dotc.ast.tpd
+import dotty.tools.dotc.core.StdNames.{nme, tpnme}
+
+import dotty.tools.dotc.core.Flags._
 
 // This module provides functionality for scala.reflect -> scala.meta conversions
 // to keep track of scala.reflect attributes.
 // We have to work hard in order to provide a DSL that allows us to use .withMattrs with scala.reflect artifacts,
 // but the end result is worth it, I think.
-trait ToMattrs extends ReflectToolkit with MetaToolkit {
-  self: Api =>
+trait ToMattrs[A >: dtr.Untyped <: dty.Type] extends ReflectToolkit[A] with MetaToolkit {
+  self: Api[A] =>
 
   // ======= DEFINITION OF THE DSL =======
 
@@ -30,7 +42,7 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
       require(denot != s.Denotation.Zero)
       implicitly[YesDenotNoTyping[T]].withMattrs(mtree, denot)
     }
-    def withMattrs(gpre: g.Type, symlike: SymLike): T = {
+    def withMattrs(gpre: dty.Type, symlike: SymLike): T = {
       withMattrs(l.Denotation(gpre, symlike.lsym))
     }
     def tryMattrs(denotlike: DenotLike): T = {
@@ -38,7 +50,7 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
       if (denot != s.Denotation.Zero) withMattrs(denot)
       else mtree
     }
-    def tryMattrs(gpre: g.Type, symlike: SymLike): T = {
+    def tryMattrs(gpre: dty.Type, symlike: SymLike): T = {
       tryMattrs(l.Denotation(gpre, symlike.lsym))
     }
   }
@@ -59,12 +71,12 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
   protected implicit class XtensionYesDenotYesTypingTree[T <: m.Tree : YesDenotYesTyping](mtree: T) {
     def withMattrs(denotlike: DenotLike): T = {
       val denot @ s.Denotation.Single(spre, ssym) = denotlike.sdenot
-      val gpre = spre match { case s.Prefix.Zero => g.NoPrefix; case s.Prefix.Type(mtpe: m.Type.Arg) => mtpe.toGtype }
+      val gpre = spre match { case s.Prefix.Zero => dty.NoPrefix; case s.Prefix.Type(mtpe: m.Type.Arg) => mtpe.toGtype }
       val gsym = symbolTable.convert(ssym).gsymbol
-      val typing = self.typing(gsym.typeSignatureIn(gpre))
+      val typing = self.typing(gpre.memberInfo(gsym))
       withMattrs(denot, typing)
     }
-    def withMattrs(gpre: g.Type, symlike: SymLike): T = {
+    def withMattrs(gpre: dty.Type, symlike: SymLike): T = {
       withMattrs(l.Denotation(gpre, symlike.lsym))
     }
     def tryMattrs(denotlike: DenotLike): T = {
@@ -72,7 +84,7 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
       if (denot != s.Denotation.Zero) withMattrs(denot)
       else mtree
     }
-    def tryMattrs(gpre: g.Type, symlike: SymLike): T = {
+    def tryMattrs(gpre: dty.Type, symlike: SymLike): T = {
       tryMattrs(l.Denotation(gpre, symlike.lsym))
     }
 
@@ -82,7 +94,7 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
       require(denot != s.Denotation.Zero && typing != s.Typing.Zero)
       implicitly[YesDenotYesTyping[T]].withMattrs(mtree, denot, typing)
     }
-    def withMattrs(gpre: g.Type, symlike: SymLike, tpelike: TypingLike): T = {
+    def withMattrs(gpre: dty.Type, symlike: SymLike, tpelike: TypingLike): T = {
       withMattrs(l.Denotation(gpre, symlike.lsym), tpelike)
     }
     def tryMattrs(denotlike: DenotLike, tpelike: TypingLike): T = {
@@ -92,20 +104,20 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
       else if (denot == s.Denotation.Zero && typing == s.Typing.Zero) mtree
       else abort(debug(denot, typing))
     }
-    def tryMattrs(gpre: g.Type, symlike: SymLike, tpelike: TypingLike): T = {
+    def tryMattrs(gpre: dty.Type, symlike: SymLike, tpelike: TypingLike): T = {
       tryMattrs(l.Denotation(gpre, symlike.lsym), tpelike)
     }
   }
 
   // ======= IMPLEMENTATION OF THE DSL =======
 
-  private def denot(gpre0: g.Type, lsym: l.Symbol): s.Denotation = {
+  private def denot(gpre0: dty.Type, lsym: l.Symbol): s.Denotation = {
     if (lsym == l.Zero) s.Denotation.Zero
     else {
-      require(gpre0 != g.NoType)
-      val gpre = if (gpre0 == g.DefaultPrefix) lsym.gsymbol.prefix else gpre0
+      require(gpre0 != dty.NoType)
+      val gpre = if (gpre0 == z.DefaultPrefix) lsym.gsymbol.prefix else gpre0
       val hpre = {
-        if (gpre == g.NoPrefix) s.Prefix.Zero
+        if (gpre == dty.NoPrefix) s.Prefix.Zero
         else s.Prefix.Type(gpre.toMtype)
       }
       val ssym = symbolTable.convert(lsym)
@@ -113,17 +125,18 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
     }
   }
 
-  private def typing(gtpe: g.Type): s.Typing = {
+  private def typing(gtpe: dty.Type): s.Typing = {
     // NOTE: s.Typing.Nonrecursive is lazy, so we need to make sure
     // that we're at the right phase when running this code
-    if (gtpe == null || gtpe == g.NoType) s.Typing.Zero
-    else if (gtpe.typeSymbol.isModuleClass) s.Typing.Recursive
-    else s.Typing.Nonrecursive(g.enteringTyper(gtpe.toMtypeArg))
+    if (gtpe == null || gtpe == dty.NoType) s.Typing.Zero
+    else if (gtpe.typeSymbol.is(ModuleClass)) s.Typing.Recursive
+    //else s.Typing.Nonrecursive(g.enteringTyper(gtpe.toMtypeArg))
+    else s.Typing.Nonrecursive(gtpe.toMtypeArg)
   }
 
   // ======= TYPE CLASSES AND IMPLICIT CONVERSIONS =======
 
-  protected trait YesDenotNoTyping[T <: Tree] {
+  protected trait YesDenotNoTyping[T <: mapi.Tree] {
     def withMattrs(tree: T, denot: s.Denotation): T
   }
   protected object YesDenotNoTyping {
@@ -134,7 +147,7 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
     implicit def Ambig2[T <: mapi.Term]: YesDenotNoTyping[T] = ???
   }
 
-  protected trait NoDenotYesTyping[T <: Tree] {
+  protected trait NoDenotYesTyping[T <: mapi.Tree] {
     def withMattrs(tree: T, typing: s.Typing): T
   }
   protected object NoDenotYesTyping {
@@ -160,7 +173,7 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
     implicit def Ambig2[T <: mapi.Name]: NoDenotYesTyping[T] = ???
   }
 
-  protected trait YesDenotYesTyping[T <: Tree] {
+  protected trait YesDenotYesTyping[T <: mapi.Tree] {
     def withMattrs(tree: T, denot: s.Denotation, typing: s.Typing): T
   }
   protected object YesDenotYesTyping {
@@ -174,19 +187,22 @@ trait ToMattrs extends ReflectToolkit with MetaToolkit {
 
   protected trait DenotLike { def sdenot: s.Denotation }
   protected object DenotLike {
-    implicit def ldenotIsDenotLike(ldenot: l.Denotation): DenotLike = new DenotLike { def sdenot = denot(ldenot.pre, ldenot.sym) }
+    implicit def ldenotIsDenotLike(ldenot: l.Denotation): DenotLike =
+      new DenotLike { def sdenot = denot(ldenot.pre, ldenot.sym) }
     implicit def sdenotIsDenotLike(sdenot0: s.Denotation): DenotLike = new DenotLike { def sdenot = sdenot0 }
   }
 
   protected trait SymLike { def lsym: l.Symbol }
   protected object SymLike {
-    implicit def gsymIsSymLike(gsym: g.Symbol): SymLike = new SymLike { def lsym = gsym.toLogical }
+    implicit def dsymIsSymLike(dsym: dsy.Symbol): SymLike =
+      new SymLike { def lsym = dsym.toLogical }
     implicit def lsymIsSymLike(lsym0: l.Symbol): SymLike = new SymLike { def lsym = lsym0 }
   }
 
   protected trait TypingLike { def styping: s.Typing }
   protected object TypingLike {
-    implicit def gtpeIsTypingLike(gtpe: g.Type): TypingLike = new TypingLike { def styping = typing(gtpe) }
+    implicit def dtpeIsTypingLike(dtpe: dty.Type): TypingLike =
+      new TypingLike { def styping = typing(dtpe) }
     implicit def stypingIsTypingLike(styping0: s.Typing): TypingLike = new TypingLike { def styping = styping0 }
   }
 }

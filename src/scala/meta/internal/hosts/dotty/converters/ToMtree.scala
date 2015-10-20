@@ -1,5 +1,5 @@
 package scala.meta
-package internal.hosts.scalac
+package internal.hosts.dotty
 package converters
 
 import org.scalameta.invariants._
@@ -11,17 +11,27 @@ import scala.{Seq => _}
 import scala.collection.immutable.Seq
 import scala.collection.mutable
 import scala.compat.Platform.EOL
-import scala.tools.nsc.{Global => ScalaGlobal}
 import scala.reflect.{classTag, ClassTag}
-import scala.reflect.internal.Flags._
 import scala.{meta => mapi}
 import scala.meta.internal.{ast => m}
 import scala.meta.internal.{semantic => s}
 import scala.meta.internal.flags._
 import scala.meta.internal.ast.Helpers.{XtensionTermOps => _, _}
-import scala.meta.internal.hosts.scalac.reflect._
+import scala.meta.internal.hosts.dotty.reflect._
 import scala.meta.internal.prettyprinters.Attributes
 import scala.meta.internal.ast.XtensionConvertDebug
+
+import dotty.tools.dotc.{util => dut}
+import dotty.tools.dotc.{core => dco}
+import dotty.tools.dotc.core.{Symbols => dsy}
+import dotty.tools.dotc.core.{TypeErasure => dte}
+import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.core.Decorators._
+import dotty.tools.dotc.core.{Types => dty}
+import dotty.tools.dotc.core.{Names => dna}
+import dotty.tools.dotc.ast.{Trees => dtr}
+import dotty.tools.dotc.ast.tpd
+import dotty.tools.dotc.core.StdNames.{nme, tpnme}
 
 // This module exposes a method that can convert scala.reflect trees
 // into equivalent scala.meta trees.
@@ -36,8 +46,8 @@ import scala.meta.internal.ast.XtensionConvertDebug
 // you will need to use a dedicated module called `mergeTrees`
 // that is capable of merging syntactically precise trees (obtained from parsing)
 // and semantically precise trees (obtain from converting).
-trait ToMtree extends ReflectToolkit with MetaToolkit {
-  self: Api =>
+trait ToMtree[A >: dtr.Untyped <: dty.Type] extends ReflectToolkit[A] with MetaToolkit {
+  self: Api[A] =>
 
   protected implicit class XtensionGtreeToMtree(gtree0: g.Tree) {
     // TODO: figure out a mechanism to automatically remove navigation links once we're done
@@ -70,20 +80,20 @@ trait ToMtree extends ReflectToolkit with MetaToolkit {
             m.Term.Name(lvalue).tryMattrs(ldenot)
           case l.TermIdent(lname) =>
             lname.toMtree[m.Term.Name]
-          case l.TermSelect(lpre, lname) =>
-            val mpre = lpre.toMtree[m.Term]
-            val mname = lname.toMtree[m.Term.Name]
-            m.Term.Select(mpre, mname)
-          case l.TermApply(lfun, largs) =>
-            val mfun = lfun.toMtree[m.Term]
-            val margs = largs.toMtrees[m.Term]
-            m.Term.Apply(mfun, margs)
+          // case l.TermSelect(lpre, lname) =>
+          //   val mpre = lpre.toMtree[m.Term]
+          //   val mname = lname.toMtree[m.Term.Name]
+          //   m.Term.Select(mpre, mname)
+          // case l.TermApply(lfun, largs) =>
+          //   val mfun = lfun.toMtree[m.Term]
+          //   val margs = largs.toMtrees[m.Term]
+          //   m.Term.Apply(mfun, margs)
           case l.TermParamDef(lmods, lname, ltpt, ldefault) =>
             val mmods = lmods.toMtrees[m.Mod]
             val mname = lname.toMtree[m.Term.Param.Name]
             val mtpt = if (ltpt.nonEmpty) Some(ltpt.toMtree[m.Type]) else None
             val mdefault = if (ldefault.nonEmpty) Some(ldefault.toMtree[m.Term]) else None
-            m.Term.Param(mmods, mname, mtpt, mdefault).tryMattrs(gtree.symbol.tpe)
+            m.Term.Param(mmods, mname, mtpt, mdefault).tryMattrs(gtree.symbol.info)
 
           // ============ TYPES ============
 
@@ -171,7 +181,7 @@ trait ToMtree extends ReflectToolkit with MetaToolkit {
           case l.SelfDef(lname, ltpt) =>
             val mname = lname.toMtree[m.Term.Param.Name]
             val mtpt = if (ltpt.nonEmpty) Some(ltpt.toMtree[m.Type]) else None
-            val gtpe = lname.denot.sym match { case l.Self(owner) => owner.typeOfThis; case _ => g.NoType }
+            val gtpe = lname.denot.sym match { case l.Self(owner) => owner.asClass.classInfo.selfType; case _ => dty.NoType }
             m.Term.Param(Nil, mname, mtpt, None).tryMattrs(gtpe)
 
           // ============ MODIFIERS ============
@@ -179,12 +189,12 @@ trait ToMtree extends ReflectToolkit with MetaToolkit {
           // ============ ODDS & ENDS ============
 
           case _ =>
-            fail(s"unsupported tree ${g.showRaw(gtree)}")
+            fail(s"unsupported tree ${z.showRaw(gtree)}")
         }
         val maybeTypedMtree = maybeDenotedMtree match {
           case maybeDenotedMtree: m.Term.Name => maybeDenotedMtree // do nothing, typing already inferred from denotation
           case maybeDenotedMtree: m.Ctor.Name => maybeDenotedMtree // do nothing, typing already inferred from denotation
-          case maybeDenotedMtree: m.Term => maybeDenotedMtree.tryMattrs(gtree.tpe)
+          case maybeDenotedMtree: m.Term if maybeDenotedMtree.typing eq null => maybeDenotedMtree.tryMattrs(gtree.tpe)
           case maybeDenotedMtree: m.Term.Param => maybeDenotedMtree // do nothing, typing already assigned during conversion
           case maybeDenotedMtree => maybeDenotedMtree
         }
@@ -215,7 +225,7 @@ trait ToMtree extends ReflectToolkit with MetaToolkit {
           Debug.logConvert {
             println("======= SCALA.REFLECT TREE =======")
             println(gtree)
-            println(g.showRaw(gtree, printIds = true, printTypes = true))
+            println(z.showRaw(gtree, printIds = true, printTypes = true))
             println("======== SCALA.META TREE ========")
             println(maybeIndexedMtree)
             println(maybeIndexedMtree.show[Attributes])
@@ -231,7 +241,7 @@ trait ToMtree extends ReflectToolkit with MetaToolkit {
           expected = expected.replace("$", ".")
           val actual = maybeIndexedMtree.productPrefix
           val summary = s"expected = $expected, actual = $actual"
-          val details = s"${g.showRaw(gtree)}$EOL${maybeIndexedMtree.show[Structure]}"
+          val details = s"${z.showRaw(gtree)}$EOL${maybeIndexedMtree.show[Structure]}"
           fail(s"unexpected result: $summary$EOL$details")
         }
       } catch {

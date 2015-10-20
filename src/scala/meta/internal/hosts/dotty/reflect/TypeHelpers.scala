@@ -1,28 +1,34 @@
-package scala.meta.internal.hosts.scalac
+package scala.meta.internal.hosts.dotty
 package reflect
 
-import scala.tools.nsc.Global
-import scala.reflect.internal.Flags
 import scala.collection.mutable
 import org.scalameta.invariants._
 
-trait TypeHelpers {
-  self: ReflectToolkit =>
+import dotty.tools.dotc.{util => dut}
+import dotty.tools.dotc.{core => dco}
+import dotty.tools.dotc.core.{Symbols => dsy}
+import dotty.tools.dotc.core.{TypeErasure => dte}
+import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.core.Decorators._
+import dotty.tools.dotc.core.{Types => dty}
+import dotty.tools.dotc.core.{Names => dna}
+import dotty.tools.dotc.ast.{Trees => dtr}
+import dotty.tools.dotc.ast.tpd
+import dotty.tools.dotc.core.StdNames.{nme, tpnme}
 
-  import global.{require => _, _}
-  import definitions._
+trait TypeHelpers[A >: dtr.Untyped <: dty.Type] {
+  self: ReflectToolkit[A] =>
 
-  implicit class RichHelperType(tpe: Type) {
+
+  implicit class RichHelperType(tpe: dty.Type) {
+    def paramss: List[List[dsy.Symbol]] = tpe.paramTypess.map(_.map(_.typeSymbol))
+    /*
     def etaReduce: Type = EtaReduce.unapply(tpe).getOrElse(tpe)
-    def normalizeVararg: Type = tpe match {
-      case TypeRef(_, sym, List(arg)) if sym == RepeatedParamClass => appliedType(SeqClass, arg)
-      case _ => tpe
-    }
     def directBaseTypes: List[Type] = ???
+    */
   }
-
-  implicit class RichHelperClassInfoType(tpe: ClassInfoType) {
-    def realParents: List[Type] = {
+  implicit class RichHelperClassInfoType(tpe: dty.ClassInfo) {
+    def realParents: List[dty.Type] = {
       tpe.parents match {
         case classTpe :: traitTpe :: rest if traitTpe <:< classTpe =>
           // NOTE: this is obviously imprecise, but at least it captures the common case
@@ -33,6 +39,7 @@ trait TypeHelpers {
     }
   }
 
+  /*
   object EtaReduce {
     def unapply(tpe: Type): Option[Type] = tpe match {
       case PolyType(tparams, TypeRef(pre, sym, targs)) =>
@@ -46,4 +53,5 @@ trait TypeHelpers {
         None
     }
   }
+  */
 }

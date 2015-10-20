@@ -1,10 +1,10 @@
 package scala.meta
 package internal.hosts
 
-package object scalac {
-  implicit class XtensionScalahostDebug(debug: org.scalameta.debug.Debug.type) {
+package object dotty {
+  implicit class XtensionDottyhostDebug(debug: org.scalameta.debug.Debug.type) {
     def logScalahost(op: => Unit): Unit = {
-      if (sys.props("scalahost.debug") != null) debug.log(op)
+      if (sys.props("dottyhost.debug") != null) debug.log(op)
     }
   }
 }

@@ -1,4 +1,4 @@
-package scala.meta.internal.hosts.scalac
+package scala.meta.internal.hosts.dotty
 package converters
 
 import org.scalameta.unreachable

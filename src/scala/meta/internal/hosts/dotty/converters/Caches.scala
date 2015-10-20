@@ -1,5 +1,5 @@
 package scala.meta
-package internal.hosts.scalac
+package internal.hosts.dotty
 package converters
 
 import org.scalameta.collections._
@@ -12,13 +12,17 @@ import scala.collection.immutable.Seq
 import scala.tools.nsc.{Global => ScalaGlobal}
 import scala.meta.internal.{ast => m}
 import scala.meta.internal.{semantic => s}
-import scala.meta.internal.hosts.scalac.reflect._
+import scala.meta.internal.hosts.dotty.reflect._
 import scala.meta.internal.prettyprinters.Attributes
+
+import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.ast.{Trees => dtr}
+import dotty.tools.dotc.core.{Types => dty}
 
 // This module explicitly lists caches that are used by the conversions.
 // Some of them are here to improve performance, but some of them are necessary for uniqueness and/or correctness.
-trait Caches extends ReflectToolkit with MetaToolkit {
-  self: Api =>
+trait Caches[A >: dtr.Untyped <: dty.Type] extends ReflectToolkit[A] with MetaToolkit {
+  self: Api[A] =>
 
   // NOTE: These maps are mutable, but every mapping there is immutable,
   // i.e. won't change regardless of the mutations happening in the underlying compiler.
@@ -30,7 +34,7 @@ trait Caches extends ReflectToolkit with MetaToolkit {
   //
   // Therefore, the maps below are called "caches".
   protected lazy val symbolTable = new SymbolTable() // TwoWayCache[s.Symbol, l.Symbol]
-  protected lazy val tpeCache = TwoWayCache[g.Type, m.Type.Arg]()
+  protected lazy val tpeCache = TwoWayCache[dty.Type, m.Type.Arg]()
 
   // NOTE: These maps are mutable, and all their mapping are mutable.
   // E.g. if we load new sources into the compiler, it is possible that they will take over

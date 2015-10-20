@@ -1,16 +1,22 @@
-package scala.meta.internal.hosts.scalac
+package scala.meta.internal.hosts.dotty
 package reflect
 
 import scala.tools.nsc.Global
+import dotty.tools.dotc.core.Contexts.{Context => DottyContext}
 
-trait ReflectToolkit extends Metadata
-                        with TreeHelpers
-                        with TypeHelpers
-                        with SymbolHelpers
-                        with Platform
-                        with LogicalSymbols
-                        with LogicalTrees {
+import dotty.tools.dotc.ast.{Trees => dtr}
+import dotty.tools.dotc.core.{Types => dty}
+
+trait ReflectToolkit[A >: dtr.Untyped <: dty.Type]
+                    extends dtr.Instance[A]
+                       with TreeHelpers[A]
+                       with TypeHelpers[A]
+                       with SymbolHelpers[A]
+                       with Platform[A]
+                       with LogicalSymbols[A]
+                       with LogicalTrees[A] {
   val global: Global
-  lazy val g: global.type = global
+  val g: dtr.Instance[A]
+  implicit val ctx: DottyContext
   object l extends LogicalSymbols with LogicalTrees
 }

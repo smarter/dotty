@@ -1,66 +1,75 @@
 package scala.meta
-package internal.hosts.scalac
+package internal.hosts.dotty
 package converters
 
 import org.scalameta.invariants._
 import org.scalameta.unreachable
 import scala.{Seq => _}
 import scala.collection.immutable.Seq
-import scala.reflect.internal.Flags._
-import scala.tools.nsc.{Global => ScalaGlobal}
 import scala.meta.internal.{ast => m}
 import scala.meta.internal.{semantic => s}
-import scala.meta.internal.hosts.scalac.reflect._
+import scala.meta.internal.hosts.dotty.reflect._
 import scala.meta.internal.flags._
 import java.util.UUID.randomUUID
 
+import dotty.tools.dotc.{util => dut}
+import dotty.tools.dotc.{core => dco}
+import dotty.tools.dotc.core.{Symbols => dsy}
+import dotty.tools.dotc.core.{TypeErasure => dte}
+import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.core.Decorators._
+import dotty.tools.dotc.core.{Types => dty}
+import dotty.tools.dotc.core.{Names => dna}
+import dotty.tools.dotc.ast.{Trees => dtr}
+import dotty.tools.dotc.ast.tpd
+import dotty.tools.dotc.core.StdNames.{nme, tpnme}
+
+import dotty.tools.dotc.core.Flags._
+
 // This module exposes a method that can convert scala.reflect types into equivalent scala.meta types.
 // See comments to ToMtree to learn more about how this conversion preserves the original syntax of those types.
-trait ToMtype extends ReflectToolkit with MetaToolkit {
-  self: Api =>
+trait ToMtype[A >: dtr.Untyped <: dty.Type] extends ReflectToolkit[A] with MetaToolkit {
+  self: Api[A] =>
 
-  protected implicit class XtensionGtypeToMtype(gtpe: g.Type) {
+  protected implicit class XtensionGtypeToMtype(gtpe: dty.Type) {
     def toMtype: m.Type = gtpe.toMtypeArg.require[m.Type]
     def toMtypeArg: m.Type.Arg = tpeCache.getOrElseUpdate(gtpe, {
       val mtpe = gtpe match {
-        case g.NoPrefix =>
+        case dty.NoPrefix =>
           unreachable
-        case g.NoType =>
+        case dty.NoType =>
           unreachable
-        case g.SuperType(thistpe, supertpe) =>
-          require(thistpe.isInstanceOf[g.ThisType] && thistpe.typeSymbol.isType && supertpe.typeSymbol.isType)
-          val supersym = if (supertpe.isInstanceOf[g.RefinedType]) g.NoSymbol else supertpe.typeSymbol
-          val superqual = m.Name.Indeterminate(thistpe.typeSymbol.displayName).withMattrs(g.DefaultPrefix, thistpe.typeSymbol)
+        case dty.SuperType(thistpe, supertpe) => 
+         require(thistpe.isInstanceOf[dty.ThisType] && thistpe.typeSymbol.isType && supertpe.typeSymbol.isType)
+          val supersym = if (supertpe.isInstanceOf[dty.RefinedType]) dsy.NoSymbol else supertpe.typeSymbol
+          val superqual = m.Name.Indeterminate(thistpe.typeSymbol.displayName).withMattrs(z.DefaultPrefix, thistpe.typeSymbol)
           val supermix = ({
-            if (supersym == g.NoSymbol) m.Name.Anonymous()
+            if (supersym == dsy.NoSymbol) m.Name.Anonymous()
             else m.Name.Indeterminate(supertpe.typeSymbol.displayName)
           }).withMattrs(thistpe, supersym)
           m.Type.Singleton(m.Term.Super(superqual, supermix))
-        case g.ThisType(sym) =>
-          require(sym.isClass)
+        case tpe: dty.ThisType =>
+          val sym = tpe.cls
           val ref = {
-            if (sym.isModuleClass) sym.module.asTerm.toMname(g.DefaultPrefix)
-            // TODO: should we really use g.DefaultPrefix here?
-            else m.Term.This(m.Name.Indeterminate(sym.displayName).withMattrs(g.DefaultPrefix, sym)).withMattrs(gtpe.widen)
+            if (sym.is(ModuleClass)) sym.companionModule.asTerm.toMname(z.DefaultPrefix)
+            // TODO: should we really use z.DefaultPrefix here?
+            else m.Term.This(m.Name.Indeterminate(sym.displayName).withMattrs(z.DefaultPrefix, sym)).withMattrs(gtpe.widen)
           }
           m.Type.Singleton(ref)
-        case g.SingleType(pre, sym) =>
-          require(sym.isTerm)
+        case tpe @ dty.TermRef(pre, _) =>
+          val sym = tpe.symbol
           val name = sym.asTerm.toMname(pre)
           val ref = pre match {
-            case g.NoPrefix =>
+            case dty.NoPrefix =>
               name
             case pre if pre.typeSymbol.isStaticOwner =>
               name
-            case pre: g.SingletonType =>
+            case pre: dty.SingletonType =>
               val m.Type.Singleton(preref) = pre.toMtype
               m.Term.Select(preref, name).inheritAttrs(name)
-            case pre @ g.TypeRef(g.NoPrefix, quant, Nil) if quant.hasFlag(DEFERRED | EXISTENTIAL) =>
-              require(quant.name.endsWith(g.nme.SINGLETON_SUFFIX))
-              val prename = g.Ident(quant.name.toString.stripSuffix(g.nme.SINGLETON_SUFFIX)).displayName
-              val preref = m.Term.Name(prename).withMattrs(g.DefaultPrefix, quant)
-              m.Term.Select(preref, name).inheritAttrs(name)
-            case pre: g.TypeRef =>
+            case pre @ dty.TypeRef(dty.NoPrefix, name) if pre.symbol.is(Deferred) =>
+              ???
+            case pre: dty.TypeRef =>
               // TODO: wow, so much for the hypothesis that all post-typer types are representable with syntax
               // here's one for you: take a look at `context.unit.synthetics.get` in Typers.scala
               // the prefix of the selection is typed as `Typers.this.global.CompilationUnit#synthetics.type`
@@ -71,87 +80,47 @@ trait ToMtype extends ReflectToolkit with MetaToolkit {
               // therefore for now I'm just putting a stub here
               name
             case _ =>
-              throw new ConvertException(gtpe, s"unsupported type $gtpe, prefix = ${pre.getClass}, structure = ${g.showRaw(gtpe, printIds = true, printTypes = true)}")
+              throw new ConvertException(gtpe, s"unsupported type $gtpe, prefix = ${pre.getClass}, structure = ${gtpe.show}")
           }
           // NOTE: we can't just emit m.Type.Singleton(m.Term.Name(...).withDenot(pre, sym))
           // because in some situations (when the prefix is not stable) that will be a lie
           // because naked names are supposed to be usable without a prefix
           m.Type.Singleton(ref)
-        case g.TypeRef(pre, sym, args) =>
-          require(sym.isType)
-          if (sym == g.definitions.RepeatedParamClass) {
-            m.Type.Arg.Repeated(args.head.toMtype)
-          } else if (sym == g.definitions.ByNameParamClass) {
-            m.Type.Arg.ByName(args.head.toMtype)
+        case tpe: dty.TypeRef =>
+          val pre = tpe.prefix
+          val sym = tpe.symbol
+          if (sym == ctx.definitions.RepeatedParamClass) {
+            ???
           } else {
-            val mref = ({
-              if (sym.isModuleClass) {
-                g.SingleType(pre, sym.module).toMtype
-              } else {
-                val mname = sym.asType.toMname(pre)
-                pre match {
-                  case g.NoPrefix =>
-                    mname
-                  case pre if pre.typeSymbol.isStaticOwner =>
-                    mname
-                  case pre: g.SingletonType =>
-                    val m.Type.Singleton(preref) = pre.toMtype
-                    m.Type.Select(preref, mname)
-                  case _ =>
-                    m.Type.Project(pre.toMtype, mname)
-                }
-              }
-            })
-            if (args.isEmpty) mref
-            else {
-              if (g.definitions.FunctionClass.seq.contains(sym) && args.nonEmpty) {
-                val funargs :+ funret = args
-                m.Type.Function(funargs.map(_.toMtypeArg), funret.toMtype)
-              } else if (g.definitions.TupleClass.seq.contains(sym) && args.length > 1) {
-                m.Type.Tuple(args.map(_.toMtype))
-              } else if (sym.name.looksLikeInfix && mref.isInstanceOf[m.Type.Name] && args.length == 2) {
-                m.Type.ApplyInfix(args(0).toMtype, mref.require[m.Type.Name], args(1).toMtype)
-              } else {
-                m.Type.Apply(mref, args.map(_.toMtype))
-              }
+            val mname = sym.asType.toMname(pre)
+            pre match {
+              case dty.NoPrefix =>
+                mname
+              case pre if pre.typeSymbol.isStaticOwner =>
+                mname
+              case pre: dty.SingletonType =>
+                val m.Type.Singleton(preref) = pre.toMtype
+                m.Type.Select(preref, mname)
+              case _ =>
+                m.Type.Project(pre.toMtype, mname)
             }
           }
-        case g.RefinedType(parents, decls) =>
-          // TODO: detect `val x, y: Int`
-          val pdecls = decls.toLogical.map(_.toMmember(g.NoPrefix)).toList // TODO: actually, prefix here is not empty
-          m.Type.Compound(parents.map(_.toMtype), pdecls.map(_.stat))
-        case g.ExistentialType(quants, underlying) =>
-          // TODO: infer type placeholders where they were specified explicitly
-          require(quants.forall(quant => quant.isType && quant.hasFlag(DEFERRED | EXISTENTIAL)))
-          val mquants = quants.toLogical.map(_.toMmember(g.NoPrefix)).toList // TODO: actually, prefix here is not empty
-          m.Type.Existential(underlying.toMtype, mquants.map(_.stat))
-        case g.AnnotatedType(annots, underlying) =>
-          m.Type.Annotate(underlying.toMtype, annots.toMannots)
-        case g.ConstantType(const @ g.Constant(tpe: g.Type)) =>
+        // case tpe @ dty.RefinedType(parent, _) =>
+        //   val refSym = tpe.refinedInfo.typeSymbol
+        //   m.Type.Compound(Seq(parent.toMtype), refSym.toLogical.toMmember(dty.NoPrefix).stat)
+        // case dty.AnnotatedType(annot, underlying) =>
+        //   m.Type.Annotate(underlying.toMtype, Seq(annot.toMannot))
+        case dty.ConstantType(const @ dco.Constants.Constant(tpe: dty.Type)) =>
           tpe.widen.toMtype
-        case g.ConstantType(const) =>
+        case dty.ConstantType(const) =>
           const.toMlit
-        case tpe @ g.PolyType(tparams, ret) =>
-          // NOTE: it turns out that we can't avoid polytypes here
-          // even though we never need to carry around type signatures of our members (those members are their own type signatures!)
-          // there are legitimate polytypes, namely type lambdas
-          tpe match {
-            case EtaReduce(tpe) =>
-              tpe.toMtype
-            case _ =>
-              val mquants = tparams.toLogical.map(_.toMmember(g.NoPrefix).require[m.Type.Param])
-              m.Type.Lambda(mquants, ret.toMtype)
-          }
-        case tpe @ g.MethodType(params, ret) =>
-          def extractParamss(paramss: List[List[g.Symbol]], tpe: g.Type): List[List[g.Symbol]] = tpe match {
-            case g.MethodType(params1, ret1) => extractParamss(paramss :+ params1, ret1)
-            case _ => paramss
-          }
-          val gparamss = extractParamss(Nil, tpe)
-          val mparamss = gparamss.toLogical.map(_.map(_.toMmember(g.NoPrefix).require[m.Term.Param]))
+        case tpe @ dty.MethodType(_, params) =>
+          val ret = tpe.resultType
+          val gparamss = tpe.paramTypess.map(_.map(_.typeSymbol))
+          val mparamss = gparamss.toLogical.map(_.map(_.toMmember(dty.NoPrefix).require[m.Term.Param]))
           m.Type.Method(mparamss, ret.toMtype)
         case _ =>
-          throw new ConvertException(gtpe, s"unsupported type $gtpe, designation = ${gtpe.getClass}, structure = ${g.showRaw(gtpe, printIds = true, printTypes = true)}")
+          throw new ConvertException(gtpe, s"unsupported type $gtpe, designation = ${gtpe.getClass}, structure = ${gtpe.show}")
       }
       mtpe.forceTypechecked
     })
