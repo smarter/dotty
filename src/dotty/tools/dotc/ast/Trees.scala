@@ -195,6 +195,9 @@ object Trees {
     /** Is this tree either the empty tree or the empty ValDef? */
     def isEmpty: Boolean = false
 
+    /** Is this tree neither the empty tree nor the empty ValDef? */
+    def nonEmpty: Boolean = !isEmpty
+
     /** Convert tree to a list. Gives a singleton list, except
      *  for thickets which return their element trees.
      */
