@@ -646,7 +646,8 @@ class TypeApplications(val self: Type) extends AnyVal {
     def tryLift(bcs: List[ClassSymbol]): Boolean = bcs match {
       case bc :: bcs1 =>
         val tp = self.baseTypeWithArgs(bc)
-        val targs = tp.argInfos
+        //val targs = tp.argInfos
+        val targs = tp.argInfos.takeRight(Math.min(tp.argInfos.length, tparams.length))
         val tycon = tp.withoutArgs(targs)
         def variancesMatch(param1: Symbol, param2: Symbol) =
           param2.variance == param2.variance || param2.variance == 0
