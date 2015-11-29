@@ -762,6 +762,18 @@ object Types {
       case tp => tp
     }
 
+    /** Follow aliases in TypeRefs only */
+    final def safeDealias(implicit ctx: Context): Type = this match {
+      case tp: TypeRef if tp.symbol.isAliasType =>
+        tp.info match {
+          case TypeAlias(alias: TypeRef) => alias.safeDealias
+          case TypeAlias(alias) => alias
+          case _ => tp
+        }
+      case tp =>
+        tp
+    }
+
     /** If this is a TypeAlias type, its alias otherwise this type itself */
     final def followTypeAlias(implicit ctx: Context): Type = this match {
       case TypeAlias(alias) => alias

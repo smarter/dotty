@@ -146,32 +146,28 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
           case info2: TypeAlias => firstTry(tp1, info2.alias)
           case _ => tp1 match {
             case tp1: NamedType =>
-              tp1.info match {
-                case info1: TypeAlias => compareNamed(info1.alias, tp2)
-                case _ =>
-                  val sym1 = tp1.symbol
-                  (if ((sym1 ne NoSymbol) && (sym1 eq tp2.symbol))
-                     ctx.erasedTypes ||
-                     sym1.isStaticOwner ||
-                     isSubType(tp1.prefix, tp2.prefix) ||
-                     thirdTryNamed(tp1, tp2)
-                   else
-                     (tp1.name eq tp2.name) &&
-                     isSubType(tp1.prefix, tp2.prefix) &&
-                     (tp1.signature == tp2.signature) &&
-                     !tp1.isInstanceOf[WithFixedSym] &&
-                     !tp2.isInstanceOf[WithFixedSym] ||
-                     compareHK(tp1, tp2, inOrder = true) ||
-                     compareHK(tp2, tp1, inOrder = false) ||
-                     thirdTryNamed(tp1, tp2))
-              }
+              val sym1 = tp1.symbol
+              if ((sym1 ne NoSymbol) && (sym1 eq tp2.symbol))
+                ctx.erasedTypes ||
+                sym1.isStaticOwner ||
+                isSubType(tp1.prefix, tp2.prefix) ||
+                thirdTryNamed(tp1, tp2)
+              else
+                (tp1.name eq tp2.name) &&
+                isSubType(tp1.prefix, tp2.prefix) &&
+                (tp1.signature == tp2.signature) &&
+                !tp1.isInstanceOf[WithFixedSym] &&
+                !tp2.isInstanceOf[WithFixedSym] ||
+                compareHK(tp1, tp2, inOrder = true) ||
+                compareHK(tp2, tp1, inOrder = false) ||
+                thirdTryNamed(tp1, tp2)
             case _ =>
               compareHK(tp2, tp1, inOrder = false) ||
               secondTry(tp1, tp2)
           }
         }
       }
-      compareNamed(tp1, tp2)
+      compareNamed(tp1.safeDealias, tp2)
     case tp2: ProtoType =>
       isMatchedByProto(tp2, tp1)
     case tp2: BoundType =>
@@ -238,7 +234,7 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
   private def secondTry(tp1: Type, tp2: Type): Boolean = tp1 match {
     case tp1: NamedType =>
       tp1.info match {
-        case info1: TypeAlias => isSubType(info1.alias, tp2)
+        case info1: TypeAlias => isSubType(info1.alias.safeDealias, tp2)
         case _ => compareHK(tp1, tp2, inOrder = true) || thirdTry(tp1, tp2)
           // Note: If we change the order here, doing compareHK first and following aliases second,
           // we get a -Ycheck error when compiling dotc/transform. Need to investigate.
