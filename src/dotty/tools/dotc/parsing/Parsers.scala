@@ -1591,6 +1591,10 @@ object Parsers {
           if (in.token == IMPLICIT) {
             implicitOffset = in.skipToken()
             implicitFlag = Implicit
+          } else if (!implicitFlag.isEmpty) {
+            // Report an error because we don't allow non-implicit clauses after the
+            // first implicit clause
+            accept(IMPLICIT)
           }
           commaSeparated(param)
         }
@@ -1600,7 +1604,7 @@ object Parsers {
         if (in.token == LPAREN)
           paramClause() :: {
             firstClauseOfCaseClass = false
-            if (implicitFlag.isEmpty) clauses() else Nil
+            clauses()
           }
         else Nil
       }
