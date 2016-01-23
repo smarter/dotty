@@ -40,6 +40,7 @@ class Compiler {
       List(new FrontEnd),
       List(new PostTyper),
       List(new Pickler),
+      List(new sbt.SbtApi.ApiPhase),
       List(new FirstTransform,
            new CheckReentrant),
       List(new RefChecks,

@@ -2488,9 +2488,11 @@ object Types {
       case _ => false
     }
 
+    def paramName = binder.paramNames(paramNum)
+
     override def underlying(implicit ctx: Context): Type = binder.paramBounds(paramNum)
     // no customized hashCode/equals needed because cycle is broken in PolyType
-    override def toString = s"PolyParam(${binder.paramNames(paramNum)})"
+    override def toString = s"PolyParam(paramName)"
 
     override def computeHash = doHash(paramNum, binder.identityHash)
 

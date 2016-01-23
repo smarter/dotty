@@ -1035,6 +1035,8 @@ object SymDenotations {
       else defn.RootClass
     }
 
+    def isPublic(implicit ctx: Context): Boolean = !this.is(Protected | Private)
+
     /** The primary constructor of a class or trait, NoSymbol if not applicable. */
     def primaryConstructor(implicit ctx: Context): Symbol = NoSymbol
 
