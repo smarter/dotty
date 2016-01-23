@@ -181,7 +181,7 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer  { thisTran
             if (sym.isClass) tree
             else {
               Checking.boundsChecker.traverse(tree.rhs)
-              cpy.TypeDef(tree)(rhs = TypeTree(tree.symbol.info))
+              cpy.TypeDef(tree)(rhs = TypeTree(tree.symbol.info, tree.rhs))
             }
           super.transform(tree1)
         case tree: MemberDef =>
