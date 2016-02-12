@@ -40,6 +40,7 @@ class Compiler {
       List(new FrontEnd),
       List(new PostTyper),
       List(new Pickler),
+      List(new Tracer),
       List(new FirstTransform,
            new CheckReentrant),
       List(new RefChecks,
