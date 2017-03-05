@@ -694,6 +694,27 @@ class ClassfileParser(
       }
 
       def unpickleScala(bytes: Array[Byte]): Some[Embedded] = {
+        if (ctx.settings.noScala2x.value &&
+            !(classRoot.symbol.associatedFile.toString.contains("scala-library-2.11.5.jar") ||
+              classRoot.symbol.associatedFile.toString.contains("scala-compiler-2.11.5-20170111-125332-40bdc7b65a.jar") ||
+              classRoot.symbol.associatedFile.toString.contains("scala-xml_2.11-1.0.2.jar") ||
+              classRoot.symbol.associatedFile.toString.contains("scala-partest_2.11-1.0.11.jar") ||
+              /* classRoot.symbol.associatedFile.toString.contains("scala-reflect-2.11.5.jar") ||*/
+              classRoot.symbol.name.toString.contains("AbstractFile") ||
+              classRoot.symbol.name.toString.contains("PlainFile") ||
+              classRoot.symbol.name.toString.contains("PlainDirectory") ||
+              classRoot.symbol.name.toString.contains("Directory") ||
+              classRoot.symbol.name.toString.contains("File") ||
+              classRoot.symbol.name.toString.contains("Streamable") ||
+              classRoot.symbol.name.toString.contains("Path") ||
+              classRoot.symbol.name.toString.contains("ZipArchive") ||
+              classRoot.symbol.name.toString.contains("VirtualFile") ||
+              classRoot.symbol.name.toString.contains("WeakHashSet") ||
+              classRoot.symbol.name.toString.contains("PickleBuffer") || // Brought in by the backend
+              classRoot.symbol.name.toString.contains("Set"))) { // Required by BackendInterface
+          assert(false, s"Trying to unpickle from $classRoot (${classRoot.symbol.associatedFile})")
+        }
+
         val unpickler = new unpickleScala2.Scala2Unpickler(bytes, classRoot, moduleRoot)(ctx)
         unpickler.run()(ctx.addMode(Mode.Scala2Unpickling))
         Some(unpickler)

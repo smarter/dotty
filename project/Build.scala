@@ -107,7 +107,9 @@ object DottyBuild extends Build {
     // The non-bootstrapped dotty-library is not necessary when bootstrapping dotty
     autoScalaLibrary := false,
     // ...but scala-library is
-    libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion
+    libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion,
+
+    scalacOptions += "-no-scala2x"
   )
 
   /** Projects -------------------------------------------------------------- */

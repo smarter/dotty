@@ -10,6 +10,8 @@ class ScalaSettings extends Settings.SettingGroup {
 
   protected def defaultClasspath = sys.env.getOrElse("CLASSPATH", ".")
 
+  val noScala2x = BooleanSetting("-no-scala2x", "Disable support for Scala 2 classfiles.")
+
   /** Path related settings */
   val bootclasspath = PathSetting("-bootclasspath", "Override location of bootstrap class files.", Defaults.scalaBootClassPath)
   val extdirs = PathSetting("-extdirs", "Override location of installed extensions.", Defaults.scalaExtDirs)
