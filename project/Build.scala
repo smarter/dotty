@@ -40,6 +40,8 @@ object Build {
     // "-XX:+HeapDumpOnOutOfMemoryError", "-Xmx1g", "-Xss2m"
   )
 
+  lazy val dottyInstance = taskKey[ScalaInstance]("Dotty Instance")
+
   // Packages all subprojects to their jars
   lazy val packageAll =
     taskKey[Map[String, String]]("Package everything needed to run tests")
@@ -561,10 +563,59 @@ object Build {
       )
   )
 
+  lazy val crossSettings = Seq(
+    crossScalaVersions := Seq("2.11.5", "0.1.1-SNAPSHOT"),
+    scalaOrganization := {
+      if (scalaVersion.value.startsWith("0.1"))
+        dottyOrganization
+      else
+        scalaOrganization.value
+    },
+    scalaCompilerBridgeSource := {
+      if (scalaVersion.value.startsWith("0.1"))
+        (dottyOrganization % "dotty-sbt-bridge" % scalaVersion.value % "component").sources()
+      else
+        scalaCompilerBridgeSource.value
+    },
+    autoScalaLibrary := false,
+    managedScalaInstance := !scalaVersion.value.startsWith("0.1"),
+    libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion,
+
+    ivyConfigurations += Configurations.ScalaTool,
+    libraryDependencies ++= {
+      if (scalaVersion.value.startsWith("0.1"))
+        Seq(dottyOrganization % "dotty-compiler_2.11" % scalaVersion.value % "scala-tool")
+      else
+        Seq()
+    },
+
+    scalaInstance := Def.taskDyn {
+      if (scalaVersion.value.startsWith("0.1"))
+        dottyInstance
+      else
+        Defaults.scalaInstanceTask
+    }.value,
+    dottyInstance := {
+      val toolReport = update.value.configuration(Configurations.ScalaTool.name).get
+      def files(id: String) =
+        for {
+          m <- toolReport.modules if m.module.name == id;
+          (art, file) <- m.artifacts if art.`type` == Artifact.DefaultType
+        } yield file
+      def file(id: String) = files(id).headOption getOrElse sys.error(s"Missing ${id}.jar")
+      val allFiles = toolReport.modules.flatMap(_.artifacts.map(_._2))
+      val libraryJar = file("scala-library")
+      val compilerJar = file("dotty-compiler_2.11")
+      val otherJars = allFiles.filterNot(x => x == libraryJar || x == compilerJar)
+      ScalaInstance(scalaVersion.value, libraryJar, compilerJar, otherJars: _*)(state.value.classLoaderCache.apply)
+    }
+  )
+
   lazy val `dotty-library` = project.in(file("library")).
     settings(sourceStructure).
     settings(dottyLibrarySettings).
-    settings(publishing)
+    settings(publishing).
+    settings(crossSettings)
 
   lazy val `dotty-library-bootstrapped` = project.in(file("library")).
     settings(sourceStructure).
