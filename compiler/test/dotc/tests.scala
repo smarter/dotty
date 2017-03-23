@@ -168,6 +168,21 @@ class tests extends CompilerTest {
     compileFile(posSpecialDir, "spec-t5545/S_1")
     compileFile(posSpecialDir, "spec-t5545/S_2")
   }
+  @Test def pos_false_companion = {
+    // compile by hand in two batches, since junit lacks the infrastructure to
+    // compile files in multiple batches according to _1, _2, ... suffixes.
+    val opts = List("-priorityclasspath", defaultOutputDir) ++ defaultOptions
+
+    compileList("pos_false_companion Part 1/2", List(
+      s"$posSpecialDir/false-companion/outerFoo_1.scala",
+      s"$posSpecialDir/false-companion/outerinnerFoo_1.scala"
+    ), opts)
+    compileList("pos_false_companion Part 2/2", List(
+      // The order in which we pass these files to the compiler is important
+      s"$posSpecialDir/false-companion/00_outerinnerTest_2.scala",
+      s"$posSpecialDir/false-companion/01_outerinnerFoo_2.scala"
+    ), opts)
+  }
   @Test def pos_utf8 = compileFile(posSpecialDir, "utf8encoded", explicitUTF8)
   @Test def pos_utf16 = compileFile(posSpecialDir, "utf16encoded", explicitUTF16)
 
