@@ -74,8 +74,15 @@ object NavigateAST {
       }
       path
     }
-    def singlePath(p: Positioned, path: List[Positioned]): List[Positioned] =
-      if (p.pos contains pos) {
+    def singlePath(p: Positioned, path: List[Positioned]): List[Positioned] = {
+      val currentHasPos =
+        p.pos.contains(pos) && (!p.pos.isZeroExtent ||
+          (path match {
+            case p1 :: _ => p1.pos.isZeroExtent || !p1.pos.contains(pos)
+            case _ => true
+          }))
+
+      if (currentHasPos) {
         p match {
           case p: WithLazyField[_] =>
             p.forceIfLazy
@@ -83,6 +90,7 @@ object NavigateAST {
         }
         childPath(p.productIterator, p :: path)
       } else path
+    }
     singlePath(from, Nil)
   }
 }
