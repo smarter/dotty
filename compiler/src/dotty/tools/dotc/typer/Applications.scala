@@ -820,7 +820,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
           ttree.tpe match {
             case alias: TypeRef if alias.info.isAlias && !nestedCtx.reporter.hasErrors =>
               companionRef(alias) match {
-                case companion: TermRef => return untpd.ref(companion) withPos tree.pos
+                case companion: TermRef => return untpd.ref(companion, tree.pos)
                 case _ =>
               }
             case _ =>

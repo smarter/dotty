@@ -347,7 +347,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
 
     val tree1 = ownType match {
       case ownType: NamedType if !prefixIsElidable(ownType) =>
-        ref(ownType).withPos(tree.pos)
+        ref(ownType, tree.pos)
       case _ =>
         tree.withType(ownType)
     }

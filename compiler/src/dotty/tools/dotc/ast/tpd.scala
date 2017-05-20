@@ -325,20 +325,31 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   }
 
   /** A tree representing the same reference as the given type */
-  def ref(tp: NamedType)(implicit ctx: Context): Tree =
-    if (tp.isType) TypeTree(tp)
-    else if (prefixIsElidable(tp)) Ident(tp)
-    else if (tp.symbol.is(Module) && ctx.owner.isContainedIn(tp.symbol.moduleClass))
-      followOuterLinks(This(tp.symbol.moduleClass.asClass))
-    else if (tp.symbol hasAnnotation defn.ScalaStaticAnnot)
-      Ident(tp)
-    else tp.prefix match {
-      case pre: SingletonType => followOuterLinks(singleton(pre)).select(tp)
-      case pre => Select(TypeTree(pre), tp)
-    } // no checks necessary
+  def ref(tp: NamedType, pos: Position = NoPosition)(implicit ctx: Context): Tree = {
+    val t =
+      if (tp.isType) TypeTree(tp)
+      else if (prefixIsElidable(tp)) Ident(tp)
+      else if (tp.symbol.is(Module) && ctx.owner.isContainedIn(tp.symbol.moduleClass)) {
+        val t0 = This(tp.symbol.moduleClass.asClass).withOptionalPos(pos)
+        followOuterLinks(t0.withOptionalPos(pos.startPos))
+      } else if (tp.symbol hasAnnotation defn.ScalaStaticAnnot)
+        Ident(tp)
+      else tp.prefix match {
+        case pre: SingletonType =>
+          val t0 = singleton(pre)
+          followOuterLinks(t0.withOptionalPos(pos.startPos)).select(tp)
+        case pre =>
+          val t0 = TypeTree(pre)
+          Select(t0.withOptionalPos(pos.startPos), tp)
+      } // no checks necessary
+    t.withOptionalPos(pos)
+  }
+
+  def ref(sym: Symbol, pos: Position)(implicit ctx: Context): Tree =
+    ref(NamedType(sym.owner.thisType, sym.name, sym.denot), pos)
 
   def ref(sym: Symbol)(implicit ctx: Context): Tree =
-    ref(NamedType(sym.owner.thisType, sym.name, sym.denot))
+    ref(sym, NoPosition)
 
   private def followOuterLinks(t: Tree)(implicit ctx: Context) = t match {
     case t: This if ctx.erasedTypes && !(t.symbol == ctx.owner.enclosingClass || t.symbol.isStaticOwner) =>
@@ -363,7 +374,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   def newArray(elemTpe: Type, returnTpe: Type, pos: Position, dims: JavaSeqLiteral)(implicit ctx: Context): Tree = {
     val elemClass = elemTpe.classSymbol
     def newArr =
-      ref(defn.DottyArraysModule).select(defn.newArrayMethod).withPos(pos)
+      ref(defn.DottyArraysModule, pos.startPos).select(defn.newArrayMethod).withPos(pos)
 
     if (!ctx.erasedTypes) {
       assert(!TypeErasure.isUnboundedGeneric(elemTpe)) //needs to be done during typer. See Applications.convertNewGenericArray
@@ -761,7 +772,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
             ref(tree.symbol.setter)
           case Select(qual, _) => qual.select(tree.symbol.setter)
         }
-        setr.appliedTo(rhs)
+        setr/*.withPos(tree.pos)*/.appliedTo(rhs)
       }
       else Assign(tree, rhs)
 

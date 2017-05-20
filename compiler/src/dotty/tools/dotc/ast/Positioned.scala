@@ -42,6 +42,9 @@ abstract class Positioned extends DotClass with Product {
   def withPos(posd: Positioned): this.type =
     if (posd == null) this else withPos(posd.pos)
 
+  def withOptionalPos(pos: Position): this.type =
+    if (pos == NoPosition) this else withPos(pos)
+
   /** This item with a position that's the union of the given `pos` and the
    *  current position.
    */

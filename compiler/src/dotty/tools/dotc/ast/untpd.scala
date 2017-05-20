@@ -327,8 +327,8 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
 
   def unitLiteral = Literal(Constant(()))
 
-  def ref(tp: NamedType)(implicit ctx: Context): Tree =
-    TypedSplice(tpd.ref(tp))
+  def ref(tp: NamedType, pos: Position = NoPosition)(implicit ctx: Context): Tree =
+    TypedSplice(tpd.ref(tp, pos))
 
   def rootDot(name: Name) = Select(Ident(nme.ROOTPKG), name)
   def scalaDot(name: Name) = Select(rootDot(nme.scala_), name)

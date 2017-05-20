@@ -441,7 +441,7 @@ class Inliner(call: tpd.Tree, rhs: tpd.Tree)(implicit ctx: Context) {
         tree.tpe match {
           case thistpe: ThisType =>
             thisProxy.get(thistpe.cls) match {
-              case Some(t) => ref(t).withPos(tree.pos)
+              case Some(t) => ref(t, tree.pos)
               case None => tree
             }
           case _ => tree
