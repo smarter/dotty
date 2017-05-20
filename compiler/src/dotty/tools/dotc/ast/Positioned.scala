@@ -75,8 +75,13 @@ abstract class Positioned extends DotClass with Product {
                                             // is known, from left to right.
     def fillIn(ps: List[Positioned], start: Int, end: Int): Unit = ps match {
       case p :: ps1 =>
-        p.setPos(Position(start, end))
-        fillIn(ps1, end, end)
+        if (!p.pos.exists || p.pos.isZeroExtent) {
+          p.setPos(Position(start, start))
+          fillIn(ps1, start, end)
+        } else {
+          p.setPos(Position(start, end))
+          fillIn(ps1, end, end)
+        }
       case nil =>
     }
     while (true) {
