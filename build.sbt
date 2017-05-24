@@ -21,5 +21,6 @@ val `scala-reflect` = Build.`scala-reflect`
 val scalap = Build.scalap
 
 val `sbt-dotty` = Build.`sbt-dotty`
+val `vscode-dotty` = Build.`vscode-dotty`
 
 inThisBuild(Build.thisBuildSettings)
