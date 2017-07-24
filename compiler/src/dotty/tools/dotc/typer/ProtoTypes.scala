@@ -172,8 +172,10 @@ object ProtoTypes {
   /** A prototype for expressions that appear in function position
    *
    *  [](args): resultType
+   *
+   *  @param isSelfConstrCall  True for prototypes of `this(...)` constructor calls
    */
-  case class FunProto(args: List[untpd.Tree], resType: Type, typer: Typer)(implicit ctx: Context)
+  case class FunProto(args: List[untpd.Tree], resType: Type, typer: Typer, isSelfConstrCall: Boolean)
   extends UncachedGroundType with ApplyingProto {
     private var myTypedArgs: List[Tree] = Nil
 
@@ -185,15 +187,19 @@ object ProtoTypes {
     /** A map recording the typer states in which arguments stored in myTypedArg were typed */
     private var evalState: SimpleMap[untpd.Tree, TyperState] = SimpleMap.Empty
 
-    def isMatchedBy(tp: Type)(implicit ctx: Context) =
-      typer.isApplicable(tp, Nil, typedArgs, resultType)
+    /** Evalute `op` with the proper context to type the arguments. */
+    protected def withArgCtx[T](op: Context => T)(implicit ctx: Context) =
+      if (isSelfConstrCall) op(ctx.thisCallArgContext) else op(ctx)
 
-    def derivedFunProto(args: List[untpd.Tree] = this.args, resultType: Type, typer: Typer = this.typer) =
-      if ((args eq this.args) && (resultType eq this.resultType) && (typer eq this.typer)) this
-      else new FunProto(args, resultType, typer)
+    def isMatchedBy(tp: Type)(implicit ctx: Context) = withArgCtx { implicit ctx =>
+      typer.isApplicable(tp, Nil, typedArgs, resultType)
+    }
+
+    def derivedFunProto(args: List[untpd.Tree] = this.args, resType: Type, typer: Typer = this.typer) =
+      if ((args eq this.args) && (resType eq this.resType) && (typer eq this.typer)) this
+      else new FunProto(args, resType, typer, isSelfConstrCall)
 
     override def notApplied = WildcardType
-
     /** Forget the types of any arguments that have been typed producing a constraint in a
      *  typer state that is not yet committed into the one of the current context `ctx`.
      *  This is necessary to avoid "orphan" TypeParamRefs that are referred to from
@@ -227,7 +233,7 @@ object ProtoTypes {
     /** The typed arguments. This takes any arguments already typed using
      *  `typedArg` into account.
      */
-    def typedArgs: List[Tree] = {
+    def typedArgs(implicit ctx: Context): List[Tree] = withArgCtx { implicit ctx =>
       if (myTypedArgs.size != args.length)
         myTypedArgs = args.mapconserve(cacheTypedArg(_, typer.typed(_)))
       myTypedArgs
@@ -236,7 +242,7 @@ object ProtoTypes {
     /** Type single argument and remember the unadapted result in `myTypedArg`.
      *  used to avoid repeated typings of trees when backtracking.
      */
-    def typedArg(arg: untpd.Tree, formal: Type)(implicit ctx: Context): Tree = {
+    def typedArg(arg: untpd.Tree, formal: Type)(implicit ctx: Context): Tree = withArgCtx { implicit ctx =>
       val targ = cacheTypedArg(arg, typer.typedUnadapted(_, formal))
       typer.adapt(targ, formal, arg)
     }
@@ -254,7 +260,7 @@ object ProtoTypes {
       case pt: FunProto =>
         pt
       case _ =>
-        myTupled = new FunProto(untpd.Tuple(args) :: Nil, resultType, typer)
+        myTupled = new FunProto(untpd.Tuple(args) :: Nil, resType, typer, isSelfConstrCall)
         tupled
     }
 
@@ -277,7 +283,7 @@ object ProtoTypes {
 
     def isDropped: Boolean = toDrop
 
-    override def toString = s"FunProto(${args mkString ","} => $resultType)"
+    override def toString = s"FunProto(${args mkString ","} => $resType)"
 
     def map(tm: TypeMap)(implicit ctx: Context): FunProto =
       derivedFunProto(args, tm(resultType), typer)
@@ -293,8 +299,10 @@ object ProtoTypes {
    *
    *  [](args): resultType, where args are known to be typed
    */
-  class FunProtoTyped(args: List[tpd.Tree], resultType: Type, typer: Typer)(implicit ctx: Context) extends FunProto(args, resultType, typer)(ctx) {
-    override def typedArgs = args
+  class FunProtoTyped(args: List[tpd.Tree], resultType: Type, typer: Typer)
+  // args are already typed so no need to set isSelfConstrCall
+  extends FunProto(args, resultType, typer, isSelfConstrCall = false) {
+    override def typedArgs(implicit ctx: Context) = args
   }
 
   /** A prototype for implicitly inferred views:
@@ -331,7 +339,7 @@ object ProtoTypes {
   }
 
   class UnapplyFunProto(argType: Type, typer: Typer)(implicit ctx: Context) extends FunProto(
-    untpd.TypedSplice(dummyTreeOfType(argType))(ctx) :: Nil, WildcardType, typer)
+    untpd.TypedSplice(dummyTreeOfType(argType))(ctx) :: Nil, WildcardType, typer, isSelfConstrCall = false)
 
   /** A prototype for expressions [] that are type-parameterized:
    *
