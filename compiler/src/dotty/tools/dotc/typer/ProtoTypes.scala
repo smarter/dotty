@@ -227,7 +227,7 @@ object ProtoTypes {
     /** The typed arguments. This takes any arguments already typed using
      *  `typedArg` into account.
      */
-    def typedArgs: List[Tree] = {
+    def typedArgs(implicit ctx: Context): List[Tree] = {
       if (myTypedArgs.size != args.length)
         myTypedArgs = args.mapconserve(cacheTypedArg(_, typer.typed(_)))
       myTypedArgs
@@ -294,7 +294,7 @@ object ProtoTypes {
    *  [](args): resultType, where args are known to be typed
    */
   class FunProtoTyped(args: List[tpd.Tree], resultType: Type, typer: Typer)(implicit ctx: Context) extends FunProto(args, resultType, typer)(ctx) {
-    override def typedArgs = args
+    override def typedArgs(implicit ctx: Context) = args
   }
 
   /** A prototype for implicitly inferred views:
