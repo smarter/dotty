@@ -348,7 +348,7 @@ object Contexts {
      *   - as scope: The parameters of the auxiliary constructor.
      */
     def thisCallArgContext: Context = {
-      assert(owner.isClassConstructor, this)
+      assert(owner.isClassConstructor)
       val constrCtx = outersIterator.dropWhile(_.outer.owner == owner).next()
       superOrThisCallContext(owner, constrCtx.scope)
         .setTyperState(typerState)

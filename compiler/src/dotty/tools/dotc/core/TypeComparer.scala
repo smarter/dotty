@@ -126,7 +126,7 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
         result
       } catch {
         case NonFatal(ex) =>
-          // if (ex.isInstanceOf[AssertionError]) showGoal(tp1, tp2)
+          if (ex.isInstanceOf[AssertionError]) showGoal(tp1, tp2)
           recCount -= 1
           constraint = saved
           successCount = savedSuccessCount
