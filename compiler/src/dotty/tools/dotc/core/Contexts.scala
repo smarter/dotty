@@ -695,9 +695,7 @@ object Contexts {
   }
 
   /** Info that changes on each compiler run */
-  class RunInfo(protected val ictx: Context) extends ImplicitRunInfo with ConstraintRunInfo {
-    // implicit val ctx: Context = initctx
-  }
+  class RunInfo(protected val ictx: Context) extends ImplicitRunInfo with ConstraintRunInfo
 
   class GADTMap(initBounds: SimpleMap[Symbol, TypeBounds]) {
     private var myBounds = initBounds

@@ -128,8 +128,13 @@ object Implicits {
       }
 
       if (refs.isEmpty) Nil
-      else refs.filter(refMatches(_)(ctx.fresh.retractMode(Mode.ImplicitsEnabled).addMode(Mode.TypevarsMissContext).setExploreTyperState)) // create a defensive copy of ctx to avoid constraint pollution
-               .map(Candidate(_, level))
+      else {
+        val filteringCtx = ctx.fresh
+          .retractMode(Mode.ImplicitsEnabled)
+          .addMode(Mode.TypevarsMissContext)
+          .setExploreTyperState // create a defensive copy of ctx to avoid constraint pollution
+        refs.filter(refMatches(_)(filteringCtx)).map(Candidate(_, level))
+      }
     }
   }
 
@@ -379,7 +384,6 @@ trait ImplicitRunInfo { self: RunInfo =>
      *  abstract types are eliminated.
      */
     object liftToClasses extends TypeMap {
-      // override implicit protected val ctx: Context = liftingCtx
       override def stopAtStatic = true
       def apply(tp: Type) = tp match {
         case tp: TypeRef if tp.symbol.isAbstractOrAliasType =>
@@ -445,7 +449,7 @@ trait ImplicitRunInfo { self: RunInfo =>
               if (companion.exists) addRef(companion.valRef)
               cls.classParents foreach addParentScope
             }
-            tp.classSymbols(liftingCtx) foreach addClassScope
+            tp.classSymbols foreach addClassScope
           case _ =>
             // We exclude lower bounds to conform to SLS 7.2:
             // "The parts of a type T are: [...] if T is an abstract type, the parts of its upper bound"

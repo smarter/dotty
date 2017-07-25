@@ -199,9 +199,9 @@ object ProtoTypes {
     def isMatchedBy(tp: Type)(implicit ctx: Context) =
       typer.isApplicable(tp, Nil, typedArgs, resultType)(argCtx)
 
-    def derivedFunProto(args: List[untpd.Tree] = this.args, resultType: Type, typer: Typer = this.typer) =
-      if ((args eq this.args) && (resultType eq this.resultType) && (typer eq this.typer)) this
-      else new FunProto(args, resultType, typer, isSelfConstrCall)
+    def derivedFunProto(args: List[untpd.Tree] = this.args, resType: Type, typer: Typer = this.typer) =
+      if ((args eq this.args) && (resType eq this.resType) && (typer eq this.typer)) this
+      else new FunProto(args, resType, typer, isSelfConstrCall)
 
     override def notApplied = WildcardType
     /** Forget the types of any arguments that have been typed producing a constraint in a
@@ -264,7 +264,7 @@ object ProtoTypes {
       case pt: FunProto =>
         pt
       case _ =>
-        myTupled = new FunProto(untpd.Tuple(args) :: Nil, resultType, typer, isSelfConstrCall)
+        myTupled = new FunProto(untpd.Tuple(args) :: Nil, resType, typer, isSelfConstrCall)
         tupled
     }
 
@@ -287,7 +287,7 @@ object ProtoTypes {
 
     def isDropped: Boolean = toDrop
 
-    override def toString = s"FunProto(${args mkString ","} => $resultType)"
+    override def toString = s"FunProto(${args mkString ","} => $resType)"
 
     def map(tm: TypeMap)(implicit ctx: Context): FunProto =
       derivedFunProto(args, tm(resultType), typer)
