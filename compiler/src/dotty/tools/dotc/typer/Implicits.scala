@@ -364,7 +364,7 @@ trait ImplicitRunInfo { self: RunInfo =>
    *                      a type variable, we need the current context, the current
    *                      runinfo context does not do.
    */
-  def implicitScope(rootTp: Type, liftingCtx: Context): OfTypeImplicits = {
+  def implicitScope(rootTp: Type, liftingCtx: Context)(implicit ctx: Context): OfTypeImplicits = {
 
     val seen: mutable.Set[Type] = mutable.Set()
     val incomplete: mutable.Set[Type] = mutable.Set()
@@ -376,7 +376,7 @@ trait ImplicitRunInfo { self: RunInfo =>
      *  abstract types are eliminated.
      */
     object liftToClasses extends TypeMap {
-      override implicit protected val ctx: Context = liftingCtx
+      // override implicit protected val ctx: Context = liftingCtx
       override def stopAtStatic = true
       def apply(tp: Type) = tp match {
         case tp: TypeRef if tp.symbol.isAbstractOrAliasType =>
@@ -468,7 +468,7 @@ trait ImplicitRunInfo { self: RunInfo =>
               iscope(liftedTp, isLifted = true).companionRefs
             else
               collectCompanions(tp)
-          val result = new OfTypeImplicits(tp, refs)(ctx)
+          val result = new OfTypeImplicits(tp, refs)(ictx)
           if (ctx.typerState.ephemeral)
             record("ephemeral cache miss: implicitScope")
           else if (canCache &&
