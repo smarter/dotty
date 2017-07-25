@@ -182,6 +182,8 @@ object ProtoTypes {
 
     override def resultType(implicit ctx: Context) = resType
 
+    val ictx = ctx
+
     /** A map in which typed arguments can be stored to be later integrated in `typedArgs`. */
     private var myTypedArg: SimpleMap[untpd.Tree, Tree] = SimpleMap.Empty
 
@@ -189,8 +191,10 @@ object ProtoTypes {
     private var evalState: SimpleMap[untpd.Tree, TyperState] = SimpleMap.Empty
 
     /** Context used to type the arguments. */
-    protected def argCtx(implicit ctx: Context) =
+    protected def argCtx(implicit ctx: Context) = {
+      assert(ctx.outersIterator.contains(ictx))
       if (isSelfConstrCall) ctx.thisCallArgContext else ctx
+    }
 
     def isMatchedBy(tp: Type)(implicit ctx: Context) =
       typer.isApplicable(tp, Nil, typedArgs, resultType)
