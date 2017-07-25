@@ -243,7 +243,7 @@ object ProtoTypes {
      *  used to avoid repeated typings of trees when backtracking.
      */
     def typedArg(arg: untpd.Tree, formal: Type)(implicit ctx: Context): Tree = {
-      val targ = cacheTypedArg(arg, typer.typedUnadapted(_, formal)(argCtx))
+      val targ = cacheTypedArg(arg, typer.typedUnadapted(_, formal)(argCtx))(argCtx)
       typer.adapt(targ, formal, arg)(argCtx)
     }
 

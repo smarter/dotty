@@ -648,7 +648,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
   def typedApply(tree: untpd.Apply, pt: Type)(implicit ctx: Context): Tree = {
 
     def realApply(implicit ctx: Context): Tree = track("realApply") {
-      val originalProto = new FunProto(tree.args, IgnoredProto(pt), this, untpd.isSelfConstrCall(tree))(argCtx(tree))
+      val originalProto = new FunProto(tree.args, IgnoredProto(pt), this, untpd.isSelfConstrCall(tree))
       val fun1 = typedExpr(tree.fun, originalProto)
 
       // Warning: The following lines are dirty and fragile. We record that auto-tupling was demanded as
@@ -677,7 +677,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
               if (proto.allArgTypesAreCurrent())
                 new ApplyToTyped(tree, fun1, funRef, proto.typedArgs, pt)
               else
-                new ApplyToUntyped(tree, fun1, funRef, proto, pt)(argCtx(tree))
+                new ApplyToUntyped(tree, fun1, funRef, proto, pt)
             convertNewGenericArray(ConstFold(app.result))
           case _ =>
             handleUnexpectedFunType(tree, fun1)
