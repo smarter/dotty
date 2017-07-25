@@ -48,12 +48,12 @@ object Implicits {
   /** A common base class of contextual implicits and of-type implicits which
    *  represents a set of implicit references.
    */
-  abstract class ImplicitRefs(protected val ictx: Context) {
+  abstract class ImplicitRefs {
     /** The nesting level of this context. Non-zero only in ContextialImplicits */
     def level: Int = 0
 
     /** The implicit references */
-    def refs: List[TermRef]
+    def refs(implicit ctx: Context): List[TermRef]
 
     /** Return those references in `refs` that are compatible with type `pt`. */
     protected def filterMatching(pt: Type)(implicit ctx: Context): List[Candidate] = track("filterMatching") {
@@ -137,13 +137,15 @@ object Implicits {
    *  @param tp              the type determining the implicit scope
    *  @param companionRefs   the companion objects in the implicit scope.
    */
-  class OfTypeImplicits(tp: Type, val companionRefs: TermRefSet)(ictx: Context) extends ImplicitRefs(ictx) {
-    assert(ictx.typer != null)
-
-    lazy val refs: List[TermRef] = {
-      val buf = new mutable.ListBuffer[TermRef]
-      for (companion <- companionRefs) buf ++= companion.implicitMembers(ictx)
-      buf.toList
+  class OfTypeImplicits(tp: Type, val companionRefs: TermRefSet) extends ImplicitRefs {
+    private[this] var myRefs: List[TermRef] = _
+    def refs(implicit ctx: Context): List[TermRef] = {
+      if (myRefs == null) {
+        val buf = new mutable.ListBuffer[TermRef]
+        for (companion <- companionRefs) buf ++= companion.implicitMembers
+        myRefs = buf.toList
+      }
+      myRefs
     }
 
     private[this] var myEligible: List[Candidate] = _
@@ -160,21 +162,19 @@ object Implicits {
       myEligible
     }
 
-    override def toString = {
-      implicit val ctx = ictx
-      i"OfTypeImplicits($tp), companions = ${companionRefs.toList}%, %; refs = $refs%, %."
-    }
+    // override def toString = s"OfTypeImplicits($tp), companions = ${companionRefs.toList}%, %; refs = $refs%, %."
   }
 
   /** The implicit references coming from the context.
-   *  @param refs      the implicit references made visible by the current context.
+   *  @param myRefs    the implicit references made visible by the current context.
    *                   Note: The name of the reference might be different from the name of its symbol.
    *                   In the case of a renaming import a => b, the name of the reference is the renamed
    *                   name, b, whereas the name of the symbol is the original name, a.
-   *  @param outerCtx  the next outer context that makes visible further implicits
    */
-  class ContextualImplicits(val refs: List[TermRef], val outerImplicits: ContextualImplicits)(ictx: Context) extends ImplicitRefs(ictx) {
+  class ContextualImplicits(myRefs: List[TermRef], val outerImplicits: ContextualImplicits, private val ictx: Context) extends ImplicitRefs {
     private val eligibleCache = new mutable.AnyRefMap[Type, List[Candidate]]
+
+    override def refs(implicit ctx: Context) = myRefs
 
     /** The level increases if current context has a different owner or scope than
      *  the context of the next-outer ImplicitRefs. This is however disabled under
@@ -233,7 +233,7 @@ object Implicits {
     }
 
     override def toString = {
-      val own = s"(implicits: $refs%, %)"
+      val own = s"(implicits: $myRefs%, %)"
       if (isOuterMost) own else own + "\n " + outerImplicits
     }
 
@@ -246,7 +246,7 @@ object Implicits {
         val outerExcluded = outerImplicits exclude root
         if (ictx.importInfo.site(ictx).termSymbol(ictx) == root) outerExcluded
         else if (outerExcluded eq outerImplicits) this
-        else new ContextualImplicits(refs, outerExcluded)(ictx)
+        else new ContextualImplicits(myRefs, outerExcluded, ictx)
       }
   }
 
@@ -471,7 +471,7 @@ trait ImplicitRunInfo { self: RunInfo =>
               iscope(liftedTp, isLifted = true).companionRefs
             else
               collectCompanions(tp)
-          val result = new OfTypeImplicits(tp, refs)(ictx)
+          val result = new OfTypeImplicits(tp, refs)
           if (ctx.typerState.ephemeral)
             record("ephemeral cache miss: implicitScope")
           else if (canCache &&
@@ -605,7 +605,7 @@ trait Implicits { self: Typer =>
     def lazyImplicitCtx(lazyImplicit: Symbol): Context = {
       val lctx = ctx.fresh
       for (delayedRef <- ctx.property(DelayedImplicit))
-        lctx.setImplicits(new ContextualImplicits(delayedRef :: Nil, ctx.implicits)(ctx))
+        lctx.setImplicits(new ContextualImplicits(delayedRef :: Nil, ctx.implicits, ctx))
       lctx.setProperty(DelayedImplicit, lazyImplicit.termRef)
     }
 
