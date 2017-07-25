@@ -141,7 +141,7 @@ class Compiler {
     ctx.initialize()(start) // re-initialize the base context with start
     def addImport(ctx: Context, refFn: () => TermRef) =
       ctx.fresh.setImportInfo(ImportInfo.rootImport(refFn)(ctx))
-    (start.setRunInfo(new RunInfo(start)) /: defn.RootImportFns)(addImport)
+    (start.setRunInfo(new RunInfo) /: defn.RootImportFns)(addImport)
   }
 
   def reset()(implicit ctx: Context): Unit = {
