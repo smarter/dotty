@@ -192,7 +192,7 @@ object ProtoTypes {
 
     /** Context used to type the arguments. */
     protected def argCtx(implicit ctx: Context) = {
-      assert(ctx.outersIterator.contains(ictx))
+      assert(ctx.outersIterator.contains(ictx), ctx)
       if (isSelfConstrCall) ctx.thisCallArgContext else ctx
     }
 

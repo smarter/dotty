@@ -49,9 +49,6 @@ object Implicits {
    *  represents a set of implicit references.
    */
   abstract class ImplicitRefs(protected val ictx: Context) {
-    // val ictx: Context =
-    //   if (initctx == NoContext) initctx else initctx retractMode Mode.ImplicitsEnabled
-
     /** The nesting level of this context. Non-zero only in ContextialImplicits */
     def level: Int = 0
 
@@ -142,25 +139,31 @@ object Implicits {
    */
   class OfTypeImplicits(tp: Type, val companionRefs: TermRefSet)(ictx: Context) extends ImplicitRefs(ictx) {
     assert(ictx.typer != null)
-    implicit val ctx: Context = ictx
 
     lazy val refs: List[TermRef] = {
       val buf = new mutable.ListBuffer[TermRef]
-      for (companion <- companionRefs) buf ++= companion.implicitMembers
+      for (companion <- companionRefs) buf ++= companion.implicitMembers(ictx)
       buf.toList
     }
 
+    private[this] var myEligible: List[Candidate] = _
     /** The candidates that are eligible for expected type `tp` */
-    lazy val eligible: List[Candidate] =
-      /*>|>*/ track("eligible in tpe") /*<|<*/ {
-        /*>|>*/ ctx.traceIndented(i"eligible($tp), companions = ${companionRefs.toList}%, %", implicitsDetailed, show = true) /*<|<*/ {
-          if (refs.nonEmpty && monitored) record(s"check eligible refs in tpe", refs.length)
-          filterMatching(tp)
+    def eligible(implicit ctx: Context): List[Candidate] = {
+      if (myEligible == null) {
+        /*>|>*/ track("eligible in tpe") /*<|<*/ {
+          /*>|>*/ ctx.traceIndented(i"eligible($tp), companions = ${companionRefs.toList}%, %", implicitsDetailed, show = true) /*<|<*/ {
+            if (refs.nonEmpty && monitored) record(s"check eligible refs in tpe", refs.length)
+            myEligible = filterMatching(tp)
+          }
         }
       }
+      myEligible
+    }
 
-    override def toString =
+    override def toString = {
+      implicit val ctx = ictx
       i"OfTypeImplicits($tp), companions = ${companionRefs.toList}%, %; refs = $refs%, %."
+    }
   }
 
   /** The implicit references coming from the context.
@@ -170,7 +173,7 @@ object Implicits {
    *                   name, b, whereas the name of the symbol is the original name, a.
    *  @param outerCtx  the next outer context that makes visible further implicits
    */
-  class ContextualImplicits(val refs: List[TermRef], val outerImplicits: ContextualImplicits)(initctx: Context) extends ImplicitRefs(initctx) {
+  class ContextualImplicits(val refs: List[TermRef], val outerImplicits: ContextualImplicits)(ictx: Context) extends ImplicitRefs(ictx) {
     private val eligibleCache = new mutable.AnyRefMap[Type, List[Candidate]]
 
     /** The level increases if current context has a different owner or scope than
