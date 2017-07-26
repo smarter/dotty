@@ -175,9 +175,11 @@ object ProtoTypes {
    *
    *  @param isSelfConstrCall  True for prototypes of `this(...)` constructor calls
    */
-  case class FunProto(args: List[untpd.Tree], resType: Type, typer: Typer, isSelfConstrCall: Boolean)
+  case class FunProto(args: List[untpd.Tree], resType: Type, typer: Typer, isSelfConstrCall: Boolean)(implicit ctx: Context)
   extends UncachedGroundType with ApplyingProto {
     private var myTypedArgs: List[Tree] = Nil
+
+    val ictx = ctx
 
     override def resultType(implicit ctx: Context) = resType
 
@@ -188,8 +190,10 @@ object ProtoTypes {
     private var evalState: SimpleMap[untpd.Tree, TyperState] = SimpleMap.Empty
 
     /** Evalute `op` with the proper context to type the arguments. */
-    protected def withArgCtx[T](op: Context => T)(implicit ctx: Context) =
+    protected def withArgCtx[T](op: Context => T)(implicit ctx: Context) = {
+      assert(ctx.outersIterator.contains(ictx))
       if (isSelfConstrCall) op(ctx.thisCallArgContext) else op(ctx)
+    }
 
     def isMatchedBy(tp: Type)(implicit ctx: Context) = withArgCtx { implicit ctx =>
       typer.isApplicable(tp, Nil, typedArgs, resultType)
@@ -299,9 +303,9 @@ object ProtoTypes {
    *
    *  [](args): resultType, where args are known to be typed
    */
-  class FunProtoTyped(args: List[tpd.Tree], resultType: Type, typer: Typer)
+  class FunProtoTyped(args: List[tpd.Tree], resultType: Type, typer: Typer)(implicit ctx: Context)
   // args are already typed so no need to set isSelfConstrCall
-  extends FunProto(args, resultType, typer, isSelfConstrCall = false) {
+  extends FunProto(args, resultType, typer, isSelfConstrCall = false)(ctx) {
     override def typedArgs(implicit ctx: Context) = args
   }
 
