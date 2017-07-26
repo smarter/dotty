@@ -189,10 +189,18 @@ object ProtoTypes {
     /** A map recording the typer states in which arguments stored in myTypedArg were typed */
     private var evalState: SimpleMap[untpd.Tree, TyperState] = SimpleMap.Empty
 
+    private[this] var thisCallArgCtxUsed: Boolean = false
+
     /** Evalute `op` with the proper context to type the arguments. */
     protected def withArgCtx[T](op: Context => T)(implicit ctx: Context) = {
-      assert(ctx.outersIterator.contains(ictx))
-      if (isSelfConstrCall) op(ctx.thisCallArgContext) else op(ctx)
+      assert(thisCallArgCtxUsed || ctx.outersIterator.contains(ictx))
+      if (isSelfConstrCall && !thisCallArgCtxUsed) {
+        // Context#thisCallArgContext is not idempotent so we must only use it
+        // once even with nested calls to withArgCtx
+        thisCallArgCtxUsed = true
+        try op(ctx.thisCallArgContext)
+        finally thisCallArgCtxUsed = false
+      } else op(ctx)
     }
 
     def isMatchedBy(tp: Type)(implicit ctx: Context) = withArgCtx { implicit ctx =>
