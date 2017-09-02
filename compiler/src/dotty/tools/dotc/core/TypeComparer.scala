@@ -464,14 +464,12 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
             isSubType(tp1.resType, tp2.resType.subst(tp2, tp1))
           finally comparedTypeLambdas = saved
         case _ =>
-          if (!tp1.isHK) {
-            tp2 match {
-              case EtaExpansion(tycon2) if tycon2.symbol.isClass =>
-                return isSubType(tp1, tycon2)
-              case _ =>
-            }
+          tp2 match {
+            case EtaExpansion(tycon2) if (!tp1.isHK && tycon2.symbol.isClass) || tp1.isDirectRef(tycon2.symbol) =>
+              isSubType(tp1, tycon2)
+            case _ =>
+              fourthTry(tp1, tp2)
           }
-          fourthTry(tp1, tp2)
       }
       compareTypeLambda
     case OrType(tp21, tp22) =>
