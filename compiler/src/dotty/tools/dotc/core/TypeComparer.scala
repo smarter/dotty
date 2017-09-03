@@ -464,14 +464,18 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
             isSubType(tp1.resType, tp2.resType.subst(tp2, tp1))
           finally comparedTypeLambdas = saved
         case _ =>
-          if (!tp1.isHK) {
+          if (tp1.isHK) {
+            val t = EtaExpansion(tp1)
+            assert(tp1 != t, tp1)
+            isSubType(t, tp2)
+          } else {
             tp2 match {
               case EtaExpansion(tycon2) if tycon2.symbol.isClass =>
-                return isSubType(tp1, tycon2)
+                isSubType(tp1, tycon2)
               case _ =>
+                fourthTry(tp1, tp2)
             }
           }
-          fourthTry(tp1, tp2)
       }
       compareTypeLambda
     case OrType(tp21, tp22) =>
@@ -596,7 +600,7 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
       isSubType(tp1.underlying.hiBound, tp2)
     case tp1: HKTypeLambda =>
       def compareHKLambda = tp1 match {
-        case EtaExpansion(tycon1) => isSubType(tycon1, tp2)
+        // case EtaExpansion(tycon1) => isSubType(tycon1, tp2)
         case _ => tp2 match {
           case tp2: HKTypeLambda => false // this case was covered in thirdTry
           case _ => tp2.isHK && isSubType(tp1.resultType, tp2.appliedTo(tp1.paramRefs))

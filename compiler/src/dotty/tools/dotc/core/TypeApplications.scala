@@ -60,7 +60,7 @@ object TypeApplications {
   object EtaExpansion {
     def apply(tycon: Type)(implicit ctx: Context) = {
       assert(tycon.typeParams.nonEmpty, tycon)
-      tycon.EtaExpand(tycon.typeParamSymbols)
+      tycon.EtaExpand(tycon.typeParams)
     }
 
     def unapply(tp: Type)(implicit ctx: Context): Option[TypeRef] = tp match {
@@ -254,9 +254,9 @@ class TypeApplications(val self: Type) extends AnyVal {
   /** Convert a type constructor `TC` which has type parameters `X1, ..., Xn`
    *  to `[X1, ..., Xn] -> TC[X1, ..., Xn]`.
    */
-  def EtaExpand(tparams: List[TypeSymbol])(implicit ctx: Context): Type = {
-    val tparamsToUse = if (variancesConform(typeParams, tparams)) tparams else typeParamSymbols
-    HKTypeLambda.fromParams(tparamsToUse, self.appliedTo(tparams.map(_.typeRef)))
+  def EtaExpand(tparams: List[TypeParamInfo])(implicit ctx: Context): Type = {
+    val tparamsToUse = if (variancesConform(typeParams, tparams)) tparams else typeParams
+    HKTypeLambda.fromParams(tparamsToUse, self.appliedTo(tparams.map(_.paramRef)))
       //.ensuring(res => res.EtaReduce =:= self, s"res = $res, core = ${res.EtaReduce}, self = $self, hc = ${res.hashCode}")
   }
 
