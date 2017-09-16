@@ -1155,7 +1155,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
             case _ => mapOver(t)
           }
         }
-        (flip(tp1) relaxed_<:< flip(tp2)) || viewExists(tp1, tp2)
+        (flip(tp1) relaxed_frozen_<:< flip(tp2)) || viewExists(tp1, tp2)
       }
 
     /** Drop any implicit parameter section */

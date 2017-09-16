@@ -35,8 +35,9 @@ object ProtoTypes {
      *    3. there is an implicit conversion from `tp` to `pt`.
      *    4. `tp` is a numeric subtype of `pt` (this case applies even if implicit conversions are disabled)
      */
-    def isCompatible(tp: Type, pt: Type)(implicit ctx: Context): Boolean =
-      (tp.widenExpr relaxed_<:< pt.widenExpr) || viewExists(tp, pt)
+    def isCompatible(tp: Type, pt: Type)(implicit ctx: Context): Boolean = {
+      (tp.widenExpr relaxed_frozen_<:< pt.widenExpr) || viewExists(tp, pt)
+    }
 
     /** Test compatibility after normalization in a fresh typerstate. */
     def normalizedCompatible(tp: Type, pt: Type)(implicit ctx: Context) = {

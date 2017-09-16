@@ -773,6 +773,9 @@ object Types {
     def relaxed_<:<(that: Type)(implicit ctx: Context) =
       (this <:< that) || (this isValueSubType that)
 
+    def relaxed_frozen_<:<(that: Type)(implicit ctx: Context) =
+      (this frozen_<:< that) || (this isValueSubType that)
+
     /** Is this type a legal type for member `sym1` that overrides another
      *  member `sym2` of type `that`? This is the same as `<:<`, except that
      *  if `matchLoosely` evaluates to true the types `=> T` and `()T` are seen
