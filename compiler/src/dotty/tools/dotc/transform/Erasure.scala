@@ -572,10 +572,6 @@ object Erasure {
       super.typedDefDef(ddef1, sym)
     }
 
-    /** After erasure, we may have to replace the closure method by a bridge.
-     *  LambdaMetaFactory handles this automatically for most types, but we have
-     *  to deal with boxing and unboxing of value classes ourselves.
-     */
     override def typedClosure(tree: untpd.Closure, pt: Type)(implicit ctx: Context) = {
       val xxl = defn.isXXLFunctionClass(tree.typeOpt.typeSymbol)
       var implClosure @ Closure(_, meth, _) = super.typedClosure(tree, pt)
@@ -589,25 +585,52 @@ object Erasure {
           val implResultType = implType.resultType
           val samResultType = sam.info.resultType
 
-          // Given a value class V with an underlying type U, the following code:
-          //   val f: Function1[V, V] = x => ...
-          // results in the creation of a closure and a method:
-          //   def $anonfun(v1: V): V = ...
-          //   val f: Function1[V, V] = closure($anonfun)
-          // After [[Erasure]] this method will look like:
-          //   def $anonfun(v1: ErasedValueType(V, U)): ErasedValueType(V, U) = ...
-          // And after [[ElimErasedValueType]] it will look like:
-          //   def $anonfun(v1: U): U = ...
-          // This method does not implement the SAM of Function1[V, V] anymore and
-          // needs to be replaced by a bridge:
-          //   def $anonfun$2(v1: V): V = new V($anonfun(v1.underlying))
-          //   val f: Function1 = closure($anonfun$2)
-          // In general, a bridge is needed when the signature of the closure method after
-          // Erasure contains an ErasedValueType but the corresponding type in the functional
-          // interface is not an ErasedValueType.
+          // The following code:
+          //
+          //     val f: Function1[Int, Any] = x => ...
+          //
+          // results in the creation of a closure and a method in the typer:
+          //
+          //     def $anonfun(x: Int): Any = ...
+          //     val f: Function1[Int, Any] = closure($anonfun)
+          //
+          // Notice that `$anonfun` takes a primitive as argument, but the single abstract method
+          // of `Function1` after erasure is:
+          //
+          //     def apply(x: Object): Object
+          //
+          // which takes a reference as argument. Hence, some form of adaptation is required.
+          //
+          // If we do nothing, the LambdaMetaFactory bootstrap method will
+          // automatically do the adaptation. Unfortunately, the result does not
+          // implement the expected Scala semantics: null should be "unboxed" to
+          // the default value of the value class, but LMF will throw a
+          // NullPointerException instead. LMF is also not capable of doing
+          // adaptation for derived value classes.
+          //
+          // Thus, we need to replace the closure method by a bridge method that
+          // forwards to the original closure method with appropriate
+          // boxing/unboxing. For our example above, this would be:
+          //
+          //     def $anonfun1(x: Object): Object = $anonfun(BoxesRunTime.unboxToInt(x))
+          //     val f: Function1 = closure($anonfun1)
+          //
+          // In general, a bridge is needed when, after Erasure:
+          // - the signature of the closure method is not a reference type
+          // - the corresponding type in the functional interface is a reference type
+          //
+          // See test cases lambda-null.scala and t8017 for concrete examples.
+          //
+          // NOTE: No bridge is generated for closures that will be specialized
+          // by [[FunctionalInterfaces]] because afterwards the closure method
+          // will implement the single abstract method of the specialized
+          // function type without any adaptation needed.
+
+          def isReferenceType(tp: Type) = !tp.isPrimitiveValueType && !tp.isErasedValueType
           val bridgeNeeded =
+            !defn.isSpecializableFunction(implClosure.tpe.widen.classSymbol.asClass, samParamTypes, samResultType) &&
             (implResultType :: implParamTypes, samResultType :: samParamTypes).zipped.exists(
-              (implType, samType) => implType.isErasedValueType && !samType.isErasedValueType
+              (implType, samType) => !isReferenceType(implType) && isReferenceType(samType)
             )
 
           if (bridgeNeeded) {
