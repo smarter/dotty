@@ -618,26 +618,24 @@ object Erasure {
           // In general, a bridge is needed when, after Erasure:
           // - one of the parameter type of the closure method is a non-reference type,
           //   and the corresponding type in the SAM is a reference type
-          // - or the result type of the closure is Unit
-          // However, the following exceptions exist:
-          // - If the SAM is replaced by JFunction*mc* in [[FunctionalInterfaces]], no bridge is needed:
-          //   the SAM contains default methods to handle adaptation
-          // - If the SAM is replaced by JProcedure* in the backend, no adaptation
-          //   is needed for the result type.
+          // - or the result type of the closure method is an erased value type
+          //   and the result type in the SAM isn't
+          // However, the following exception exists: If the SAM is replaced by
+          // JFunction*mc* in [[FunctionalInterfaces]], no bridge is needed: the
+          // SAM contains default methods to handle adaptation
           //
           // See test cases lambda-null.scala, lambda-unit.scala and t8017 for concrete examples.
           //
           // NOTE: No bridge is generated for closures that will be specialized
           // by [[FunctionalInterfaces]] into JFunction*, this takes care of the adaption.
 
-          val isNonFunctionSAM = implClosure.tpt.tpe.exists
           def isReferenceType(tp: Type) = !tp.isPrimitiveValueType && !tp.isErasedValueType
 
           val bridgeNeeded =
             !defn.isSpecializableFunction(implClosure.tpe.widen.classSymbol.asClass, samParamTypes, samResultType) && (
-              (implParamTypes, samParamTypes).zipped.exists(
-                (implType, samType) => !isReferenceType(implType) && isReferenceType(samType)) ||
-              implResultType.isRef(defn.UnitClass) && isNonFunctionSAM)
+              (implParamTypes, samParamTypes).zipped.exists((implType, samType) =>
+                !isReferenceType(implType) && isReferenceType(samType)) ||
+              implResultType.isErasedValueType && !samResultType.isErasedValueType)
 
           if (bridgeNeeded) {
             val bridge = ctx.newSymbol(ctx.owner, nme.ANON_FUN, Flags.Synthetic | Flags.Method, sam.info)
