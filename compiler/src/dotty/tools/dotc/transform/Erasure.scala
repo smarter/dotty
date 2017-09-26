@@ -616,29 +616,28 @@ object Erasure {
           //     val f: Function1 = closure($anonfun1)
           //
           // In general, a bridge is needed when, after Erasure:
-          // - the signature of the closure method contains a non-reference type
-          // - the corresponding type in the SAM is a reference type
+          // - one of the parameter type of the closure method is a non-reference type,
+          //   and the corresponding type in the SAM is a reference type
+          // - or the result type of the closure is Unit
+          // However, the following exceptions exist:
+          // - If the SAM is replaced by JFunction*mc* in [[FunctionalInterfaces]], no bridge is needed:
+          //   the SAM contains default methods to handle adaptation
+          // - If the SAM is replaced by JProcedure* in the backend, no adaptation
+          //   is needed for the result type.
           //
           // See test cases lambda-null.scala, lambda-unit.scala and t8017 for concrete examples.
           //
           // NOTE: No bridge is generated for closures that will be specialized
-          // by [[FunctionalInterfaces]] because afterwards the closure method
-          // will implement the SAM of the specialized function class without
-          // any adaptation needed. No bridge is needed either for Function*
-          // that return Unit, they will be replaced by JProcedure in the
-          // backend which takes care of the adaptation.
+          // by [[FunctionalInterfaces]] into JFunction*, this takes care of the adaption.
 
           val isNonFunctionSAM = implClosure.tpt.tpe.exists
           def isReferenceType(tp: Type) = !tp.isPrimitiveValueType && !tp.isErasedValueType
-          def adaptationNeeded(implType: Type, samType: Type, isParam: Boolean) =
-            (isParam || !implType.isRef(defn.UnitClass) || isNonFunctionSAM) &&
-            !isReferenceType(implType) && isReferenceType(samType)
 
           val bridgeNeeded =
-            !defn.isSpecializableFunction(implClosure.tpe.widen.classSymbol.asClass, samParamTypes, samResultType) &&
-            ((implParamTypes, samParamTypes).zipped.exists(
-              (implType, samType) => adaptationNeeded(implType, samType, isParam = true)) ||
-             adaptationNeeded(implResultType, samResultType, isParam = false))
+            !defn.isSpecializableFunction(implClosure.tpe.widen.classSymbol.asClass, samParamTypes, samResultType) && (
+              (implParamTypes, samParamTypes).zipped.exists(
+                (implType, samType) => !isReferenceType(implType) && isReferenceType(samType)) ||
+              implResultType.isRef(defn.UnitClass) && isNonFunctionSAM)
 
           if (bridgeNeeded) {
             val bridge = ctx.newSymbol(ctx.owner, nme.ANON_FUN, Flags.Synthetic | Flags.Method, sam.info)
