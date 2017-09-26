@@ -649,7 +649,7 @@ object Erasure {
                 val List(bridgeParams) = bridgeParamss
                 val rhs = Apply(meth, (bridgeParams, implParamTypes).zipped.map(adapt(_, _)))
                 adapt(rhs, bridgeType.resultType)
-              })
+              }, targetType = implClosure.tpt.tpe)
             } else implClosure
           } else implClosure
         case _ =>
