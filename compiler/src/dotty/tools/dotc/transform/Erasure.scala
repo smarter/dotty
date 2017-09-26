@@ -578,9 +578,9 @@ object Erasure {
       if (xxl) implClosure = cpy.Closure(implClosure)(tpt = TypeTree(defn.FunctionXXLType))
       implClosure.tpe match {
         case SAMType(sam) =>
-          val implType = meth.tpe.widen
+          val implType = meth.tpe.widen.asInstanceOf[MethodType]
 
-          val List(implParamTypes) = implType.paramInfoss
+          val implParamTypes = implType.paramInfos
           val List(samParamTypes) = sam.info.paramInfoss
           val implResultType = implType.resultType
           val samResultType = sam.info.resultType
@@ -625,28 +625,32 @@ object Erasure {
           // SAM contains default methods to handle adaptation
           //
           // See test cases lambda-null.scala, lambda-unit.scala and t8017 for concrete examples.
-          //
-          // NOTE: No bridge is generated for closures that will be specialized
-          // by [[FunctionalInterfaces]] into JFunction*, this takes care of the adaption.
 
           def isReferenceType(tp: Type) = !tp.isPrimitiveValueType && !tp.isErasedValueType
 
-          val bridgeNeeded =
-            !defn.isSpecializableFunction(implClosure.tpe.widen.classSymbol.asClass, samParamTypes, samResultType) && (
+          if (!defn.isSpecializableFunction(implClosure.tpe.widen.classSymbol.asClass, implParamTypes, implResultType)) {
+            val paramAdaptationNeeded =
               (implParamTypes, samParamTypes).zipped.exists((implType, samType) =>
-                !isReferenceType(implType) && isReferenceType(samType)) ||
-              implResultType.isErasedValueType && !samResultType.isErasedValueType)
+                !isReferenceType(implType) && isReferenceType(samType))
+            val resultAdaptationNeeded =
+              implResultType.isErasedValueType && !samResultType.isErasedValueType
 
-          if (bridgeNeeded) {
-            val bridge = ctx.newSymbol(ctx.owner, nme.ANON_FUN, Flags.Synthetic | Flags.Method, sam.info)
-            val bridgeCtx = ctx.withOwner(bridge)
-            Closure(bridge, bridgeParamss => {
-              implicit val ctx = bridgeCtx
+            if (paramAdaptationNeeded || resultAdaptationNeeded) {
+              val bridgeType =
+                if (paramAdaptationNeeded) {
+                  if (resultAdaptationNeeded) sam.info
+                  else implType.derivedLambdaType(paramInfos = samParamTypes)
+                } else implType.derivedLambdaType(resType = samResultType)
+              val bridge = ctx.newSymbol(ctx.owner, nme.ANON_FUN, Flags.Synthetic | Flags.Method, bridgeType)
+              val bridgeCtx = ctx.withOwner(bridge)
+              Closure(bridge, bridgeParamss => {
+                implicit val ctx = bridgeCtx
 
-              val List(bridgeParams) = bridgeParamss
-              val rhs = Apply(meth, (bridgeParams, implParamTypes).zipped.map(adapt(_, _)))
-              adapt(rhs, sam.info.resultType)
-            })
+                val List(bridgeParams) = bridgeParamss
+                val rhs = Apply(meth, (bridgeParams, implParamTypes).zipped.map(adapt(_, _)))
+                adapt(rhs, bridgeType.resultType)
+              })
+            } else implClosure
           } else implClosure
         case _ =>
           implClosure
