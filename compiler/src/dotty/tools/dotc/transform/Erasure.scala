@@ -616,22 +616,29 @@ object Erasure {
           //     val f: Function1 = closure($anonfun1)
           //
           // In general, a bridge is needed when, after Erasure:
-          // - the signature of the closure method is not a reference type
-          // - the corresponding type in the functional interface is a reference type
+          // - the signature of the closure method contains a non-reference type
+          // - the corresponding type in the SAM is a reference type
           //
-          // See test cases lambda-null.scala and t8017 for concrete examples.
+          // See test cases lambda-null.scala, lambda-unit.scala and t8017 for concrete examples.
           //
           // NOTE: No bridge is generated for closures that will be specialized
           // by [[FunctionalInterfaces]] because afterwards the closure method
-          // will implement the single abstract method of the specialized
-          // function type without any adaptation needed.
+          // will implement the SAM of the specialized function class without
+          // any adaptation needed. No bridge is needed either for Function*
+          // that return Unit, they will be replaced by JProcedure in the
+          // backend which takes care of the adaptation.
 
+          val isNonFunctionSAM = implClosure.tpt.tpe.exists
           def isReferenceType(tp: Type) = !tp.isPrimitiveValueType && !tp.isErasedValueType
+          def adaptationNeeded(implType: Type, samType: Type, isParam: Boolean) =
+            (isParam || !implType.isRef(defn.UnitClass) || isNonFunctionSAM) &&
+            !isReferenceType(implType) && isReferenceType(samType)
+
           val bridgeNeeded =
             !defn.isSpecializableFunction(implClosure.tpe.widen.classSymbol.asClass, samParamTypes, samResultType) &&
-            (implResultType :: implParamTypes, samResultType :: samParamTypes).zipped.exists(
-              (implType, samType) => !isReferenceType(implType) && isReferenceType(samType)
-            )
+            ((implParamTypes, samParamTypes).zipped.exists(
+              (implType, samType) => adaptationNeeded(implType, samType, isParam = true)) ||
+             adaptationNeeded(implResultType, samResultType, isParam = false))
 
           if (bridgeNeeded) {
             val bridge = ctx.newSymbol(ctx.owner, nme.ANON_FUN, Flags.Synthetic | Flags.Method, sam.info)
