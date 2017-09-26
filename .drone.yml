@@ -101,4 +101,4 @@ pipeline:
       event: [ push, tag, deployment ]
 
 # CI runs only for the master branch (including PRs)
-branches: master
+# branches: master
