@@ -802,11 +802,7 @@ object Build {
       // The main class cannot be found automatically due to the empty inc.Analysis
       mainClass in Compile := Some("hello.world"),
 
-      // While developing the Scala.js back-end, it is very useful to see the trees dotc gives us
-      scalacOptions ++= Seq(
-        "-Xprint:all",
-        "-Yplain-printer"
-      ),
+      scalaJSUseMainModuleInitializer := true,
 
       /* Debug-friendly Scala.js optimizer options.
        * In particular, typecheck the Scala.js IR found on the classpath.

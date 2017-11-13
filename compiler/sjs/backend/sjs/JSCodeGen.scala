@@ -349,7 +349,7 @@ class JSCodeGen()(implicit ctx: Context) {
       else Some(encodeClassFullNameIdent(sym.superClass))
     val jsNativeLoadSpec =
       if (sym.is(Trait)) None
-      else Some(fullJSNameOf(sym).split('.').toList)
+      else Some(js.JSNativeLoadSpec.Global(fullJSNameOf(sym).split('.').toList))
 
     js.ClassDef(classIdent, kind,
         superClass,
@@ -453,7 +453,7 @@ class JSCodeGen()(implicit ctx: Context) {
         }
       }*/
 
-      js.FieldDef(name, irTpe, f.is(Mutable))
+      js.FieldDef(static = false, name, irTpe, f.is(Mutable))
     }).toList
   }
 
@@ -578,7 +578,7 @@ class JSCodeGen()(implicit ctx: Context) {
       tree: Tree, optimizerHints: OptimizerHints): js.MethodDef = {
     implicit val pos = tree.pos
 
-    ctx.debuglog("genMethod " + methodName.name)
+    ctx.debuglog("genMethod " + methodName.encodedName)
     ctx.debuglog("")
 
     val jsParams = for (param <- paramsSyms) yield {
