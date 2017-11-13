@@ -789,13 +789,13 @@ object Build {
    */
   lazy val sjsSandbox = project.in(file("sandbox/scalajs")).
     enablePlugins(ScalaJSPlugin).
-    settings(commonNonBootstrappedSettings).
+    settings(commonBootstrappedSettings).
     settings(
       /* Remove the Scala.js compiler plugin for scalac, and enable the
        * Scala.js back-end of dotty instead.
        */
       libraryDependencies ~= { deps =>
-        deps.filterNot(_.name.startsWith("scalajs-compiler"))
+        deps.filterNot(_.name.startsWith("scalajs-compiler")).map(_.withDottyCompat())
       },
       scalacOptions += "-scalajs",
 
@@ -803,7 +803,10 @@ object Build {
       mainClass in Compile := Some("hello.world"),
 
       // While developing the Scala.js back-end, it is very useful to see the trees dotc gives us
-      scalacOptions += "-Xprint:labelDef",
+      scalacOptions ++= Seq(
+        "-Xprint:all",
+        "-Yplain-printer"
+      ),
 
       /* Debug-friendly Scala.js optimizer options.
        * In particular, typecheck the Scala.js IR found on the classpath.
