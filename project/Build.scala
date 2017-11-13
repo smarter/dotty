@@ -393,6 +393,8 @@ object Build {
   // Settings shared between dotty-compiler and dotty-compiler-bootstrapped
   lazy val commonDottyCompilerSettings = Seq(
 
+      unmanagedSourceDirectories in Compile += baseDirectory.value / "sjs",
+
       // The scala-backend folder is a git submodule that contains a fork of the Scala 2.11
       // compiler developed at https://github.com/lampepfl/scala/tree/sharing-backend.
       // We do not compile the whole submodule, only the part of the Scala 2.11 GenBCode backend
@@ -560,32 +562,33 @@ object Build {
        * sources instead of depending on the binaries.
        */
       //TODO: disabling until moved to separate project
-      //ivyConfigurations += config("sourcedeps").hide,
-      //libraryDependencies +=
-      //  "org.scala-js" %% "scalajs-ir" % scalaJSVersion % "sourcedeps",
-      //sourceGenerators in Compile += Def.task {
-      //  val s = streams.value
-      //  val cacheDir = s.cacheDirectory
-      //  val trgDir = (sourceManaged in Compile).value / "scalajs-ir-src"
+      ivyConfigurations += config("sourcedeps").hide,
+      transitiveClassifiers := Seq("sources"),
+      libraryDependencies +=
+       "org.scala-js" %% "scalajs-ir" % scalaJSVersion % "sourcedeps",
+      sourceGenerators in Compile += Def.task {
+       val s = streams.value
+       val cacheDir = s.cacheDirectory
+       val trgDir = (sourceManaged in Compile).value / "scalajs-ir-src"
 
-      //  val report = updateClassifiers.value
-      //  val scalaJSIRSourcesJar = report.select(
-      //      configuration = Set("sourcedeps"),
-      //      module = (_: ModuleID).name.startsWith("scalajs-ir_"),
-      //      artifact = artifactFilter(`type` = "src")).headOption.getOrElse {
-      //    sys.error(s"Could not fetch scalajs-ir sources")
-      //  }
+       val report = updateClassifiers.value
+       val scalaJSIRSourcesJar = report.select(
+           configuration = Set("sourcedeps"),
+           module = (_: ModuleID).name.startsWith("scalajs-ir_"),
+           artifact = artifactFilter(`type` = "src")).headOption.getOrElse {
+         sys.error(s"Could not fetch scalajs-ir sources")
+       }
 
-      //  FileFunction.cached(cacheDir / s"fetchScalaJSIRSource",
-      //      FilesInfo.lastModified, FilesInfo.exists) { dependencies =>
-      //    s.log.info(s"Unpacking scalajs-ir sources to $trgDir...")
-      //    if (trgDir.exists)
-      //      IO.delete(trgDir)
-      //    IO.createDirectory(trgDir)
-      //    IO.unzip(scalaJSIRSourcesJar, trgDir)
-      //    (trgDir ** "*.scala").get.toSet
-      //  } (Set(scalaJSIRSourcesJar)).toSeq
-      //}.taskValue,
+       FileFunction.cached(cacheDir / s"fetchScalaJSIRSource",
+           FilesInfo.lastModified, FilesInfo.exists) { dependencies =>
+         s.log.info(s"Unpacking scalajs-ir sources to $trgDir...")
+         if (trgDir.exists)
+           IO.delete(trgDir)
+         IO.createDirectory(trgDir)
+         IO.unzip(scalaJSIRSourcesJar, trgDir)
+         (trgDir ** "*.scala").get.toSet
+       } (Set(scalaJSIRSourcesJar)).toSeq
+      }.taskValue,
 
       // Spawn new JVM in run and test
       fork in run := true,

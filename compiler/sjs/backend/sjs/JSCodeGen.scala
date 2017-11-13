@@ -185,7 +185,7 @@ class JSCodeGen()(implicit ctx: Context) {
     import dotty.tools.io._
 
     val outputDirectory: AbstractFile = // TODO Support virtual files
-      new PlainDirectory(new Directory(new java.io.File(ctx.settings.d.value)))
+      new PlainDirectory(ctx.settings.outputDir.value)
 
     val pathParts = sym.fullName.toString.split("[./]")
     val dir = (outputDirectory /: pathParts.init)(_.subdirectoryNamed(_))
@@ -285,9 +285,9 @@ class JSCodeGen()(implicit ctx: Context) {
           js.ModuleExportDef("hello.world"),
           js.MethodDef(static = false, js.StringLiteral("main"),
               Nil, jstpe.AnyType,
-              js.Block(List(
+              Some(js.Block(List(
                 js.Apply(js.This()(jstpe.ClassType(classIdent.name)), js.Ident("main__V"), Nil)(jstpe.NoType),
-                js.Undefined())))(
+                js.Undefined()))))(
               OptimizerHints.empty, None))
       } else {
         /*
@@ -339,17 +339,22 @@ class JSCodeGen()(implicit ctx: Context) {
     implicit val pos = sym.pos
 
     val classIdent = encodeClassFullNameIdent(sym)
+    val kind = {
+      if (sym.is(Trait)) ClassKind.AbstractJSType
+      else if (sym.is(ModuleClass)) ClassKind.NativeJSModuleClass
+      else ClassKind.NativeJSClass
+    }
     val superClass =
       if (sym.is(Trait)) None
       else Some(encodeClassFullNameIdent(sym.superClass))
-    val jsName =
-      if (sym.is(Trait) || sym.is(ModuleClass)) None
-      else Some(fullJSNameOf(sym))
+    val jsNativeLoadSpec =
+      if (sym.is(Trait)) None
+      else Some(fullJSNameOf(sym).split('.').toList)
 
-    js.ClassDef(classIdent, ClassKind.RawJSType,
+    js.ClassDef(classIdent, kind,
         superClass,
         genClassInterfaces(sym),
-        jsName,
+        jsNativeLoadSpec,
         Nil)(
         OptimizerHints.empty)
   }
