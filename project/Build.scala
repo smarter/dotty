@@ -561,11 +561,10 @@ object Build {
        * of scalajs-ir built with a different Scala compiler, we add its
        * sources instead of depending on the binaries.
        */
-      //TODO: disabling until moved to separate project
       ivyConfigurations += config("sourcedeps").hide,
       transitiveClassifiers := Seq("sources"),
       libraryDependencies +=
-       "org.scala-js" %% "scalajs-ir" % scalaJSVersion % "sourcedeps",
+       ("org.scala-js" %% "scalajs-ir" % scalaJSVersion % "sourcedeps").withDottyCompat(),
       sourceGenerators in Compile += Def.task {
        val s = streams.value
        val cacheDir = s.cacheDirectory
