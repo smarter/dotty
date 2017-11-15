@@ -556,6 +556,15 @@ object Build {
         "--run-listener=dotty.tools.ContextEscapeDetector"
       ),
 
+
+
+      // FIXME: Adding the sources of scala-js ir doesn't work anymore because scalajs-ir has a few
+      // compilation errors when compiled by Dotty:
+      // - inline is now a keyword
+      // - methods defined with () need to be called with ()
+      // Until they're fixed, we rely on scalajs-ir compiled by Scala 2:
+      libraryDependencies += ("org.scala-js" %% "scalajs-ir" % scalaJSVersion).withDottyCompat(),
+      /*
       /* Add the sources of scalajs-ir.
        * To guarantee that dotty can bootstrap without depending on a version
        * of scalajs-ir built with a different Scala compiler, we add its
@@ -588,7 +597,7 @@ object Build {
          (trgDir ** "*.scala").get.toSet
        } (Set(scalaJSIRSourcesJar)).toSeq
       }.taskValue,
-
+      */
       // Spawn new JVM in run and test
       fork in run := true,
       fork in Test := true,
