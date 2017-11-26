@@ -1541,6 +1541,10 @@ object Types {
       else symbol.asSeenFrom(prefix).signature
     }
 
+    /** The signature of the current denotation if it is known without forcing.
+     *  Otherwise the signature of the current symbol if it is known without forcing.
+     *  Otherwise NotAMethod.
+     */
     private def currentSignature(implicit ctx: Context): Signature =
       if (mySig != null) mySig
       else {
@@ -1549,7 +1553,7 @@ object Types {
         else {
           val sym = currentSymbol
           if (sym.exists) sym.asSeenFrom(prefix).signature
-          else null
+          else Signature.NotAMethod
         }
       }
 
