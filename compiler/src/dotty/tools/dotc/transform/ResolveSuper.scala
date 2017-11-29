@@ -19,6 +19,7 @@ import util.Positions._
 import Names._
 import collection.mutable
 import ResolveSuper._
+import NameKinds.ImplMethName
 
 /** This phase adds super accessors and method overrides where
  *  linearization differs from Java's rule for default methods in interfaces.
@@ -61,7 +62,7 @@ class ResolveSuper extends MiniPhase with IdentityDenotTransformer { thisPhase =
     import ops._
 
     def superAccessors(mixin: ClassSymbol): List[Tree] =
-      for (superAcc <- mixin.info.decls.filter(_.isSuperAccessor))
+      for (superAcc <- mixin.info.decls.filter(s => s.isSuperAccessor && !s.name.is(ImplMethName)))
         yield {
           util.Stats.record("super accessors")
           polyDefDef(implementation(superAcc.asTerm), forwarder(rebindSuper(cls, superAcc)))
