@@ -14,7 +14,7 @@ import DenotTransformers._
 import Annotations._
 import StdNames._
 import NameOps._
-import NameKinds.{ExpandedName, TraitSetterName}
+import NameKinds.{ExpandedName, ImplMethName, TraitSetterName}
 import ast.Trees._
 
 /** This phase augments Scala2 traits with implementation classes and with additional members
@@ -59,6 +59,15 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
         parents = defn.ObjectType :: Nil,
         assocFile = mixin.assocFile).enteredAfter(thisPhase)
 
+      def info_2_12(tp: Type) = tp match {
+        case mt @ MethodType(paramNames @ nme.SELF :: _) =>
+          // 2.12 seems to always assume the enclsing mixin class as self type parameter,
+          // whereas 2.11 used the self type of this class instead.
+          val selfType :: otherParamTypes = mt.paramInfos
+          MethodType(paramNames, mixin.typeRef :: otherParamTypes, mt.resType)
+        case info => info
+      }
+
       def implMethod(meth: TermSymbol): Symbol = {
         val mold =
           if (meth.isConstructor)
@@ -67,10 +76,10 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
               info = MethodType(Nil, defn.UnitType))
           else meth.ensureNotPrivate
         meth.copy(
-          owner = implClass,
-          name = mold.name.asTermName,
+          owner = mixin,
+          name = if (meth.isConstructor) mold.name.asTermName else ImplMethName(mold.name.asTermName),
           flags = Method | JavaStatic,
-          info = fullyParameterizedType(mold.info, mixin))
+          info = info_2_12(fullyParameterizedType(mold.info, mixin)))
       }
 
       def traitSetter(getter: TermSymbol) =
@@ -83,7 +92,7 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
 
       for (sym <- mixin.info.decls) {
         if (needsForwarder(sym) || sym.isConstructor || sym.isGetter && sym.is(Lazy) || sym.is(Method, butNot = Deferred))
-          implClass.enter(implMethod(sym.asTerm))
+          mixin.enter(implMethod(sym.asTerm))
         if (sym.isGetter)
           if (sym.is(Lazy)) {
             if (!sym.hasAnnotation(defn.VolatileAnnot))
@@ -97,6 +106,7 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
           || sym.isSuperAccessor) // scala2 superaccessors are pickled as private, but are compiled as public expanded
           sym.ensureNotPrivate.installAfter(thisPhase)
       }
+      mixin.setFlag(Scala_2_12_Augmented)
       ctx.log(i"Scala2x trait decls of $mixin = ${mixin.info.decls.toList.map(_.showDcl)}%\n %")
       ctx.log(i"Scala2x impl decls of $mixin = ${implClass.info.decls.toList.map(_.showDcl)}%\n %")
     }
