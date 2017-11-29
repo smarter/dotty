@@ -49,13 +49,16 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
       val ops = new MixinOps(cls, thisPhase)
       import ops._
 
-      def info_2_12(tp: Type) = tp match {
+      def info_2_12(tp: Type): Type = tp match {
         case mt @ MethodType(paramNames @ nme.SELF :: _) =>
           // 2.12 seems to always assume the enclsing mixin class as self type parameter,
           // whereas 2.11 used the self type of this class instead.
           val selfType :: otherParamTypes = mt.paramInfos
           MethodType(paramNames, mixin.typeRef :: otherParamTypes, mt.resType)
-        case info => info
+        case pt: PolyType =>
+          pt.derivedLambdaType(resType = info_2_12(pt.resType))
+        case info =>
+          info
       }
 
       def implMethod(meth: TermSymbol): Symbol = {
