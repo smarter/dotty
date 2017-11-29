@@ -215,10 +215,8 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
         def initial = transformFollowing(superRef(initializer(getter)).appliedToNone)
 
         /** A call to the implementation of `getter` in `mixin` */
-        // TTT: check this work
         def lazyGetterCall = {
-          val implClassGetter = mixin.info.nonPrivateDecl(ImplMethName(getter.name.asTermName)).symbol
-          ref(mixin).select(implClassGetter).appliedTo(This(cls))
+          Super(This(cls), mixin.name, inConstrCall = false, mixin).select(getter).appliedToNone
         }
 
         if (isCurrent(getter) || getter.name.is(ExpandedName)) {
