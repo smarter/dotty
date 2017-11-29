@@ -49,6 +49,7 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
       val ops = new MixinOps(cls, thisPhase)
       import ops._
 
+    /*
       def info_2_12(tp: Type): Type = tp match {
         case mt @ MethodType(paramNames @ nme.SELF :: _) =>
           // 2.12 seems to always assume the enclsing mixin class as self type parameter,
@@ -74,6 +75,7 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
           flags = Method | JavaStatic,
           info = info_2_12(fullyParameterizedType(mold.info, mixin)))
       }
+     */
 
       def traitSetter(getter: TermSymbol) =
         getter.copy(
@@ -84,8 +86,10 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
           info = MethodType(getter.info.resultType :: Nil, defn.UnitType))
 
       for (sym <- mixin.info.decls) {
+        /*
         if (needsForwarder(sym) || sym.isConstructor || sym.isGetter && sym.is(Lazy) || sym.is(Method, butNot = Deferred))
           mixin.enter(implMethod(sym.asTerm))
+        */
         if (sym.isGetter)
           if (sym.is(Lazy)) {
             if (!sym.hasAnnotation(defn.VolatileAnnot))

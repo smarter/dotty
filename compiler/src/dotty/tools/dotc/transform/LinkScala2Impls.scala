@@ -39,6 +39,46 @@ class LinkScala2Impls extends MiniPhase with IdentityDenotTransformer { thisPhas
     // Adds as a side effect static members to traits which can confuse Mixin,
     // that's why it is runsAfterGroupOf
 
+  /** Copy definitions from implementation class to trait itself */
+  private def augmentScala_2_12_Trait(mixin: ClassSymbol)(implicit ctx: Context): Unit = {
+    val ops = new MixinOps(mixin, thisPhase)
+    import ops._
+
+    def info_2_12(tp: Type) = tp match {
+      case mt: MethodType =>
+        MethodType(nme.SELF :: mt.paramNames, mixin.typeRef :: mt.paramInfos, mt.resType)
+    }
+    def newImpl(meth: TermSymbol): Symbol = {
+      val mold =
+        if (meth.isConstructor)
+          meth.copySymDenotation(
+            name = nme.TRAIT_CONSTRUCTOR,
+            info = MethodType(Nil, defn.UnitType))
+        else meth.ensureNotPrivate
+      meth.copy(
+        owner = mixin,
+        name = if (meth.isConstructor) mold.name.asTermName else ImplMethName(mold.name.asTermName),
+        flags = Method | JavaStatic,
+        info = info_2_12(mold.info)
+      )
+    }
+    for (sym <- mixin.info.decls) {
+      if (needsForwarder(sym) || sym.isConstructor || sym.isGetter && sym.is(Lazy) || sym.is(Method, butNot = Deferred))
+        newImpl(sym.asTerm).enteredAfter(thisPhase)
+    }
+  }
+
+  override def prepareForTemplate(impl: Template)(implicit ctx: Context) = {
+    val cls = impl.symbol.owner.asClass
+    for (mixin <- cls.mixins)
+      if (mixin.is( Scala_2_12_Augmented)) {
+        augmentScala_2_12_Trait(mixin)
+        mixin.resetFlag(Scala_2_12_Augmented)
+      }
+    ctx
+  }
+
+
   override def transformApply(app: Apply)(implicit ctx: Context) = {
     def currentClass = ctx.owner.enclosingClass.asClass
     app match {
