@@ -393,11 +393,6 @@ object Flags {
   /** Symbol is a self name */
   final val SelfName = termFlag(54, "<selfname>")
 
-  /** Symbol is an implementation class of a Scala2 trait */
-  final val ImplClass = typeFlag(54, "<implclass>")
-
-  final val SelfNameOrImplClass = SelfName.toCommonFlags
-
   /** An existentially bound symbol (Scala 2.x only) */
   final val Scala2ExistentialCommon = commonFlag(55, "<existential>")
   final val Scala2Existential = Scala2ExistentialCommon.toTypeFlags
@@ -467,7 +462,7 @@ object Flags {
    *  is generally before the symbol is completed
    */
   final val AfterLoadFlags =
-    FromStartFlags | AccessFlags | Final | AccessorOrSealed | LazyOrTrait | SelfNameOrImplClass
+    FromStartFlags | AccessFlags | Final | AccessorOrSealed | LazyOrTrait | SelfName.toCommonFlags
 
   assert(FromStartFlags.isTermFlags && FromStartFlags.isTypeFlags)
   // TODO: Should check that FromStartFlags do not change in completion
@@ -518,7 +513,7 @@ object Flags {
     Accessor | AbsOverride | Stable | Captured | Synchronized | Inline
 
   /** Flags that can apply to a module class */
-  final val RetainedModuleClassFlags: FlagSet = RetainedModuleValAndClassFlags | ImplClass | Enum
+  final val RetainedModuleClassFlags: FlagSet = RetainedModuleValAndClassFlags | Enum
 
   /** Packages and package classes always have these flags set */
   final val PackageCreationFlags =

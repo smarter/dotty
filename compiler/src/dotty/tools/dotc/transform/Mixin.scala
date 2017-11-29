@@ -217,7 +217,7 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
         /** A call to the implementation of `getter` in `mixin` */
         // TTT: check this work
         def lazyGetterCall = {
-          val implClassGetter = mixin.info.nonPrivateDecl(ImplMethName(getter.name)).symbol
+          val implClassGetter = mixin.info.nonPrivateDecl(ImplMethName(getter.name.asTermName)).symbol
           ref(mixin).select(implClassGetter).appliedTo(This(cls))
         }
 

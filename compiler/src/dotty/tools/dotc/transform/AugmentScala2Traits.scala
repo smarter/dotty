@@ -46,18 +46,8 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
   }
 
   private def augmentScala2Trait(mixin: ClassSymbol, cls: ClassSymbol)(implicit ctx: Context): Unit = {
-    if (mixin.implClass.is(Scala2x)) () // nothing to do, mixin was already augmented
-    else {
-      //println(i"creating new implclass for $mixin ${mixin.implClass}")
       val ops = new MixinOps(cls, thisPhase)
       import ops._
-
-      val implClass = ctx.newCompleteClassSymbol(
-        owner = mixin.owner,
-        name = mixin.name.implClassName,
-        flags = Abstract | Scala2x | ImplClass,
-        parents = defn.ObjectType :: Nil,
-        assocFile = mixin.assocFile).enteredAfter(thisPhase)
 
       def info_2_12(tp: Type) = tp match {
         case mt @ MethodType(paramNames @ nme.SELF :: _) =>
@@ -107,8 +97,5 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
           sym.ensureNotPrivate.installAfter(thisPhase)
       }
       mixin.setFlag(Scala_2_12_Augmented)
-      ctx.log(i"Scala2x trait decls of $mixin = ${mixin.info.decls.toList.map(_.showDcl)}%\n %")
-      ctx.log(i"Scala2x impl decls of $mixin = ${implClass.info.decls.toList.map(_.showDcl)}%\n %")
-    }
   }
 }

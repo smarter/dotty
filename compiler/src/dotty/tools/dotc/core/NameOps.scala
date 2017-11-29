@@ -131,14 +131,6 @@ object NameOps {
       name.rewrite { case VariantName(invariant, _) => invariant }
     }
 
-    def implClassName: N = likeSpaced(name ++ tpnme.IMPL_CLASS_SUFFIX)
-
-    def traitOfImplClassName: N = {
-      val suffix = tpnme.IMPL_CLASS_SUFFIX.toString
-      assert(name.endsWith(suffix), name)
-      likeSpaced(name.mapLast(_.dropRight(suffix.length)))
-    }
-
     def errorName: N = likeSpaced(name ++ nme.ERROR)
 
     /** Map variance value -1, +1 to 0, 1 */

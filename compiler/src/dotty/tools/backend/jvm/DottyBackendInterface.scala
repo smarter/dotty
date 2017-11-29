@@ -689,7 +689,7 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
     def isStrictFP: Boolean = false // todo: implement
     def isLabel: Boolean = sym is Flags.Label
     def hasPackageFlag: Boolean = sym is Flags.Package
-    def isImplClass: Boolean = sym is Flags.ImplClass
+    def isImplClass: Boolean = false
     def isInterface: Boolean = (sym is Flags.PureInterface) || (sym is Flags.Trait)
     def hasGetter: Boolean = false // used only for generaration of beaninfo todo: implement
     def isGetter: Boolean = toDenot(sym).isGetter
@@ -707,7 +707,7 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
 
     def isFinal: Boolean = sym is Flags.Final
     def isStaticMember: Boolean = (sym ne NoSymbol) &&
-      ((sym is Flags.JavaStatic) || (owner is Flags.ImplClass) || toDenot(sym).hasAnnotation(ctx.definitions.ScalaStaticAnnot))
+      ((sym is Flags.JavaStatic) || toDenot(sym).hasAnnotation(ctx.definitions.ScalaStaticAnnot))
       // guard against no sumbol cause this code is executed to select which call type(static\dynamic) to use to call array.clone
 
     def isBottomClass: Boolean = (sym ne defn.NullClass) && (sym ne defn.NothingClass)
@@ -725,7 +725,7 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
     def isNonBottomSubClass(other: Symbol): Boolean = sym.derivesFrom(other)
     def hasAnnotation(ann: Symbol): Boolean = toDenot(sym).hasAnnotation(ann)
     def shouldEmitForwarders: Boolean =
-      (sym is Flags.Module) && !(sym is Flags.ImplClass) && sym.isStatic
+      (sym is Flags.Module) && sym.isStatic
     def isJavaEntryPoint: Boolean = CollectEntryPoints.isJavaEntryPoint(sym)
 
     def isClassConstructor: Boolean = toDenot(sym).isClassConstructor

@@ -620,9 +620,6 @@ object SymDenotations {
     /** is this the constructor of a class? */
     final def isClassConstructor = name == nme.CONSTRUCTOR
 
-    /** Is this the constructor of a trait? */
-    final def isImplClassConstructor = name == nme.TRAIT_CONSTRUCTOR
-
     /** Is this the constructor of a trait or a class */
     final def isConstructor = name.isConstructorName
 
@@ -726,7 +723,6 @@ object SymDenotations {
         || boundary.isRoot
         || (accessWithin(boundary) || accessWithinLinked(boundary)) &&
              (  !(this is Local)
-             || (owner is ImplClass) // allow private local accesses to impl class members
              || isCorrectThisType(pre)
              )
         || (this is Protected) &&
@@ -1747,8 +1743,7 @@ object SymDenotations {
     override def primaryConstructor(implicit ctx: Context): Symbol = {
       def constrNamed(cname: TermName) = info.decls.denotsNamed(cname).last.symbol
         // denotsNamed returns Symbols in reverse order of occurrence
-      if (this.is(ImplClass)) constrNamed(nme.TRAIT_CONSTRUCTOR) // ignore normal constructor
-      else if (this.is(Package)) NoSymbol
+      if (this.is(Package)) NoSymbol
       else constrNamed(nme.CONSTRUCTOR).orElse(constrNamed(nme.TRAIT_CONSTRUCTOR))
     }
 
