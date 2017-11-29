@@ -3851,7 +3851,7 @@ object Types {
           mapOverLambda
 
         case tp @ TypeArgRef(prefix, _, _) =>
-          derivedTypeArgRef(tp, atVariance(0)(this(prefix)))
+          derivedTypeArgRef(tp, atVariance(variance max 0)(this(prefix)))
 
         case tp @ SuperType(thistp, supertp) =>
           derivedSuperType(tp, this(thistp), this(supertp))
@@ -4253,7 +4253,7 @@ object Types {
         this(x, tp.info)
 
       case tp @ TypeArgRef(prefix, _, _) =>
-        atVariance(0)(this(x, prefix))
+        atVariance(variance max 0)(this(x, prefix))
 
       case SuperType(thistp, supertp) =>
         this(this(x, thistp), supertp)
