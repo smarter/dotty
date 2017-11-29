@@ -105,13 +105,13 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
   override def changesMembers: Boolean = true  // the phase adds implementions of mixin accessors
 
   override def transformSym(sym: SymDenotation)(implicit ctx: Context): SymDenotation =
-    if (sym.is(Accessor, butNot = Deferred) && sym.owner.is(Trait)) {
+    if (sym.is(Accessor, butNot = Deferred) && sym.owner.is(Trait) && !sym.name.is(ImplMethName)) {
       val sym1 =
         if (sym is Lazy) sym
         else sym.copySymDenotation(initFlags = sym.flags &~ ParamAccessor | Deferred)
       sym1.ensureNotPrivate
     }
-    else if (sym.isConstructor && sym.owner.is(Trait))
+    else if (sym.isConstructor && sym.owner.is(Trait, butNot = Scala2x))
       sym.copySymDenotation(
         name = nme.TRAIT_CONSTRUCTOR,
         info = MethodType(Nil, sym.info.resultType))
@@ -220,26 +220,20 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
         def default = Underscore(getter.info.resultType)
         def initial = transformFollowing(superRef(initializer(getter)).appliedToNone)
 
-        /** A call to the implementation of `getter` in `mixin`'s implementation class */
-        def lazyGetterCall = {
-          def canbeImplClassGetter(sym: Symbol) = sym.info.firstParamTypes match {
-            case t :: Nil => t.isDirectRef(mixin)
-            case _ => false
-          }
-          val implClassGetter = mixin.implClass.info.nonPrivateDecl(getter.name)
-            .suchThat(canbeImplClassGetter).symbol
-          ref(mixin.implClass).select(implClassGetter).appliedTo(This(cls))
-        }
-
         if (isCurrent(getter) || getter.name.is(ExpandedName)) {
           val rhs =
-            if (was(getter, ParamAccessor)) nextArgument()
-            else if (isScala2x)
-              if (getter.is(Lazy, butNot = Module)) lazyGetterCall
+            if (was(getter, ParamAccessor))
+              nextArgument()
+            else if (isScala2x) {
+              if (getter.is(Lazy, butNot = Module))
+                initial
               else if (getter.is(Module))
                 New(getter.info.resultType, List(This(cls)))
-              else Underscore(getter.info.resultType)
-            else initial
+              else
+                Underscore(getter.info.resultType)
+            }
+            else
+              initial
           // transformFollowing call is needed to make memoize & lazy vals run
           transformFollowing(DefDef(implementation(getter.asTerm), rhs))
         }

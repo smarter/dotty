@@ -48,7 +48,6 @@ trait FlagsOpsImpl extends scala.tasty.reflect.FlagsOps with CoreImpl {
     def ModuleClass: Flags = core.Flags.ModuleClass
     def PrivateLocal: Flags = core.Flags.PrivateLocal
     def Package: Flags = core.Flags.Package
-    def ImplClass: Flags = core.Flags.ImplClass
   }
 
 }
