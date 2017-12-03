@@ -7,6 +7,7 @@ import Contexts.Context
 import Flags._
 import SymUtils._
 import Symbols._
+import Denotations._
 import SymDenotations._
 import Types._
 import Decorators._
@@ -29,7 +30,7 @@ import collection.mutable
  *
  *  where f is a static member of M.
  */
-class LinkScala2Impls extends MiniPhase with IdentityDenotTransformer { thisPhase =>
+class LinkScala2Impls extends MiniPhase with DenotTransformer { thisPhase =>
   import ast.tpd._
 
   override def phaseName: String = "linkScala2Impls"
@@ -39,43 +40,44 @@ class LinkScala2Impls extends MiniPhase with IdentityDenotTransformer { thisPhas
     // Adds as a side effect static members to traits which can confuse Mixin,
     // that's why it is runsAfterGroupOf
 
-  /** Copy definitions from implementation class to trait itself */
-  private def augmentScala_2_12_Trait(mixin: ClassSymbol)(implicit ctx: Context): Unit = {
-    val ops = new MixinOps(mixin, thisPhase)
-    import ops._
+  override def transform(ref: SingleDenotation)(implicit ctx: Context): SingleDenotation = ref match {
+    case mixin: ClassDenotation if mixin.is(Scala_2_12_Augmented) =>
+      val ops = new MixinOps(mixin.symbol.asClass, thisPhase)
+      import ops._
 
-    def info_2_12(tp: Type) = tp match {
-      case mt: MethodType =>
-        MethodType(nme.SELF :: mt.paramNames, mixin.typeRef :: mt.paramInfos, mt.resType)
-    }
-    def newImpl(meth: TermSymbol): Symbol = {
-      val mold =
-        if (meth.isConstructor)
-          meth.copySymDenotation(
-            name = nme.TRAIT_CONSTRUCTOR,
-            info = MethodType(Nil, defn.UnitType))
-        else meth.ensureNotPrivate
-      meth.copy(
-        owner = mixin,
-        name = if (meth.isConstructor) mold.name.asTermName else ImplMethName(mold.name.asTermName),
-        flags = Method | JavaStatic,
-        info = info_2_12(mold.info)
-      )
-    }
-    for (sym <- mixin.info.decls) {
-      if (needsForwarder(sym) || sym.isConstructor || sym.isGetter && sym.is(Lazy) || sym.is(Method, butNot = Deferred))
-        newImpl(sym.asTerm).enteredAfter(thisPhase)
-    }
-  }
+      val cinfo = mixin.classInfo
 
-  override def prepareForTemplate(impl: Template)(implicit ctx: Context) = {
-    val cls = impl.symbol.owner.asClass
-    for (mixin <- cls.mixins)
-      if (mixin.is( Scala_2_12_Augmented)) {
-        augmentScala_2_12_Trait(mixin)
-        mixin.resetFlag(Scala_2_12_Augmented)
+      def info_2_12(tp: Type) = tp match {
+        case mt: MethodType =>
+          MethodType(nme.SELF :: mt.paramNames, mixin.typeRef :: mt.paramInfos, mt.resType)
       }
-    ctx
+      def newImpl(meth: TermSymbol): Symbol = {
+        val mold =
+          if (meth.isConstructor)
+            meth.copySymDenotation(
+              name = nme.TRAIT_CONSTRUCTOR,
+              info = MethodType(Nil, defn.UnitType))
+          else meth.ensureNotPrivate
+        meth.copy(
+          // owner = mixin.symbol,
+          name = if (meth.isConstructor) mold.name.asTermName else ImplMethName(mold.name.asTermName),
+          flags = Method | JavaStatic,
+          info = info_2_12(mold.info)
+        )
+      }
+
+      val decls = cinfo.decls
+      val decls1 = decls.cloneScope
+      for (sym <- decls) {
+        if (needsForwarder(sym) || sym.isConstructor || sym.isGetter && sym.is(Lazy) ||
+            sym.is(Method, butNot = Deferred))
+          decls1.enter(newImpl(sym.asTerm))
+      }
+
+      mixin.copySymDenotation(info =
+        cinfo.derivedClassInfo(decls = decls1))
+    case _ =>
+      ref
   }
 
 
