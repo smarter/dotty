@@ -8,8 +8,8 @@ import reporting._
 import scala.util.control.NonFatal
 import fromtasty.TASTYCompiler
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent._
+import scala.collection.JavaConverters._
 
 /** Run the Dotty compiler.
  *
@@ -134,14 +134,14 @@ class Driver extends DotClass {
       val args1 = args.filter(_ != "-parallel")
       val (fileNames, _) = setup(args1, rootCtx)
       val before = args1.takeWhile(_ != "-from-tasty")
+      val pool = Executors.newWorkStealingPool(4)
       val drivers = fileNames.map { file =>
         val d = new Driver
         val dArgs = before ++ Array("-from-tasty", file)
-        val t = new Thread { override def run = d.process(dArgs) }
-        t.setDaemon(false)
-        t
+        new Callable[Unit] { override def call = d.process(dArgs) }
       }
-      drivers.foreach(t => t.start())
+
+      pool.invokeAll(drivers.asJava)
       rootCtx.reporter
     }
   }
