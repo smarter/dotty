@@ -1842,11 +1842,11 @@ object SymDenotations {
      *  @return  `sym` is not already entered
      */
     override def proceedWithEnter(sym: Symbol, mscope: MutableScope)(implicit ctx: Context): Boolean = {
-      val entry = mscope.lookupEntry(sym.name)
+      val entry = mscope.lookupEntry(sym.originDenotation.name)
       if (entry != null) {
         if (entry.sym == sym) return false
         mscope.unlink(entry)
-        if (sym.name == nme.PACKAGE) packageObjRunId = NoRunId
+        if (sym.originDenotation.name == nme.PACKAGE) packageObjRunId = NoRunId
       }
       true
     }

@@ -256,7 +256,7 @@ object Scopes {
 
     /** create and enter a scope entry */
     protected def newScopeEntry(sym: Symbol)(implicit ctx: Context): ScopeEntry =
-      newScopeEntry(sym.name, sym)
+      newScopeEntry(sym.originDenotation.name, sym)
 
     private def enterInHash(e: ScopeEntry)(implicit ctx: Context): Unit = {
       val idx = e.name.hashCode & (hashTable.length - 1)
@@ -268,8 +268,8 @@ object Scopes {
     /** enter a symbol in this scope. */
     final def enter[T <: Symbol](sym: T)(implicit ctx: Context): T = {
       if (sym.isType && ctx.phaseId <= ctx.typerPhase.id) {
-        assert(lookup(sym.name) == NoSymbol,
-          s"duplicate ${sym.debugString}; previous was ${lookup(sym.name).debugString}") // !!! DEBUG
+        assert(lookup(sym.originDenotation.name) == NoSymbol,
+          s"duplicate ${sym.debugString}; previous was ${lookup(sym.originDenotation.name).debugString}") // !!! DEBUG
       }
       newScopeEntry(sym)
       sym
@@ -277,7 +277,7 @@ object Scopes {
 
     /** enter a symbol, asserting that no symbol with same name exists in scope */
     final def enterUnique(sym: Symbol)(implicit ctx: Context): Unit = {
-      assert(lookup(sym.name) == NoSymbol, (sym.showLocated, lookup(sym.name).showLocated))
+      assert(lookup(sym.originDenotation.name) == NoSymbol, (sym.showLocated, lookup(sym.originDenotation.name).showLocated))
       enter(sym)
     }
 
@@ -334,7 +334,7 @@ object Scopes {
 
     /** remove symbol from this scope if it is present */
     final def unlink(sym: Symbol)(implicit ctx: Context): Unit = {
-      var e = lookupEntry(sym.name)
+      var e = lookupEntry(sym.originDenotation.name)
       while (e ne null) {
         if (e.sym == sym) unlink(e)
         e = lookupNextEntry(e)
@@ -345,8 +345,8 @@ object Scopes {
      *  @pre `prev` and `replacement` have the same name.
      */
     final def replace(prev: Symbol, replacement: Symbol)(implicit ctx: Context): Unit = {
-      require(prev.name == replacement.name)
-      var e = lookupEntry(prev.name)
+      require(prev.originDenotation.name == replacement.originDenotation.name)
+      var e = lookupEntry(prev.originDenotation.name)
       while (e ne null) {
         if (e.sym == prev) e.sym = replacement
         e = lookupNextEntry(e)
