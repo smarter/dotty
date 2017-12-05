@@ -138,7 +138,12 @@ class Driver extends DotClass {
       val (fa, fb) = fileNames.splitAt(fileNames.length/2)
       val (f1, f2) = fa.splitAt(fa.length/2)
       val (f3, f4) = fb.splitAt(fb.length/2)
-      val drivers = List(f1, f2, f3, f4).map { files =>
+
+      val (fx, fyz) = fileNames.splitAt(fileNames.length/3)
+      val (fy, fz) = fyz.splitAt(fyz.length/2)
+      // val drivers = List(f1, f2, f3, f4).map { files =>
+      // val drivers = List(fx, fy, fz).map { files =>
+      val drivers = List(fa, fb).map { files =>
         val d = new Driver
         val dArgs = before ++ ("-from-tasty" :: files)
         new Callable[Unit] { override def call = d.process(dArgs) }
