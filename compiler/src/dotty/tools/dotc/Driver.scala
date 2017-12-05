@@ -8,6 +8,9 @@ import reporting._
 import scala.util.control.NonFatal
 import fromtasty.TASTYCompiler
 
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+
 /** Run the Dotty compiler.
  *
  *  Extending this class lets you customize many aspect of the compilation
@@ -25,6 +28,7 @@ class Driver extends DotClass {
   protected def doCompile(compiler: Compiler, fileNames: List[String])(implicit ctx: Context): Reporter =
     if (fileNames.nonEmpty)
       try {
+        println("Compiling: " + fileNames)
         val run = compiler.newRun
         run.compile(fileNames)
         run.printSummary()
@@ -123,8 +127,23 @@ class Driver extends DotClass {
    *                    if compilation succeeded.
    */
   def process(args: Array[String], rootCtx: Context): Reporter = {
-    val (fileNames, ctx) = setup(args, rootCtx)
-    doCompile(newCompiler(ctx), fileNames)(ctx)
+    if (!args.contains("-parallel")) {
+      val (fileNames, ctx) = setup(args, rootCtx)
+      doCompile(newCompiler(ctx), fileNames)(ctx)
+    } else {
+      val args1 = args.filter(_ != "-parallel")
+      val (fileNames, _) = setup(args1, rootCtx)
+      val before = args1.takeWhile(_ != "-from-tasty")
+      val drivers = fileNames.map { file =>
+        val d = new Driver
+        val dArgs = before ++ Array("-from-tasty", file)
+        val t = new Thread { override def run = d.process(dArgs) }
+        t.setDaemon(false)
+        t
+      }
+      drivers.foreach(t => t.start())
+      rootCtx.reporter
+    }
   }
 
   def main(args: Array[String]): Unit = {
@@ -132,6 +151,6 @@ class Driver extends DotClass {
     // we may try to load it but fail with another StackOverflowError and lose the original exception,
     // see <https://groups.google.com/forum/#!topic/scala-user/kte6nak-zPM>.
     val _ = NonFatal
-    sys.exit(if (process(args).hasErrors) 1 else 0)
+    val a =/*sys.exit*/(if (process(args).hasErrors) 1 else 0)
   }
 }
