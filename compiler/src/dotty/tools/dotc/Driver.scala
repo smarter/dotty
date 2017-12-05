@@ -135,9 +135,12 @@ class Driver extends DotClass {
       val (fileNames, _) = setup(args1, rootCtx)
       val before = args1.takeWhile(_ != "-from-tasty")
       val pool = Executors.newWorkStealingPool(4)
-      val drivers = fileNames.map { file =>
+      val (fa, fb) = fileNames.splitAt(fileNames.length/2)
+      val (f1, f2) = fa.splitAt(fa.length/2)
+      val (f3, f4) = fb.splitAt(fb.length/2)
+      val drivers = List(f1, f2, f3, f4).map { files =>
         val d = new Driver
-        val dArgs = before ++ Array("-from-tasty", file)
+        val dArgs = before ++ ("-from-tasty" :: files)
         new Callable[Unit] { override def call = d.process(dArgs) }
       }
 
