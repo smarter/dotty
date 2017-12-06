@@ -349,7 +349,13 @@ class Namer { typer: Typer =>
     }
     val existing = pkgOwner.info.decls.lookup(pid.name)
 
-    if ((existing is Package) && (pkgOwner eq existing.owner)) existing
+    if ((existing is Package) && (pkgOwner eq existing.owner)) {
+      val scope = existing.unforcedDecls.openForMutations
+      for (sym <- scope.toList.iterator)
+        if ((sym ne NoSymbol) && sym.defRunId != ctx.runId && sym.isClass && sym.asClass.assocFile == ctx.source.file)
+          scope.unlink(sym)
+      existing
+    }
     else {
       /** If there's already an existing type, then the package is a dup of this type */
       val existingType = pkgOwner.info.decls.lookup(pid.name.toTypeName)

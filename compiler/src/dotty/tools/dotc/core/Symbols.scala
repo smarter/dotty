@@ -439,7 +439,8 @@ object Symbols {
     final def lastKnownDenotation: SymDenotation =
       lastDenot
 
-    private[core] def defRunId: RunId =
+    // [core] once we move createPackageSymbol refresh logic to core
+    private[dotc] def defRunId: RunId =
       if (lastDenot == null) NoRunId else lastDenot.validFor.runId
 
     /** Does this symbol come from a currently compiled source file? */
