@@ -106,7 +106,12 @@ class SymUtils(val self: Symbol) extends AnyVal {
     val fieldName =
       if (self.hasAnnotation(defn.ScalaStaticAnnot)) thisName.getterName
       else thisName.fieldName
-    self.owner.info.decl(fieldName).suchThat(!_.is(Method)).symbol
+
+    val saved = Scopes.checkNames
+    Scopes.checkNames = false
+    val s = self.owner.info.decl(fieldName).suchThat(!_.is(Method)).symbol
+    Scopes.checkNames = saved
+    s
   }
 
   def isField(implicit ctx: Context): Boolean =

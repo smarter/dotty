@@ -55,7 +55,7 @@ class ExpandPrivate extends MiniPhase with IdentityDenotTransformer { thisPhase 
           else if (sym.is(Protected)) other.is(Protected | Private)
           else true // sym is public
         }
-        val fail = sym.allOverriddenSymbols.findSymbol(x => !hasWeakerAccess(x))
+        val fail = Scopes.noCheck { sym.allOverriddenSymbols.findSymbol(x => !hasWeakerAccess(x)) }
         if (fail.exists) {
           assert(false, i"${sym.showFullName}: ${sym.info} has weaker access than superclass method ${fail.showFullName}: ${fail.info}")
         }

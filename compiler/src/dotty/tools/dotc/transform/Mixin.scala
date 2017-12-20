@@ -121,6 +121,7 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
     if (sym is Lazy) sym
     else {
       val initName = InitializerName(sym.name.asTermName)
+      Scopes.noCheck {
       sym.owner.info.decl(initName).symbol
         .orElse(
           ctx.newSymbol(
@@ -129,6 +130,7 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
             Protected | Synthetic | Method,
             sym.info,
             coord = sym.symbol.coord).enteredAfter(thisPhase))
+      }
     }
   }.asTerm
 

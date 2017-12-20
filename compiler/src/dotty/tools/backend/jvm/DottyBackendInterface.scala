@@ -140,6 +140,9 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
     case _ => false
   }
 
+  private[this] val saved = Scopes.checkNames
+  Scopes.checkNames = false
+
   val hashMethodSym: Symbol = NoSymbol // used to dispatch ## on primitives to ScalaRuntime.hash. Should be implemented by a miniphase
   val externalEqualsNumNum: Symbol = defn.BoxesRunTimeModule.requiredMethod(nme.equalsNumNum)
   val externalEqualsNumChar: Symbol = NoSymbol // ctx.requiredMethod(BoxesRunTimeTypeRef, nme.equalsNumChar) // this method is private
@@ -151,6 +154,9 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
   val PartialFunctionClass: Symbol = defn.PartialFunctionClass
   val AbstractPartialFunctionClass: Symbol = defn.AbstractPartialFunctionClass
   val String_valueOf: Symbol = defn.String_valueOf_Object
+
+  Scopes.checkNames = saved
+
   lazy val Predef_classOf: Symbol = defn.ScalaPredefModule.requiredMethod(nme.classOf)
 
   lazy val AnnotationRetentionAttr = ctx.requiredClass("java.lang.annotation.Retention")
@@ -159,11 +165,13 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
   lazy val AnnotationRetentionRuntimeAttr = ctx.requiredClass("java.lang.annotation.RetentionPolicy").linkedClass.requiredValue("RUNTIME")
   lazy val JavaAnnotationClass = ctx.requiredClass("java.lang.annotation.Annotation")
 
-  def boxMethods: Map[Symbol, Symbol] = defn.ScalaValueClasses().map{x => // @darkdimius Are you sure this should be a def?
+  def boxMethods: Map[Symbol, Symbol] = Scopes.noCheck { defn.ScalaValueClasses().map{x => // @darkdimius Are you sure this should be a def?
     (x, Erasure.Boxing.boxMethod(x.asClass))
   }.toMap
-  def unboxMethods: Map[Symbol, Symbol] =
+  }
+  def unboxMethods: Map[Symbol, Symbol] = Scopes.noCheck {
     defn.ScalaValueClasses().map(x => (x, Erasure.Boxing.unboxMethod(x.asClass))).toMap
+  }
 
   override def isSyntheticArrayConstructor(s: Symbol) = {
     s eq defn.newArrayMethod
@@ -375,13 +383,22 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
     else clazz.getName
   }
 
-  def requiredClass[T](implicit evidence: ClassTag[T]): Symbol =
-    ctx.requiredClass(erasureString(evidence.runtimeClass).toTermName)
+  def requiredClass[T](implicit evidence: ClassTag[T]): Symbol = {
+    val saved = Scopes.checkNames
+    Scopes.checkNames = false
+    val s = ctx.requiredClass(erasureString(evidence.runtimeClass).toTermName)
+    Scopes.checkNames = saved
+    s
+  }
 
   def requiredModule[T](implicit evidence: ClassTag[T]): Symbol = {
     val moduleName = erasureString(evidence.runtimeClass)
     val className = if (moduleName.endsWith("$")) moduleName.dropRight(1)  else moduleName
-    ctx.requiredModule(className.toTermName)
+    val saved = Scopes.checkNames
+    Scopes.checkNames = false
+    val s = ctx.requiredModule(className.toTermName)
+    Scopes.checkNames = saved
+    s
   }
 
 
@@ -883,7 +900,9 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
 
 
   implicit def typeHelper(tp: Type): TypeHelper = new TypeHelper {
-    def member(string: Name): Symbol = tp.member(string.toTermName).symbol
+    def member(string: Name): Symbol = Scopes.noCheck {
+      tp.member(string.toTermName).symbol
+    }
 
     def isFinalType: Boolean = tp.typeSymbol is Flags.Final //in scalac checks for type parameters. Why? Aren't they gone by backend?
 

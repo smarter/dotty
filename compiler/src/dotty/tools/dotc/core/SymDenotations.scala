@@ -945,7 +945,10 @@ object SymDenotations {
     final def companionModule(implicit ctx: Context): Symbol = {
       if (this.flagsUNSAFE is Flags.Module) this.sourceModule
       else {
+        val saved = Scopes.checkNames
+        Scopes.checkNames = false
         val companionMethod = info.decls.denotsNamed(nme.COMPANION_MODULE_METHOD, selectPrivate).first
+        Scopes.checkNames = saved
         if (companionMethod.exists)
           companionMethod.info.resultType.classSymbol.sourceModule
         else
@@ -961,7 +964,10 @@ object SymDenotations {
     final def companionClass(implicit ctx: Context): Symbol =
       if (is(Package)) NoSymbol
       else {
+        val saved = Scopes.checkNames
+        Scopes.checkNames = false
         val companionMethod = info.decls.denotsNamed(nme.COMPANION_CLASS_METHOD, selectPrivate).first
+        Scopes.checkNames = saved
         if (companionMethod.exists)
           companionMethod.info.resultType.classSymbol
         else

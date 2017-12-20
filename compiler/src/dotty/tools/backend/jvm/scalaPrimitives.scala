@@ -137,7 +137,7 @@ class DottyPrimitives(ctx: Context) {
     }
 
     def addPrimitives(cls: Symbol, method: TermName, code: Int)(implicit ctx: Context): Unit = {
-      val alts = cls.info.member(method).alternatives.map(_.symbol)
+      val alts = core.Scopes.noCheck { cls.info.member(method).alternatives.map(_.symbol) }
       if (alts.isEmpty)
         ctx.error(s"Unknown primitive method $cls.$method")
       else alts foreach (s =>

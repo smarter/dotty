@@ -10,6 +10,7 @@ import Symbols._
 import Types.{TermRef, NoPrefix}
 import Flags.Implicit
 import Names._
+import StdNames._
 import Periods._
 import Decorators._
 import Contexts._
@@ -23,6 +24,15 @@ import SymDenotations.NoDenotation
 import collection.mutable
 
 object Scopes {
+  var checkNames: Boolean = true
+
+  def noCheck[T](op: => T): T = {
+    val saved = checkNames
+    checkNames = false
+    val ret = op
+    checkNames = saved
+    ret
+  }
 
   /** Maximal fill factor of hash table */
   private final val FillFactor = 2.0/3.0
@@ -134,6 +144,7 @@ object Scopes {
     /** Returns an iterator yielding every symbol with given name in this scope.
      */
     final def lookupAll(name: Name)(implicit ctx: Context): Iterator[Symbol] = new Iterator[Symbol] {
+      assert(!checkNames || ctx.runId < 2 || ctx.phase.id <= ctx.erasurePhase.id + 1, ctx.phase)
       var e = lookupEntry(name)
       def hasNext: Boolean = e ne null
       def next(): Symbol = { val r = e.sym; e = lookupNextEntry(e); r }
@@ -144,6 +155,7 @@ object Scopes {
      *  in `this.toList`.
      */
     final def denotsNamed(name: Name, select: SymDenotation => Boolean = selectAll)(implicit ctx: Context): PreDenotation = {
+      assert(!checkNames || name == nme.U2EVT || name == nme.EVT2U || name == nme.TRAIT_CONSTRUCTOR || name == nme.CONSTRUCTOR || ctx.runId < 2 || ctx.phase.id <= ctx.erasurePhase.id + 1, ctx.phase)
       var syms: PreDenotation = NoDenotation
       var e = lookupEntry(name)
       while (e != null) {

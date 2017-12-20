@@ -62,7 +62,7 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
   def transformLazyVal(tree: ValOrDefDef)(implicit ctx: Context): Tree = {
     val sym = tree.symbol
     if (!(sym is Flags.Lazy) || sym.owner.is(Flags.Trait) || (sym.isStatic && sym.is(Flags.Module))) tree
-    else {
+    else { Scopes.noCheck {
       val isField = sym.owner.isClass
       if (isField) {
         if (sym.isVolatile ||
@@ -79,7 +79,7 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
           transformMemberDefNonVolatile(tree)
       }
       else transformLocalDef(tree)
-    }
+    } }
   }
 
 

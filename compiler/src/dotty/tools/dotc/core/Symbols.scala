@@ -368,8 +368,13 @@ trait Symbols { this: Context =>
 
   def requiredPackageRef(path: PreName): TermRef = requiredPackage(path).termRef
 
-  def requiredClass(path: PreName): ClassSymbol =
-    base.staticRef(path.toTypeName).requiredSymbol(_.isClass).asClass
+  def requiredClass(path: PreName): ClassSymbol = {
+    val saved = Scopes.checkNames
+    Scopes.checkNames = false
+    val s = base.staticRef(path.toTypeName).requiredSymbol(_.isClass).asClass
+    Scopes.checkNames = saved
+    s
+  }
 
   def requiredClassRef(path: PreName): TypeRef = requiredClass(path).typeRef
 
@@ -379,8 +384,13 @@ trait Symbols { this: Context =>
   def getClassIfDefined(path: PreName): Symbol =
     base.staticRef(path.toTypeName, generateStubs = false).requiredSymbol(_.isClass, generateStubs = false)
 
-  def requiredModule(path: PreName): TermSymbol =
-    base.staticRef(path.toTermName).requiredSymbol(_ is Module).asTerm
+  def requiredModule(path: PreName): TermSymbol = {
+    val saved = Scopes.checkNames
+    Scopes.checkNames = false
+    val s = base.staticRef(path.toTermName).requiredSymbol(_ is Module).asTerm
+    Scopes.checkNames = saved
+    s
+  }
 
   def requiredModuleRef(path: PreName): TermRef = requiredModule(path).termRef
 }

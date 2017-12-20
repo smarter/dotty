@@ -72,10 +72,11 @@ class NonLocalReturns extends MiniPhase {
     val nonLocalReturnControl = defn.NonLocalReturnControlType
     val ex = ctx.newSymbol(meth, nme.ex, EmptyFlags, nonLocalReturnControl, coord = body.pos)
     val pat = BindTyped(ex, nonLocalReturnControl)
-    val rhs = If(
+    val rhs = Scopes.noCheck { If(
         ref(ex).select(nme.key).appliedToNone.select(nme.eq).appliedTo(ref(key)),
         ref(ex).select(nme.value).ensureConforms(meth.info.finalResultType),
         Throw(ref(ex)))
+      }
     val catches = CaseDef(pat, EmptyTree, rhs) :: Nil
     val tryCatch = Try(body, catches, EmptyTree)
     Block(keyDef :: Nil, tryCatch)

@@ -59,8 +59,10 @@ class LinkScala2Impls extends MiniPhase with IdentityDenotTransformer { thisPhas
       name = if (sym.isConstructor) sym.name else ImplMethName(sym.name),
       info = info_2_12(sym)
     )
+    Scopes.noCheck {
     for (sym <- mixin.implClass.info.decls)
       newImpl(sym.asTerm).enteredAfter(thisPhase)
+    }
   }
 
   override def prepareForTemplate(impl: Template)(implicit ctx: Context) = {
@@ -96,13 +98,14 @@ class LinkScala2Impls extends MiniPhase with IdentityDenotTransformer { thisPhas
     val cls = meth.owner
     if (cls.is(ImplClass))
       cls.traitOfImplClass.info.decl(implName).atSignature(meth.signature).symbol
-    else if (cls.is(Scala_2_12_Trait))
+    else if (cls.is(Scala_2_12_Trait)) Scopes.noCheck {
       if (meth.isConstructor)
         cls.info.decl(nme.TRAIT_CONSTRUCTOR).symbol
       else
         cls.info.decl(implName)
           .suchThat(c => FullParameterization.memberSignature(c.info) == meth.signature)
           .symbol
+    }
     else throw new AssertionError(i"no impl method for $meth")
   }
 

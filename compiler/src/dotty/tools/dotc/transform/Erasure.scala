@@ -156,9 +156,9 @@ object Erasure {
       sym.name == nme.box && sym.owner.linkedClass.isPrimitiveValueClass
 
     def boxMethod(cls: ClassSymbol)(implicit ctx: Context) =
-      cls.linkedClass.info.member(nme.box).symbol
+      core.Scopes.noCheck { cls.linkedClass.info.member(nme.box).symbol }
     def unboxMethod(cls: ClassSymbol)(implicit ctx: Context) =
-      cls.linkedClass.info.member(nme.unbox).symbol
+      core.Scopes.noCheck { cls.linkedClass.info.member(nme.unbox).symbol }
 
     /** Isf this tree is an unbox operation which can be safely removed
      *  when enclosed in a box, the unboxed argument, otherwise EmptyTree.

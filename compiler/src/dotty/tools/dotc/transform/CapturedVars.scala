@@ -109,7 +109,7 @@ class CapturedVars extends MiniPhase with IdentityDenotTransformer { thisPhase =
     val vble = vdef.symbol
     if (captured.contains(vble)) {
       def boxMethod(name: TermName): Tree =
-        ref(vble.info.classSymbol.companionModule.info.member(name).symbol)
+        core.Scopes.noCheck { ref(vble.info.classSymbol.companionModule.info.member(name).symbol) }
       cpy.ValDef(vdef)(
         rhs = vdef.rhs match {
           case EmptyTree => boxMethod(nme.zero).appliedToNone.withPos(vdef.pos)
@@ -122,7 +122,7 @@ class CapturedVars extends MiniPhase with IdentityDenotTransformer { thisPhase =
   override def transformIdent(id: Ident)(implicit ctx: Context): Tree = {
     val vble = id.symbol
     if (captured.contains(vble))
-      id.select(nme.elem).ensureConforms(vble.denot(ctx.withPhase(thisPhase)).info)
+      core.Scopes.noCheck { id.select(nme.elem).ensureConforms(vble.denot(ctx.withPhase(thisPhase)).info) }
     else id
   }
 
