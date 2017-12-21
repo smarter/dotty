@@ -24,9 +24,9 @@ import SymDenotations.NoDenotation
 import collection.mutable
 
 object Scopes {
-  var checkNames: Boolean = true
+  @dotty.tools.sharable var checkNames: Boolean = true
 
-  def noCheck[T](op: => T): T = {
+  def noCheck[T](op: => T): T = synchronized {
     val saved = checkNames
     checkNames = false
     val ret = op
