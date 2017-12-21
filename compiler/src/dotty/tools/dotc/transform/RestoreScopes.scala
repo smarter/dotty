@@ -34,7 +34,7 @@ class RestoreScopes extends MiniPhase with IdentityDenotTransformer { thisPhase 
   }
 
   private def restoreScope(tree: Tree)(implicit ctx: Context) = tree match {
-    case TypeDef(_, impl: Template) =>
+    case TypeDef(_, impl: Template) => Scopes.noCheck {
       val restoredDecls = newScope
       for (stat <- impl.constr :: impl.body)
         if (stat.isInstanceOf[MemberDef] && stat.symbol.exists)
@@ -58,10 +58,12 @@ class RestoreScopes extends MiniPhase with IdentityDenotTransformer { thisPhase 
 
       pkg.enter(cls)
       val cinfo = cls.classInfo
+      // FIXME: Figure out why I was seeing this stuff in typer in the next run.
       tree.symbol.copySymDenotation(
         info = cinfo.derivedClassInfo( // Dotty deviation: Cannot expand cinfo inline without a type error
           decls = restoredDecls: Scope)).installAfter(thisPhase)
       tree
+    }
     case tree => tree
   }
 }

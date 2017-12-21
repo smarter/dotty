@@ -23,8 +23,12 @@ class MoveStatics extends MiniPhase with SymTransformer {
 
   def transformSym(sym: SymDenotation)(implicit ctx: Context): SymDenotation = {
     if (sym.hasAnnotation(defn.ScalaStaticAnnot) && sym.owner.is(Flags.Module) && sym.owner.companionClass.exists) {
-      sym.owner.asClass.delete(sym.symbol)
-      sym.owner.companionClass.asClass.enter(sym.symbol)
+      dotty.tools.dotc.core.Scopes.noCheck {
+        // Would be safe because after RestoreScopes, but can be renamed by RenameLifted
+        // FIXME: RenameLifted should be before RestoreScopes?
+        sym.owner.asClass.delete(sym.symbol)
+        sym.owner.companionClass.asClass.enter(sym.symbol)
+      }
       val flags = if (sym.is(Flags.Method)) sym.flags else sym.flags | Flags.Mutable
       sym.copySymDenotation(owner = sym.owner.companionClass, initFlags = flags)
     }

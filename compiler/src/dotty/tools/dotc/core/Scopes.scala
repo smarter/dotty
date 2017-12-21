@@ -171,6 +171,8 @@ object Scopes {
      *  a copy with the matching symbols.
      */
     final def filteredScope(p: Symbol => Boolean)(implicit ctx: Context): Scope = {
+      // FIXME: Use ScopeEntry, avoid calling sym.name (can have changed, may require forcing)
+      Scopes.noCheck {
       var result: MutableScope = null
       for (sym <- iterator)
         if (!p(sym)) {
@@ -178,6 +180,7 @@ object Scopes {
           result.unlink(sym)
         }
       if (result == null) this else result
+      }
     }
 
     def implicitDecls(implicit ctx: Context): List[TermRef] = Nil
@@ -373,6 +376,7 @@ object Scopes {
     /** Lookup a symbol entry matching given name.
      */
     override def lookupEntry(name: Name)(implicit ctx: Context): ScopeEntry = {
+      assert(!checkNames || name == nme.U2EVT || name == nme.EVT2U || name == nme.TRAIT_CONSTRUCTOR || name == nme.CONSTRUCTOR || ctx.runId < 2 || ctx.phase.id <= ctx.erasurePhase.id + 1, ctx.phase)
       var e: ScopeEntry = null
       if (hashTable ne null) {
         e = hashTable(name.hashCode & (hashTable.length - 1))

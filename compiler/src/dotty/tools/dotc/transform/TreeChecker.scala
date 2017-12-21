@@ -408,7 +408,8 @@ class TreeChecker extends Phase with SymTransformer {
 
     override def typedCase(tree: untpd.CaseDef, pt: Type, selType: Type, gadtSyms: Set[Symbol])(implicit ctx: Context): CaseDef = {
       withDefinedSyms(tree.pat.asInstanceOf[tpd.Tree].filterSubTrees(_.isInstanceOf[ast.Trees.Bind[_]])) {
-        super.typedCase(tree, pt, selType, gadtSyms)
+        // FIXME: GADT should be empty at this point, avoid TreeMap.
+        core.Scopes.noCheck { super.typedCase(tree, pt, selType, gadtSyms) }
       }
     }
 
