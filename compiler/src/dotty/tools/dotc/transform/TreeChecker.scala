@@ -56,17 +56,18 @@ class TreeChecker extends Phase with SymTransformer {
 
   def isValidJVMMethodName(name: Name) = name.toString.forall(isValidJVMMethodChar)
 
-  def printError(str: String)(implicit ctx: Context) = {
-    ctx.echo(Console.RED + "[error] " + Console.WHITE  + str)
-  }
-
   val NoSuperClass = Trait | Package
 
   def testDuplicate(sym: Symbol, registry: mutable.Map[String, Symbol], typ: String)(implicit ctx: Context) = {
     val name = sym.fullName.mangledString
-    if (this.flatClasses && registry.contains(name))
-        printError(s"$typ defined twice $sym ${sym.id} ${registry(name).id}")
-    registry(name) = sym
+    if (this.flatClasses) {
+      registry.get(name) match {
+        case Some(prev) =>
+          assert(sym eq prev, i"$typ defined twice $sym ${sym.id} ${prev.id}")
+        case _ =>
+          registry(name) = sym
+      }
+    }
   }
 
   def checkCompanion(symd: SymDenotation)(implicit ctx: Context): Unit = {
@@ -85,14 +86,13 @@ class TreeChecker extends Phase with SymTransformer {
     if (sym.isClass && !sym.isAbsent) {
       val validSuperclass = sym.isPrimitiveValueClass || defn.syntheticCoreClasses.contains(sym) ||
         (sym eq defn.ObjectClass) || (sym is NoSuperClass) || (sym.asClass.superClass.exists)
-      if (!validSuperclass)
-        printError(s"$sym has no superclass set")
 
+      assert(validSuperclass, i"$sym has no superclass set")
       testDuplicate(sym, seenClasses, "class")
     }
 
     if (sym.is(Method) && sym.is(Deferred) && sym.is(Private))
-      assert(false, s"$sym is both Deferred and Private")
+      assert(false, i"$sym is both Deferred and Private")
 
     checkCompanion(symd)
 
