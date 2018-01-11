@@ -13,56 +13,19 @@ clone:
 pipeline:
   # TESTS:
   # We run tests in parallel. Tests run in a copy of the working directory to avoid conflict
-  test_legacy:
-    group: test
-    image: lampepfl/dotty:2017-11-17
-    commands:
-      - cp -R . /tmp/0/ && cd /tmp/0/
-      - ./project/scripts/sbt legacyTests
-
   test:
     group: test
     image: lampepfl/dotty:2017-11-17
     commands:
       - cp -R . /tmp/1/ && cd /tmp/1/
-      - ./project/scripts/sbt ";compile ;test"
-      - ./project/scripts/sbtTests
+      - ./project/scripts/sbt ";compile ;test-only -- --tests=compilePos"
 
   test_bootstrapped:
     group: test
     image: lampepfl/dotty:2017-11-17
     commands:
       - cp -R . /tmp/2/ && cd /tmp/2/
-      - ./project/scripts/sbt ";dotty-bootstrapped/compile ;dotty-bootstrapped/test"
-      - ./project/scripts/sbtBootstrappedTests
-
-  test_optimised:
-    group: test
-    image: lampepfl/dotty:2017-11-17
-    commands:
-      - cp -R . /tmp/3/ && cd /tmp/3/
-      - ./project/scripts/sbt dotty-optimised/test
-
-  test_sbt:
-    group: test
-    image: lampepfl/dotty:2017-11-17
-    commands:
-      - cp -R . /tmp/4/ && cd /tmp/4/
-      - ./project/scripts/sbt sbt-dotty/scripted
-    when:
-      # sbt scripted tests are slow and don't run on PRs
-      event: [ push, tag, deployment ]
-
-  # DOCUMENTATION:
-  documentation:
-    image: lampepfl/dotty:2017-11-17
-    commands:
-      - ./project/scripts/genDocs
-    secrets: [ bot_pass ]
-    when:
-      event: push
-      # We only generate the documentation for the master branch
-      branch: master
+      - ./project/scripts/sbt ";dotty-bootstrapped/compile ;dotty-bootstrapped/test-only -- --tests=compilePos"
 
   # PUBLISHING:
   # Publishing expect NIGHTLYBUILD or RELEASEBUILD to be set. See dottyVersion in Build.scala

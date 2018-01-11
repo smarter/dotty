@@ -1150,6 +1150,7 @@ trait ParallelTesting extends RunnerOrchestration { self =>
    *  dissociated
    */
   def compileList(testName: String, files: List[String], flags: TestFlags)(implicit testGroup: TestGroup): CompilationTest = {
+    println("##compiling: " + files.mkString(" "))
     val outDir = defaultOutputDir + testGroup + "/" + testName + "/"
 
     // Directories in which to compile all containing files with `flags`:
