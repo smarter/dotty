@@ -1055,7 +1055,30 @@ class TreeUnpickler(reader: TastyReader,
       else {
         val start = currentAddr
         val tp = readType()
-        if (tp.exists) setPos(start, TypeTree(tp)) else EmptyTree
+        if (tp.exists) {
+          val tree = TypeTree(tp)
+          var addr = start
+          var pos = posAt(addr)
+          // This is subtle: when a TypeTree is pickled as just a type, we don't know if SHARED
+          // means that just the type is shared, or the full TypeTree is shared. This matter
+          // when trying to set the position of a TypeTree:
+          // - If just the type is shared, then the SHARED node will have its
+          //   own pickled position for the TypeTree.
+          // - If the full TypeTree is shared then the SHARED node will have no
+          //   position on its own, and we need to look at the position at the
+          //   referenced address.
+          //
+          // To distinguish between the two, we assume that pickled TypeTrees always have
+          // a pickled position, this is enforced in TreePickler#pickleTree
+          while (pos == NoPosition && bytes(index(addr)) == SHARED) {
+            val sharedFork = fork
+            sharedFork.reader.readByte()
+            addr = sharedFork.reader.readAddr()
+            pos = posAt(addr)
+          }
+          if (pos.exists) tree.setPosUnchecked(pos)
+          tree
+        } else EmptyTree
       }
 
     def readCases(end: Addr)(implicit ctx: Context): List[CaseDef] =

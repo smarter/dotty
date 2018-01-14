@@ -519,6 +519,8 @@ class TreePickler(pickler: TastyPickler) {
           writeByte(PACKAGE)
           withLength { pickleType(pid.tpe); pickleStats(stats) }
         case tree: TypeTree =>
+          // See the comment in TreeUnpickler#readTpt to know why this is required
+          assert(tree.pos.exists, "Cannot pickle $tree because it doesn't have a position.")
           pickleType(tree.tpe)
         case SingletonTypeTree(ref) =>
           writeByte(SINGLETONtpt)
