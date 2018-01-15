@@ -469,7 +469,7 @@ class Namer { typer: Typer =>
     case vdef: ValDef if (isEnumConstant(vdef)) =>
       val enumClass = sym.owner.linkedClass
       if (!(enumClass is Flags.Sealed)) enumClass.setFlag(Flags.AbstractSealed)
-      enumClass.addAnnotation(Annotation.Child(sym))
+      enumClass.addAnnotation(Annotation.Child(sym, enumClass.pos))
     case _ =>
   }
 

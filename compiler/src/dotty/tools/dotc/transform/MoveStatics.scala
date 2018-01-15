@@ -43,12 +43,13 @@ class MoveStatics extends MiniPhase with SymTransformer {
         val newBodyWithStaticConstr =
           if (staticFields.nonEmpty) {
             /* do NOT put Flags.JavaStatic here. It breaks .enclosingClass */
-            val staticCostructor = ctx.newSymbol(orig.symbol, nme.STATIC_CONSTRUCTOR, Flags.Synthetic | Flags.Method | Flags.Private, MethodType(Nil, defn.UnitType))
-            staticCostructor.addAnnotation(Annotation(defn.ScalaStaticAnnot))
-            staticCostructor.entered
+            val staticConstructor = ctx.newSymbol(orig.symbol, nme.STATIC_CONSTRUCTOR, Flags.Synthetic | Flags.Method | Flags.Private, MethodType(Nil, defn.UnitType),
+              coord = orig.pos)
+            staticConstructor.addAnnotation(Annotation(defn.ScalaStaticAnnot, staticConstructor.pos))
+            staticConstructor.entered
 
-            val staticAssigns = staticFields.map(x => Assign(ref(x.symbol), x.rhs.changeOwner(x.symbol, staticCostructor)))
-            tpd.DefDef(staticCostructor, Block(staticAssigns, tpd.unitLiteral)) :: newBody
+            val staticAssigns = staticFields.map(x => Assign(ref(x.symbol), x.rhs.changeOwner(x.symbol, staticConstructor)))
+            tpd.DefDef(staticConstructor, Block(staticAssigns, tpd.unitLiteral)) :: newBody
           } else newBody
 
         val oldTemplate = orig.rhs.asInstanceOf[Template]

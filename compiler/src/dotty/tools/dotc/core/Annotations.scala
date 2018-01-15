@@ -80,34 +80,34 @@ object Annotations {
 
     def apply(tree: Tree) = ConcreteAnnotation(tree)
 
-    def apply(cls: ClassSymbol)(implicit ctx: Context): Annotation =
-      apply(cls, Nil)
+    def apply(cls: ClassSymbol, pos: Position)(implicit ctx: Context): Annotation =
+      apply(cls, Nil, pos)
 
-    def apply(cls: ClassSymbol, arg: Tree)(implicit ctx: Context): Annotation =
-      apply(cls, arg :: Nil)
+    def apply(cls: ClassSymbol, arg: Tree, pos: Position)(implicit ctx: Context): Annotation =
+      apply(cls, arg :: Nil, pos)
 
-    def apply(cls: ClassSymbol, arg1: Tree, arg2: Tree)(implicit ctx: Context): Annotation =
-      apply(cls, arg1 :: arg2 :: Nil)
+    def apply(cls: ClassSymbol, arg1: Tree, arg2: Tree, pos: Position)(implicit ctx: Context): Annotation =
+      apply(cls, arg1 :: arg2 :: Nil, pos)
 
-    def apply(cls: ClassSymbol, args: List[Tree])(implicit ctx: Context): Annotation =
-      apply(cls.typeRef, args)
+    def apply(cls: ClassSymbol, args: List[Tree], pos: Position)(implicit ctx: Context): Annotation =
+      apply(cls.typeRef, args, pos)
 
-    def apply(atp: Type, arg: Tree)(implicit ctx: Context): Annotation =
-      apply(atp, arg :: Nil)
+    def apply(atp: Type, arg: Tree, pos: Position)(implicit ctx: Context): Annotation =
+      apply(atp, arg :: Nil, pos)
 
-    def apply(atp: Type, arg1: Tree, arg2: Tree)(implicit ctx: Context): Annotation =
-      apply(atp, arg1 :: arg2 :: Nil)
+    def apply(atp: Type, arg1: Tree, arg2: Tree, pos: Position)(implicit ctx: Context): Annotation =
+      apply(atp, arg1 :: arg2 :: Nil, pos)
 
-    def apply(atp: Type, args: List[Tree])(implicit ctx: Context): Annotation =
-      apply(New(atp, args))
+    def apply(atp: Type, args: List[Tree], pos: Position)(implicit ctx: Context): Annotation =
+      apply(New(atp, args).withPos(pos))
 
     private def resolveConstructor(atp: Type, args:List[Tree])(implicit ctx: Context): Tree = {
       val targs = atp.argTypes
       tpd.applyOverloaded(New(atp.typeConstructor), nme.CONSTRUCTOR, args, targs, atp, isAnnotConstructor = true)
     }
 
-    def applyResolve(atp: Type, args: List[Tree])(implicit ctx: Context): Annotation = {
-      apply(resolveConstructor(atp, args))
+    def applyResolve(atp: Type, args: List[Tree], pos: Position)(implicit ctx: Context): Annotation = {
+      apply(resolveConstructor(atp, args).withPos(pos))
     }
 
     /** Create an annotation where the tree is computed lazily. */
@@ -132,30 +132,30 @@ object Annotations {
         def complete(implicit ctx: Context) = treeFn(ctx)
       }
 
-    def deferred(atp: Type, args: List[Tree])(implicit ctx: Context): Annotation =
-      deferred(atp.classSymbol, implicit ctx => New(atp, args))
+    def deferred(atp: Type, args: List[Tree], pos: Position)(implicit ctx: Context): Annotation =
+      deferred(atp.classSymbol, implicit ctx => New(atp, args).withPos(pos))
 
-    def deferredResolve(atp: Type, args: List[Tree])(implicit ctx: Context): Annotation =
-      deferred(atp.classSymbol, implicit ctx => resolveConstructor(atp, args))
+    def deferredResolve(atp: Type, args: List[Tree], pos: Position)(implicit ctx: Context): Annotation =
+      deferred(atp.classSymbol, implicit ctx => resolveConstructor(atp, args).withPos(pos))
 
-    def makeAlias(sym: TermSymbol)(implicit ctx: Context) =
+    def makeAlias(sym: TermSymbol, pos: Position)(implicit ctx: Context) =
       apply(defn.AliasAnnot, List(
-        ref(TermRef(sym.owner.thisType, sym.name, sym))))
+        ref(TermRef(sym.owner.thisType, sym.name, sym))), pos)
 
     /** Extractor for child annotations */
     object Child {
 
       /** A deferred annotation to the result of a given child computation */
-      def apply(delayedSym: Context => Symbol)(implicit ctx: Context): Annotation = {
+      def apply(delayedSym: Context => Symbol, pos: Position)(implicit ctx: Context): Annotation = {
         def makeChildLater(implicit ctx: Context) = {
           val sym = delayedSym(ctx)
-          New(defn.ChildAnnotType.appliedTo(sym.owner.thisType.select(sym.name, sym)), Nil)
+          New(defn.ChildAnnotType.appliedTo(sym.owner.thisType.select(sym.name, sym)), Nil).withPos(pos)
         }
         deferred(defn.ChildAnnot, implicit ctx => makeChildLater(ctx))
       }
 
       /** A regular, non-deferred Child annotation */
-      def apply(sym: Symbol)(implicit ctx: Context): Annotation = apply(_ => sym)
+      def apply(sym: Symbol, pos: Position)(implicit ctx: Context): Annotation = apply(_ => sym, pos)
 
       def unapply(ann: Annotation)(implicit ctx: Context): Option[Symbol] =
         if (ann.symbol == defn.ChildAnnot) {
@@ -165,13 +165,13 @@ object Annotations {
         else None
     }
 
-    def makeSourceFile(path: String)(implicit ctx: Context) =
-      apply(defn.SourceFileAnnot, Literal(Constant(path)))
+    def makeSourceFile(path: String, pos: Position)(implicit ctx: Context) =
+      apply(defn.SourceFileAnnot, Literal(Constant(path)), pos)
   }
 
-  def ThrowsAnnotation(cls: ClassSymbol)(implicit ctx: Context) = {
+  def ThrowsAnnotation(cls: ClassSymbol, pos: Position)(implicit ctx: Context) = {
     val tref = cls.typeRef
-    Annotation(defn.ThrowsAnnotType.appliedTo(tref), Ident(tref))
+    Annotation(defn.ThrowsAnnotType.appliedTo(tref), Ident(tref), pos)
   }
 
   /** A decorator that provides queries for specific annotations

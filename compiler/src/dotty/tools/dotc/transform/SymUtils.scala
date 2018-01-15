@@ -144,7 +144,7 @@ class SymUtils(val self: Symbol) extends AnyVal {
     def register(child: Symbol, parent: Type) = {
       val cls = parent.classSymbol
       if (cls.is(Sealed) && (!late || child.isInaccessibleChildOf(cls)))
-        cls.addAnnotation(Annotation.Child(child))
+        cls.addAnnotation(Annotation.Child(child, cls.pos))
     }
     if (self.isClass && !self.isAnonymousClass)
       self.asClass.classParents.foreach { parent =>

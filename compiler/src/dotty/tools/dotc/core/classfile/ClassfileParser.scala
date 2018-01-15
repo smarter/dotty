@@ -278,7 +278,7 @@ class ClassfileParser(
             ctx.warning(s"no linked class for java enum $sym in ${sym.owner}. A referencing class file might be missing an InnerClasses entry.")
           else {
             if (!(enumClass is Flags.Sealed)) enumClass.setFlag(Flags.AbstractSealed)
-            enumClass.addAnnotation(Annotation.Child(sym))
+            enumClass.addAnnotation(Annotation.Child(sym, enumClass.pos))
           }
         }
       } finally {
@@ -520,7 +520,7 @@ class ClassfileParser(
       }
     }
     if (hasError || skip) None
-    else Some(Annotation.deferredResolve(attrType, argbuf.toList))
+    else Some(Annotation.deferredResolve(attrType, argbuf.toList, NoPosition))
   } catch {
     case f: FatalError => throw f // don't eat fatal errors, they mean a class was not found
     case NonFatal(ex) =>
@@ -562,14 +562,14 @@ class ClassfileParser(
         case tpnme.DeprecatedATTR =>
           val msg = Literal(Constant("see corresponding Javadoc for more information."))
           val since = Literal(Constant(""))
-          sym.addAnnotation(Annotation(defn.DeprecatedAnnot, msg, since))
+          sym.addAnnotation(Annotation(defn.DeprecatedAnnot, msg, since, sym.pos))
         case tpnme.ConstantValueATTR =>
           val c = pool.getConstant(in.nextChar)
           val c1 = convertTo(c, symtype)
           if (c1 ne null) newType = ConstantType(c1)
           else println("failure to convert " + c + " to " + symtype); //debug
         case tpnme.AnnotationDefaultATTR =>
-          sym.addAnnotation(Annotation(defn.AnnotationDefaultAnnot, Nil))
+          sym.addAnnotation(Annotation(defn.AnnotationDefaultAnnot, Nil, sym.pos))
         // Java annotations on classes / methods / fields with RetentionPolicy.RUNTIME
         case tpnme.RuntimeAnnotationATTR =>
           parseAnnotations(attrLen)
@@ -605,7 +605,7 @@ class ClassfileParser(
       for (n <- 0 until nClasses) {
         // FIXME: this performs an equivalent of getExceptionTypes instead of getGenericExceptionTypes (SI-7065)
         val cls = pool.getClassSymbol(in.nextChar.toInt)
-        sym.addAnnotation(ThrowsAnnotation(cls.asClass))
+        sym.addAnnotation(ThrowsAnnotation(cls.asClass, sym.pos))
       }
     }
 

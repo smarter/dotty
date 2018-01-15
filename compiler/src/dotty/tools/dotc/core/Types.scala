@@ -2872,13 +2872,13 @@ object Types {
      *   - add @inlineParam to inline call-by-value parameters
      */
     def fromSymbols(params: List[Symbol], resultType: Type)(implicit ctx: Context) = {
-      def translateInline(tp: Type): Type = tp match {
+      def translateInline(tp: Type, pos: Position): Type = tp match {
         case _: ExprType => tp
-        case _ => AnnotatedType(tp, Annotation(defn.InlineParamAnnot))
+        case _ => AnnotatedType(tp, Annotation(defn.InlineParamAnnot, pos))
       }
       def paramInfo(param: Symbol) = {
         val paramType = param.info.annotatedToRepeated
-        if (param.is(Inline)) translateInline(paramType) else paramType
+        if (param.is(Inline)) translateInline(paramType, param.pos) else paramType
       }
 
       apply(params.map(_.name.asTermName))(

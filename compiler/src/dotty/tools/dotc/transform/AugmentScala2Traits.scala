@@ -87,7 +87,7 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
         if (sym.isGetter)
           if (sym.is(Lazy)) {
             if (!sym.hasAnnotation(defn.VolatileAnnot))
-              sym.addAnnotation(Annotation(defn.VolatileAnnot, Nil))
+              sym.addAnnotation(Annotation(defn.VolatileAnnot, Nil, sym.pos))
           }
           else if (!sym.is(Deferred) && !sym.setter.exists &&
                    !sym.info.resultType.isInstanceOf[ConstantType])

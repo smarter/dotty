@@ -94,7 +94,7 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
     appendOffsetDefs.get(cls) match {
       case None => template
       case Some(data) =>
-        data.defs.foreach(_.symbol.addAnnotation(Annotation(defn.ScalaStaticAnnot)))
+        data.defs.foreach(d => d.symbol.addAnnotation(Annotation(defn.ScalaStaticAnnot, d.symbol.pos)))
         cpy.Template(template)(body = addInFront(data.defs, template.body))
     }
 
@@ -362,7 +362,7 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
                  .symbol.asTerm
             } else { // need to create a new flag
               offsetSymbol = ctx.newSymbol(claz, offsetById, Flags.Synthetic, defn.LongType).enteredAfter(this)
-              offsetSymbol.addAnnotation(Annotation(defn.ScalaStaticAnnot))
+              offsetSymbol.addAnnotation(Annotation(defn.ScalaStaticAnnot, offsetSymbol.pos))
               val flagName = (StdNames.nme.BITMAP_PREFIX + id.toString).toTermName
               val flagSymbol = ctx.newSymbol(claz, flagName, containerFlags, defn.LongType).enteredAfter(this)
               flag = ValDef(flagSymbol, Literal(Constants.Constant(0L)))
@@ -372,7 +372,7 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
 
           case None =>
             offsetSymbol = ctx.newSymbol(claz, offsetName(0), Flags.Synthetic, defn.LongType).enteredAfter(this)
-            offsetSymbol.addAnnotation(Annotation(defn.ScalaStaticAnnot))
+            offsetSymbol.addAnnotation(Annotation(defn.ScalaStaticAnnot, offsetSymbol.pos))
             val flagName = (StdNames.nme.BITMAP_PREFIX + "0").toTermName
             val flagSymbol = ctx.newSymbol(claz, flagName, containerFlags, defn.LongType).enteredAfter(this)
             flag = ValDef(flagSymbol, Literal(Constants.Constant(0L)))
