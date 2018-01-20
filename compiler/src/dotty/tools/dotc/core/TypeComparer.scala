@@ -711,8 +711,13 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
           val args1 = tp1base.args
           val tparams1all = tycon1.typeParams
           val lengthDiff = tparams1all.length - tparams.length
+          // println("tp1base: " + tp1base)
+          // println("tycon2: " + tycon2)
           lengthDiff >= 0 && {
             val tparams1 = tparams1all.drop(lengthDiff)
+            // println("tparams1: " + tparams1)
+            // println("tparams: " + tparams)
+            // println("vc: " + variancesConform(tparams1, tparams))
             variancesConform(tparams1, tparams) && {
               if (lengthDiff > 0)
                 tycon1 = HKTypeLambda(tparams1.map(_.paramName))(
@@ -727,21 +732,25 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
         case _ => false
       }
 
-      tp1.widen match {
-        case tp1w: AppliedType => appOK(tp1w)
-        case tp1w =>
-          tp1w.typeSymbol.isClass && {
-            val classBounds = tycon2.classSymbols
-            def liftToBase(bcs: List[ClassSymbol]): Boolean = bcs match {
-              case bc :: bcs1 =>
-                classBounds.exists(bc.derivesFrom) && appOK(tp1w.baseType(bc)) ||
-                liftToBase(bcs1)
-              case _ =>
-                false
-            }
-            liftToBase(tp1w.baseClasses)
-          } ||
-          fourthTry(tp1, tp2)
+      val tp1w = tp1.widen
+      (tp1.widen match {
+        case tp1w: AppliedType =>
+          appOK(tp1w)
+        case _ =>
+          false
+      }) || {
+        tp1w.typeSymbol.isClass && {
+          val classBounds = tycon2.classSymbols
+          def liftToBase(bcs: List[ClassSymbol]): Boolean = bcs match {
+            case bc :: bcs1 =>
+              classBounds.exists(bc.derivesFrom) && appOK(tp1w.baseType(bc)) ||
+              liftToBase(bcs1)
+            case _ =>
+              false
+          }
+          liftToBase(tp1w.baseClasses)
+        } ||
+        fourthTry(tp1, tp2)
       }
     }
 
