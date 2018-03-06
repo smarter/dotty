@@ -484,10 +484,14 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
             }
             else tp2 match {
               case EtaExpansion(tycon2) if tycon2.symbol.isClass =>
-                return recur(tp1, tycon2)
+                recur(tp1, tycon2)
               case _ =>
+                // println("tp1: " + tp1)
+                // println("tp2: " + tp2)
+                // val good = recur(EtaExpansion(tp1), tp2)
+                // assert(false, s"tp1: $tp1, tp2: $tp2, fourthTry: $fourthTry, good: $good")
+                recur(EtaExpansion(tp1), tp2)
             }
-            fourthTry
         }
         compareTypeLambda
       case OrType(tp21, tp22) =>
