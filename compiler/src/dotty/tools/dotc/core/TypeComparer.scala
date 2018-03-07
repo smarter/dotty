@@ -366,10 +366,11 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
 
       case _ =>
         val cls2 = tp2.symbol
-        if (cls2.isClass) {
-          if (cls2.typeParams.nonEmpty && tp1.isHK)
-            return recur(tp1, EtaExpansion(cls2.typeRef))
-          else {
+        if (cls2.isClass && !(cls2.typeParams.nonEmpty && tp1.isHK)) {
+          // if (cls2.typeParams.nonEmpty && tp1.isHK)
+          //   return recur(tp1, EtaExpansion(cls2.typeRef))
+          // else
+          {
             val base = tp1.baseType(cls2)
             if (base.exists) {
               if (cls2.is(JavaDefined))
