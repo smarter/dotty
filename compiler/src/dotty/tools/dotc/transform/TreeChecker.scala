@@ -49,6 +49,8 @@ class TreeChecker extends Phase with SymTransformer {
   import ast.tpd._
   import TreeChecker._
 
+  override def isTreeChecker = true
+
   private val seenClasses = collection.mutable.HashMap[String, Symbol]()
   private val seenModuleVals = collection.mutable.HashMap[String, Symbol]()
 

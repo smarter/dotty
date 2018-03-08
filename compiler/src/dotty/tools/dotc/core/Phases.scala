@@ -310,6 +310,9 @@ object Phases {
      */
     def isTyper = false
 
+    /** Is this phase an instance of TreeChecker ? */
+    def isTreeChecker = false
+
     /** Can this transform create or delete non-private members? */
     def changesMembers: Boolean = false
 

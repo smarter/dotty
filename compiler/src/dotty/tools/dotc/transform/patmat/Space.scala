@@ -279,8 +279,10 @@ trait SpaceLogic {
 }
 
 /** Scala implementation of space logic */
-class SpaceEngine(implicit ctx: Context) extends SpaceLogic {
+class SpaceEngine(ictx: Context) extends SpaceLogic {
   import tpd._
+
+  implicit val ctx: Context = ictx.addMode(Mode.AllowTypevarsInstantiation)
 
   private val scalaSomeClass       = ctx.requiredClass("scala.Some")
   private val scalaSeqFactoryClass = ctx.requiredClass("scala.collection.generic.SeqFactory")

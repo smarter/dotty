@@ -94,4 +94,6 @@ object Mode {
   /** We are in the IDE */
   val Interactive = newMode(20, "Interactive")
 
+  /** Allow instantiating type variables after Typer */
+  val AllowTypevarsInstantiation = newMode(21, "AllowTypevarsInstantiation")
 }

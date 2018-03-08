@@ -3384,7 +3384,11 @@ object Types {
      *  uninstantiated
      */
     def instanceOpt(implicit ctx: Context): Type =
-      if (inst.exists) inst else ctx.typerState.instType(this)
+      if (inst.exists) inst else {
+        assert(ctx.phase.isTyper || ctx.phase.isTreeChecker || ctx.mode.is(Mode.AllowTypevarsInstantiation),
+          s"Detected uninstantiated type variable $this in phase ${ctx.phase}")
+        ctx.typerState.instType(this)
+      }
 
     /** Is the variable already instantiated? */
     def isInstantiated(implicit ctx: Context) = instanceOpt.exists

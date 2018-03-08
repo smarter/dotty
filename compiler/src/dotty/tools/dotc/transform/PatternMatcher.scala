@@ -32,7 +32,7 @@ class PatternMatcher extends MiniPhase {
     val translated = new Translator(tree.tpe, this).translateMatch(tree)
 
     // check exhaustivity and unreachability
-    val engine = new patmat.SpaceEngine
+    val engine = new patmat.SpaceEngine(ctx)
 
     if (engine.checkable(tree)) {
       engine.checkExhaustivity(tree)

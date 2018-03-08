@@ -51,7 +51,7 @@ class PatternMatcherOld extends MiniPhase with DenotTransformer {
     val translated = new Translator()(ctx).translator.translateMatch(tree)
 
     // check exhaustivity and unreachability
-    val engine = new SpaceEngine
+    val engine = new SpaceEngine(ctx)
     if (engine.checkable(tree)) {
       engine.checkExhaustivity(tree)
       engine.checkRedundancy(tree)
