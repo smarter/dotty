@@ -29,7 +29,6 @@ import scala.annotation.tailrec
 class Simplify extends MiniPhase with IdentityDenotTransformer {
   import tpd._
   override def phaseName: String = "simplify"
-  override val cpy = tpd.cpy
 
   private[localopt] var SeqFactoryClass: Symbol = null
   private[localopt] var CommutativePrimitiveOperations: Set[Symbol] = null

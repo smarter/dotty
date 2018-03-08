@@ -460,8 +460,6 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   override val cpy: TypedTreeCopier = // Type ascription needed to pick up any new members in TreeCopier (currently there are none)
     new TypedTreeCopier
 
-  val cpyBetweenPhases = new TimeTravellingTreeCopier
-
   class TypedTreeCopier extends TreeCopier {
     def postProcess(tree: Tree, copied: untpd.Tree): copied.ThisTree[Type] =
       copied.withTypeUnchecked(tree.tpe)
@@ -484,7 +482,8 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       val tree1 = untpd.cpy.Apply(tree)(fun, args)
       tree match {
         case tree: Apply
-        if (fun.tpe eq tree.fun.tpe) && sameTypes(args, tree.args) =>
+          if (fun.tpe eq tree.fun.tpe) && (fun.tpe.widen eq tree.fun.tpe.widen)
+             && sameTypes(args, tree.args) =>
           tree1.withTypeUnchecked(tree.tpe)
         case _ => ta.assignType(tree1, fun, args)
       }
@@ -494,7 +493,8 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       val tree1 = untpd.cpy.TypeApply(tree)(fun, args)
       tree match {
         case tree: TypeApply
-        if (fun.tpe eq tree.fun.tpe) && sameTypes(args, tree.args) =>
+          if (fun.tpe eq tree.fun.tpe) && (fun.tpe.widen eq tree.fun.tpe.widen)
+             && sameTypes(args, tree.args) =>
           tree1.withTypeUnchecked(tree.tpe)
         case _ => ta.assignType(tree1, fun, args)
       }
@@ -535,7 +535,9 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     override def Closure(tree: Tree)(env: List[Tree], meth: Tree, tpt: Tree)(implicit ctx: Context): Closure = {
       val tree1 = untpd.cpy.Closure(tree)(env, meth, tpt)
       tree match {
-        case tree: Closure if sameTypes(env, tree.env) && (meth.tpe eq tree.meth.tpe) && (tpt.tpe eq tree.tpt.tpe) =>
+        case tree: Closure
+          if (meth.tpe eq tree.meth.tpe) && (meth.tpe.widen eq tree.meth.tpe.widen)
+             && (tpt.tpe eq tree.tpt.tpe) && sameTypes(env, tree.env) =>
           tree1.withTypeUnchecked(tree.tpe)
         case _ => ta.assignType(tree1, meth, tpt)
       }
@@ -603,40 +605,6 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       CaseDef(tree: Tree)(pat, guard, body)
     override def Try(tree: Try)(expr: Tree = tree.expr, cases: List[CaseDef] = tree.cases, finalizer: Tree = tree.finalizer)(implicit ctx: Context): Try =
       Try(tree: Tree)(expr, cases, finalizer)
-  }
-
-  class TimeTravellingTreeCopier extends TypedTreeCopier {
-    override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = {
-      val tree1 = untpd.cpy.Apply(tree)(fun, args)
-      tree match {
-        case tree: Apply
-        if (fun.tpe eq tree.fun.tpe) && (fun.tpe.widen eq tree.fun.tpe.widen) && sameTypes(args, tree.args) =>
-          tree1.withTypeUnchecked(tree.tpe)
-        case _ => ta.assignType(tree1, fun, args)
-      }
-    }
-
-    override def TypeApply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): TypeApply = {
-      val tree1 = untpd.cpy.TypeApply(tree)(fun, args)
-      tree match {
-        case tree: TypeApply
-        if (fun.tpe eq tree.fun.tpe) && (fun.tpe.widen eq tree.fun.tpe.widen) && sameTypes(args, tree.args) =>
-          tree1.withTypeUnchecked(tree.tpe)
-        case _ => ta.assignType(tree1, fun, args)
-      }
-    }
-
-    override def Closure(tree: Tree)(env: List[Tree], meth: Tree, tpt: Tree)(implicit ctx: Context): Closure = {
-      val tree1 = untpd.cpy.Closure(tree)(env, meth, tpt)
-      tree match {
-        case tree: Closure if sameTypes(env, tree.env) && (meth.tpe eq tree.meth.tpe) && (meth.tpe.widen eq tree.meth.tpe.widen) && (tpt.tpe eq tree.tpt.tpe) =>
-          tree1.withTypeUnchecked(tree.tpe)
-        case _ => ta.assignType(tree1, meth, tpt)
-      }
-    }
-
-    override def Closure(tree: Closure)(env: List[Tree] = tree.env, meth: Tree = tree.meth, tpt: Tree = tree.tpt)(implicit ctx: Context): Closure =
-      Closure(tree: Tree)(env, meth, tpt)
   }
 
   override def skipTransform(tree: Tree)(implicit ctx: Context) = tree.tpe.isError

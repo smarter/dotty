@@ -49,8 +49,6 @@ object MegaPhase {
     /** If set, use relaxed typing for all phases in group */
     def relaxedTypingInGroup = false
 
-    val cpy: TypedTreeCopier = cpyBetweenPhases
-
     def prepareForIdent(tree: Ident)(implicit ctx: Context): Context = ctx
     def prepareForSelect(tree: Select)(implicit ctx: Context): Context = ctx
     def prepareForThis(tree: This)(implicit ctx: Context) = ctx
@@ -152,8 +150,6 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
     }
     relaxedTypingCache
   }
-
-  private val cpy: TypedTreeCopier = cpyBetweenPhases
 
   /** Transform node using all phases in this group that have idxInGroup >= start */
   def transformNode(tree: Tree, start: Int)(implicit ctx: Context) = {
