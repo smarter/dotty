@@ -785,17 +785,24 @@ class Typer extends Namer
       val typeArgs = params1.map(_.tpt) :+ resTpt
       val tycon = TypeTree(funCls.typeRef)
       val core = assignType(cpy.AppliedTypeTree(tree)(tycon, typeArgs), tycon, typeArgs)
-      val appMeth = ctx.newSymbol(ctx.owner, nme.apply, Synthetic | Deferred, mt)
+      // val appMeth = ctx.newSymbol(ctx.owner, nme.apply, Synthetic | Deferred, mt)
+      val appMeth = ctx.owner
+      appMeth.info = mt
       val appDef = assignType(
-        untpd.DefDef(appMeth.name, Nil, List(params1), resultTpt, EmptyTree),
+        untpd.DefDef(appMeth.name.asTermName, Nil, List(params1),
+          resultTpt,
+          EmptyTree),
         appMeth)
-      RefinedTypeTree(core, List(appDef), ctx.owner.asClass)
+      RefinedTypeTree(core, List(appDef), ctx.owner.owner.asClass)
     }
 
     args match {
       case ValDef(_, _, _) :: _ =>
+        val ref = ctx.newRefinedClassSymbol(tree.pos)
+        val appMeth = ctx.newSymbol(ref, nme.apply, Synthetic | Deferred, NoCompleter)
         typedDependent(args.asInstanceOf[List[ValDef]])(
-          ctx.fresh.setOwner(ctx.newRefinedClassSymbol(tree.pos)).setNewScope)
+          ctx.fresh.setOwner(appMeth).setNewScope)
+          // ctx.fresh.setOwner(ctx.newRefinedClassSymbol(tree.pos)).setNewScope)
       case _ =>
         typed(cpy.AppliedTypeTree(tree)(untpd.TypeTree(funCls.typeRef), args :+ body), pt)
     }

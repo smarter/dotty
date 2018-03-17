@@ -46,9 +46,6 @@ class FromTastyTests extends ParallelTesting {
         // Type miss match after unpickling
         "hklub0.scala",
 
-         // Closure type miss match
-        "i4125.scala",
-
         // Missing position
         "t1203a.scala",
         "t2260.scala",
@@ -87,9 +84,6 @@ class FromTastyTests extends ParallelTesting {
          "i2337b.scala",
          "scala2trait-lazyval.scala",
          "t3452f.scala",
-
-         // Closure type miss match
-         "eff-dependent.scala",
 
          // Issue unpickling universes
          "phantom-decls-1.scala",
