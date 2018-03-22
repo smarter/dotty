@@ -3836,27 +3836,12 @@ object Types {
               //
               // which is not implementable outside of the scope of Function.
               //
-              // To avoid this kind of issue, we approximate references to
+              // To avoid this kind of issue, we approximate references to type
               // parameters of the SAM type by their bounds, this way in the
               // above example we get:
               //
               //    (x: String): Int
-              val approxParams = new ApproximatingTypeMap {
-                def apply(tp: Type): Type = tp match {
-                  case tp: TypeRef if tp.symbol.is(ClassTypeParam) && tp.symbol.owner == cls =>
-                    tp.info match {
-                      case TypeAlias(alias) =>
-                        mapOver(alias)
-                      case TypeBounds(lo, hi) =>
-                        range(atVariance(-variance)(apply(lo)), apply(hi))
-                       case _ =>
-                        range(defn.NothingType, defn.AnyType) // should happen only in error cases
-                    }
-                  case _ =>
-                    mapOver(tp)
-                }
-              }
-              val approx = approxParams(mt).asInstanceOf[MethodType]
+              val approx = ctx.typeAssigner.avoid(mt, cls.typeParams).asInstanceOf[MethodType]
               Some(approx)
             case _ =>
               None
