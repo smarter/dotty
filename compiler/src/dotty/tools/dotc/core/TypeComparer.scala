@@ -661,9 +661,11 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
         case AppliedType(tycon1, args1) =>
           tycon1.dealias match {
             case tycon1: TypeParamRef =>
-              (tycon1 == tycon2 ||
-              isSubArgs(args1, args2, tp1, tparams) &&
-              canConstrain(tycon1) && isSubType(tycon1, tycon2))
+              tycon1 == tycon2 ||
+                canConstrain(tycon1) &&
+                isSubKind(tycon1, tycon2) &&
+                isSubType(tycon1, tycon2) &&
+                isSubArgs(args1, args2, tp1, tparams)
             case tycon1: TypeRef =>
               tycon2.dealias match {
                 case tycon2: TypeRef if tycon1.symbol == tycon2.symbol =>
@@ -798,15 +800,18 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
     */
     def compareAppliedType1(tp1: AppliedType, tycon1: Type, args1: List[Type]): Boolean =
       tycon1 match {
-        case param1: TypeParamRef =>
-          def canInstantiate = tp2 match {
+        case tycon1: TypeParamRef =>
+          def canBound = tp2 match {
             case AppliedType(tycon2, args2) =>
-              isSubArgs(args1, args2, tp1, tycon2.typeParams) && isSubType(param1, tycon2.ensureHK)
+              canConstrain(tycon1) &&
+              isSubKind(tycon1, tycon2) &&
+              isSubType(tycon1, tycon2.ensureHK) &&
+              isSubArgs(args1, args2, tp1, tycon2.typeParams)
             case _ =>
               false
           }
-          canConstrain(param1) && canInstantiate ||
-            isSubType(bounds(param1).hi.applyIfParameterized(args1), tp2, approx.addLow)
+          canBound ||
+            isSubType(bounds(tycon1).hi.applyIfParameterized(args1), tp2, approx.addLow)
         case tycon1: TypeRef if tycon1.symbol.isClass =>
           false
         case tycon1: TypeProxy =>
@@ -826,6 +831,10 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
 
     def isSubApproxHi(tp1: Type, tp2: Type): Boolean =
       tp1.eq(tp2) || tp2.ne(NothingType) && isSubType(tp1, tp2, approx.addHigh)
+
+    /** Is the kind of `param` a subkind of the kind of `tp` ? */
+    def isSubKind(param: TypeParamRef, tp: Type): Boolean =
+      isSubApproxHi(bounds(param).hi, tp)
 
     // begin recur
     if (tp2 eq NoType) false

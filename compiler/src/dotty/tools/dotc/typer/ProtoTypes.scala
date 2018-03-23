@@ -521,9 +521,14 @@ object ProtoTypes {
       if (tp.symbol.isStatic || (tp.prefix `eq` NoPrefix)) tp
       else tp.derivedSelect(wildApprox(tp.prefix, theMap, seen))
     case tp @ AppliedType(tycon, args) =>
+      val argsApprox = args.mapConserve(wildApprox(_, theMap, seen))
       wildApprox(tycon, theMap, seen) match {
-        case _: WildcardType => WildcardType // this ensures we get a * type
-        case tycon1 => tp.derivedAppliedType(tycon1, args.mapConserve(wildApprox(_, theMap, seen)))
+        case WildcardType(TypeBounds(lo, hi)) =>
+          WildcardType(TypeBounds(
+            tp.derivedAppliedType(lo, argsApprox),
+            tp.derivedAppliedType(hi, argsApprox)))
+        case tycon1 =>
+          tp.derivedAppliedType(tycon1, args.mapConserve(wildApprox(_, theMap, seen)))
       }
     case tp: RefinedType => // default case, inlined for speed
       tp.derivedRefinedType(
