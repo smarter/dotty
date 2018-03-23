@@ -662,8 +662,8 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
           tycon1.dealias match {
             case tycon1: TypeParamRef =>
               (tycon1 == tycon2 ||
-              canConstrain(tycon1) && tryInstantiate(tycon1, tycon2)) &&
-              isSubArgs(args1, args2, tp1, tparams)
+              isSubArgs(args1, args2, tp1, tparams) &&
+              canConstrain(tycon1) && isSubType(tycon1, tycon2))
             case tycon1: TypeRef =>
               tycon2.dealias match {
                 case tycon2: TypeRef if tycon1.symbol == tycon2.symbol =>
@@ -801,7 +801,7 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
         case param1: TypeParamRef =>
           def canInstantiate = tp2 match {
             case AppliedType(tycon2, args2) =>
-              tryInstantiate(param1, tycon2.ensureHK) && isSubArgs(args1, args2, tp1, tycon2.typeParams)
+              isSubArgs(args1, args2, tp1, tycon2.typeParams) && isSubType(param1, tycon2.ensureHK)
             case _ =>
               false
           }

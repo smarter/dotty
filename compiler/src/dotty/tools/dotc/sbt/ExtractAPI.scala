@@ -339,7 +339,7 @@ private class ExtractAPICollector(implicit val ctx: Context) extends ThunkHolder
       new api.TypeAlias(apiType(tpe.bounds.hi), typeParams, name, access, modifiers, as.toArray)
     else {
       assert(sym.isAbstractType)
-      new api.TypeDeclaration(apiType(tpe.bounds.lo), apiType(tpe.bounds.hi), typeParams, name, access, modifiers, as.to)
+      new api.TypeDeclaration(apiType(tpe.bounds.lo), apiType(tpe.bounds.hi), typeParams, name, access, modifiers, as.toArray)
     }
   }
 
