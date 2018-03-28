@@ -3481,10 +3481,17 @@ object Types {
     }
 
     def appliedRef(implicit ctx: Context): Type = {
-      def clsDenot = if (prefix eq cls.owner.thisType) cls.denot else cls.denot.copySymDenotation(info = this)
+      // if (prefix ne cls.owner.thisType) {
+      //   println("this: " + this)
+      //   println("prefix: " + prefix)
+      //   println("cls.owner: " + cls.owner)
+      //   println("cls.owner.thisType: " + cls.owner.thisType)
+      // }
+      // def clsDenot = if (prefix eq cls.owner.thisType) cls.denot else cls.denot.copySymDenotation(info = this)
       if (appliedRefCache == null)
         appliedRefCache =
-          TypeRef(prefix, cls.name, clsDenot).appliedTo(cls.typeParams.map(_.typeRef))
+          TypeRef(prefix, cls).appliedTo(cls.typeParams.map(_.typeRef))
+          // TypeRef(prefix, cls.name, clsDenot).appliedTo(cls.typeParams.map(_.typeRef))
       appliedRefCache
     }
 

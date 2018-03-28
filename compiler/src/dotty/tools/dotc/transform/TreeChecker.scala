@@ -63,7 +63,7 @@ class TreeChecker extends Phase with SymTransformer {
     if (this.flatClasses) {
       registry.get(name) match {
         case Some(prev) =>
-          assert(sym eq prev, i"$typ defined twice $sym ${sym.id} ${prev.id}")
+          assert(false, i"$typ defined twice $sym ${sym.id} ${prev.id}")
         case _ =>
           registry(name) = sym
       }
