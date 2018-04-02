@@ -90,7 +90,7 @@ class Compiler {
          // new ElimOuterSelect,        // Expand outer selections
          new AugmentScala2Traits,    // Expand traits defined in Scala 2.x to simulate old-style rewritings
          new ResolveSuper,           // Implement super accessors and add forwarders to trait methods
-         new Simplify,               // Perform local optimizations, simplified versions of what linker does.
+         // new Simplify,               // Perform local optimizations, simplified versions of what linker does.
          new PrimitiveForwarders,    // Add forwarders to trait methods that have a mismatch between generic and primitives
          new FunctionXXLForwarders,  // Add forwarders for FunctionXXL apply method
          new ArrayConstructors) ::   // Intercept creation of (non-generic) arrays and intrinsify.
@@ -105,8 +105,8 @@ class Compiler {
     List(new Constructors,           // Collect initialization code in primary constructors
                                         // Note: constructors changes decls in transformTemplate, no InfoTransformers should be added after it
          new FunctionalInterfaces,   // Rewrites closures to implement @specialized types of Functions.
-         new GetClass,               // Rewrites getClass calls on primitive types.
-         new Simplify) ::            // Perform local optimizations, simplified versions of what linker does.
+         new GetClass/*,               // Rewrites getClass calls on primitive types.
+         new Simplify*/) ::            // Perform local optimizations, simplified versions of what linker does.
     List(new LinkScala2Impls,        // Redirect calls to trait methods defined by Scala 2.x, so that they now go to their implementations
          new LambdaLift,             // Lifts out nested functions to class scope, storing free variables in environments
                                         // Note: in this mini-phase block scopes are incorrect. No phases that rely on scopes should be here
