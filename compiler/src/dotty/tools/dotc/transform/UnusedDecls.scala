@@ -18,9 +18,9 @@ class ErasedDecls extends MiniPhase with InfoTransformer {
 
   override def phaseName: String = "erasedDecls"
 
-  override def runsAfterGroupsOf = Set(
-    PatternMatcher.name // Make sure pattern match errors are emitted
-  )
+  // override def runsAfterGroupsOf = Set(
+  //   PatternMatcher.name // Make sure pattern match errors are emitted
+  // )
 
   /** Check what the phase achieves, to be called at any point after it is finished. */
   override def checkPostCondition(tree: Tree)(implicit ctx: Context): Unit = tree match {

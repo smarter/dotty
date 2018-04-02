@@ -31,7 +31,7 @@ class SeqLiterals extends MiniPhase {
 
   override def transformSeqLiteral(tree: SeqLiteral)(implicit ctx: Context): Tree = tree match {
     case tree: JavaSeqLiteral => tree
-    case _ =>
+    case _ if !ctx.mode.is(Mode.Pattern) =>
       val arr = JavaSeqLiteral(tree.elems, tree.elemtpt)
       //println(i"trans seq $tree, arr = $arr: ${arr.tpe} ${arr.tpe.elemType}")
       val elemtp = tree.elemtpt.tpe
@@ -44,5 +44,7 @@ class SeqLiterals extends MiniPhase {
         .select(wrapMethStr.toTermName)
         .appliedToTypes(targs)
         .appliedTo(arr)
+    case _ =>
+      tree
   }
 }

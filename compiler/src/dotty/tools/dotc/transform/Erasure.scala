@@ -11,7 +11,7 @@ import core.Types._
 import core.Names._
 import core.StdNames._
 import core.NameOps._
-import core.NameKinds.AdaptedClosureName
+import core.NameKinds.{AdaptedClosureName, OuterSelectName}
 import core.Decorators._
 import core.Constants._
 import core.Definitions._
@@ -389,6 +389,14 @@ object Erasure {
           else
             owner
         recur(sym.owner)
+      }
+
+      tree.name match {
+        case OuterSelectName(_, nhops) =>
+          val SkolemType(tp) = tree.typeOpt
+          val tree1 = ExplicitOuter.outer.path(start = tree.qualifier.asInstanceOf[tpd.Tree], count = nhops).ensureConforms(tp)(ctx.withPhase(ctx.phase.prev))
+          return typed(tree1, pt)
+        case _ =>
       }
 
       val origSym = tree.symbol
