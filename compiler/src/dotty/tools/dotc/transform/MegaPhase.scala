@@ -210,7 +210,7 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
         goIdent(tree, start)
       case tree: Select =>
         implicit val ctx = prepSelect(tree, start)(outerCtx)
-        val qual = transformTree(tree.qualifier, start)
+        val qual = transformTree(tree.qualifier, start)(ctx.retractMode(Mode.Pattern))
         goSelect(cpy.Select(tree)(qual, tree.name), start)
       case tree: ValDef =>
         implicit val ctx = prepValDef(tree, start)(outerCtx)
