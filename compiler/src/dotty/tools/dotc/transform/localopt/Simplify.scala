@@ -153,12 +153,13 @@ object Simplify {
    *  System members are the only static final fields that are mutable.
    *  See https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html#jls-17.5.4
    */
-  def isEffectivelyMutable(t: Tree)(implicit ctx: Context): Boolean = t match {
-    case _ if t.symbol.is(Mutable) => true
-    case _: Select | _: Ident =>
-      t.symbol.owner == defn.SystemModule
-    case _ => false
-  }
+  def isEffectivelyMutable(t: Tree)(implicit ctx: Context): Boolean =
+    t match {
+      case _ if t.symbol.is(Mutable) => true
+      case _: Select | _: Ident =>
+        t.symbol.maybeOwner == defn.SystemModule
+      case _ => false
+    }
 
   def isImmutableAccessor(t: Tree)(implicit ctx: Context): Boolean = {
     val sym = t.symbol

@@ -110,7 +110,7 @@ class Devalify extends Optimisation {
     val valsToDrop = defined -- timesUsed.keysIterator -- timesUsedAsType.keysIterator
     val copiesToReplaceAsDuplicates = copies.filter { x =>
       val rhs = dropCasts(x._2)
-      rhs.isInstanceOf[Literal] || (!rhs.symbol.owner.isClass && !rhs.symbol.is(Method | Mutable))
+      rhs.isInstanceOf[Literal] || (!rhs.symbol.maybeOwner.isClass && !rhs.symbol.is(Method | Mutable))
     } -- timesUsedAsType.keysIterator
     // TODO: if a non-synthetic val is duplicate of a synthetic one, rename a synthetic one and drop synthetic flag?
 
