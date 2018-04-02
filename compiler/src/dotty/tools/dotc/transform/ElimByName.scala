@@ -42,7 +42,7 @@ class ElimByName extends TransformByNameApply with InfoTransformer {
 
   override def phaseName: String = ElimByName.name
 
-  override def runsAfterGroupsOf = Set(Splitter.name)
+  // override def runsAfterGroupsOf = Set(Splitter.name)
     // I got errors running this phase in an earlier group, but I did not track them down.
 
   /** Map `tree` to `tree.apply()` is `ftree` was of ExprType and becomes now a function */

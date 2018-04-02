@@ -79,13 +79,13 @@ class Compiler {
          new ExplicitOuter,          // Add accessors to outer classes from nested ones.
          new ExplicitSelf,           // Make references to non-trivial self types explicit as casts
          new CrossCastAnd,           // Normalize selections involving intersection types.
-         new Splitter) ::            // Expand selections involving union types into conditionals
+         new Splitter,//) ::            // Expand selections involving union types into conditionals
+         new ElimByName) ::             // Expand by-name parameter references
     List(new ErasedDecls,            // Removes all erased defs and vals decls (except for parameters)
          new VCInlineMethods,        // Inlines calls to value class methods
          new SeqLiterals,            // Express vararg arguments as arrays
          new InterceptedMethods,     // Special handling of `==`, `|=`, `getClass` methods
          new Getters,                // Replace non-private vals and vars with getter defs (fields are added later)
-         new ElimByName,             // Expand by-name parameter references
          new ElimOuterSelect,        // Expand outer selections
          new AugmentScala2Traits,    // Expand traits defined in Scala 2.x to simulate old-style rewritings
          new ResolveSuper,           // Implement super accessors and add forwarders to trait methods
