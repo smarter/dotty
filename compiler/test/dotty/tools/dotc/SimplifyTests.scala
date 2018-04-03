@@ -7,8 +7,8 @@ import dotty.tools.dotc.config.CompilerCommand
 import dotty.tools.dotc.core.Contexts.FreshContext
 import scala.tools.asm.tree.MethodNode
 
-class SimplifyPosTests extends SimplifyTests(optimise = true)
-class SimplifyNegTests extends SimplifyTests(optimise = false)
+// class SimplifyPosTests extends SimplifyTests(optimise = true)
+// class SimplifyNegTests extends SimplifyTests(optimise = false)
 
 abstract class SimplifyTests(val optimise: Boolean) extends DottyBytecodeTest {
   override protected def initializeCtx(c: FreshContext): Unit = {
