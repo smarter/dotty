@@ -136,7 +136,7 @@ class TailRec extends MiniPhase with FullParameterization {
                 val origVParams = tree.vparamss.flatten map (_.symbol)
                 new TreeTypeMap(
                   typeMap = identity(_)
-                    .substDealias(origTParams, trefs)
+                    .subst(origTParams, trefs)
                     .subst(origVParams, vrefss.flatten.map(_.tpe)),
                     oldOwners = origMeth :: Nil,
                   newOwners = label :: Nil
