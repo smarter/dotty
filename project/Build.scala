@@ -41,7 +41,7 @@ object ExposedValues extends AutoPlugin {
 object Build {
 
   val baseVersion = "0.8.0"
-  val scalacVersion = "2.12.4"
+  val scalacVersion = "2.13.0-M3"
 
   val dottyOrganization = "ch.epfl.lamp"
   val dottyGithubUrl = "https://github.com/lampepfl/dotty"
@@ -110,7 +110,8 @@ object Build {
       "-feature",
       "-deprecation",
       "-unchecked",
-      "-Xfatal-warnings",
+      // FIXME: Disabled because ClassfileAnnotation is deprecated but currently used in various places
+      // "-Xfatal-warnings",
       "-encoding", "UTF8",
       "-language:existentials,higherKinds,implicitConversions"
     ),
@@ -492,7 +493,7 @@ object Build {
       libraryDependencies ++= Seq(
         "org.scala-lang.modules" % "scala-asm" % "6.0.0-scala-1", // used by the backend
         "com.typesafe.sbt" % "sbt-interface" % sbtVersion.value,
-        ("org.scala-lang.modules" %% "scala-xml" % "1.0.6").withDottyCompat(),
+        ("org.scala-lang.modules" %% "scala-xml" % "1.1.0").withDottyCompat(),
         "org.scala-lang" % "scala-library" % scalacVersion % "test"
       ),
 
