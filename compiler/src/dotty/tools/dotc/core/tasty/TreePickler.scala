@@ -597,7 +597,10 @@ class TreePickler(pickler: TastyPickler) {
       if ((flags is Lazy) && !(sym is Module)) writeByte(LAZY)
       if (flags is AbsOverride) { writeByte(ABSTRACT); writeByte(OVERRIDE) }
       if (flags is Mutable) writeByte(MUTABLE)
-      if (flags is Accessor) writeByte(FIELDaccessor)
+      if (flags is Accessor) {
+        assert(sym.isSetter && sym.is(ParamAccessor), s"$sym ${sym.isSetter} ${sym.is(ParamAccessor)}")
+        writeByte(FIELDaccessor)
+      }
       if (flags is CaseAccessor) writeByte(CASEaccessor)
       if (flags is DefaultParameterized) writeByte(DEFAULTparameterized)
       if (flags is Stable) writeByte(STABLE)
