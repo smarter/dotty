@@ -575,7 +575,10 @@ class Definitions {
       case List(pt) => (pt isRef StringClass)
       case _ => false
     }).symbol.asTerm
+
   lazy val JavaSerializableClass: ClassSymbol     = ctx.requiredClass("java.io.Serializable")
+  def readResolve(cls: ClassSymbol, flags: FlagSet) = enterMethod(cls, nme.readResolve, MethodType(Nil, AnyRefType), flags)
+
   lazy val ComparableClass: ClassSymbol           = ctx.requiredClass("java.lang.Comparable")
 
   lazy val SystemClass: ClassSymbol               = ctx.requiredClass("java.lang.System")

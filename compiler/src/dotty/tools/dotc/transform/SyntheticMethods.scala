@@ -51,7 +51,7 @@ class SyntheticMethods(thisPhase: DenotTransformer) {
   def caseModuleSymbols(implicit ctx: Context): List[Symbol] = { initSymbols; myCaseModuleSymbols }
 
   /** The synthetic methods of the case or value class `clazz`. */
-  def syntheticMethods(clazz: ClassSymbol)(implicit ctx: Context): List[Tree] = {
+  def syntheticMethods(clazz: ClassSymbol, isSerializableObject: Boolean)(implicit ctx: Context): List[Tree] = {
     val clazzType = clazz.appliedRef
     lazy val accessors =
       if (isDerivedValueClass(clazz)) clazz.paramAccessors.take(1) // Tail parameters can only be `erased`
@@ -255,12 +255,33 @@ class SyntheticMethods(thisPhase: DenotTransformer) {
      */
     def canEqualBody(that: Tree): Tree = that.isInstance(AnnotatedType(clazzType, Annotation(defn.UncheckedAnnot)))
 
-    symbolsToSynthesize flatMap syntheticDefIfMissing
+    val methods = symbolsToSynthesize flatMap syntheticDefIfMissing
+
+    def createReadResolveMethod(implicit ctx: Context): Tree = {
+      ctx.log(s"adding readResolve to $clazz at ${ctx.phase}")
+      val readResolve = defn.readResolve(clazz, Private | Synthetic)
+      DefDef(readResolve, _ => ref(clazz.sourceModule)).withPos(ctx.owner.pos.focus)
+    }
+
+    if (isSerializableObject)
+      createReadResolveMethod :: methods
+     else
+      methods
   }
 
-  def addSyntheticMethods(impl: Template)(implicit ctx: Context): Template =
+  def addSyntheticMethods(impl: Template)(implicit ctx: Context): Template = {
+    val isSerializableObject =
+      (ctx.owner.is(Module)
+        && ctx.owner.isStatic
+        && ctx.owner.derivesFrom(defn.JavaSerializableClass)
+        && !ctx.owner.asClass.membersNamed(nme.readResolve)
+             .filterWithPredicate(s => s.signature == Signature(defn.AnyRefType, isJava = false))
+             .exists)
+
     if (ctx.owner.is(Case) || isDerivedValueClass(ctx.owner))
-      cpy.Template(impl)(body = impl.body ++ syntheticMethods(ctx.owner.asClass))
+      cpy.Template(impl)(body = impl.body ++ syntheticMethods(ctx.owner.asClass, isSerializableObject))
     else
       impl
+  }
+
 }
