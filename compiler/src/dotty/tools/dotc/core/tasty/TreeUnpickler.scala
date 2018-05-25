@@ -719,17 +719,21 @@ class TreeUnpickler(reader: TastyReader,
 
       val localCtx = localContext(sym)
 
-      def readRhs(implicit ctx: Context) =
-        if (noRhs(end)) EmptyTree
-        else readLater(end, rdr => ctx => rdr.readTerm()(ctx.retractMode(Mode.InSuperCall)))
+      def readRhs(implicit ctx: Context): LazyTree =
+        if (noRhs(end))
+          EmptyTree
+        else if (sym.isInlineMethod)
+          new Trees.Lazy[Tree] {
+            def complete(implicit ctx: Context) = typer.Inliner.bodyToInline(sym)
+          }
+        else
+          readLater(end, rdr => ctx => rdr.readTerm()(ctx.retractMode(Mode.InSuperCall)))
 
       def ValDef(tpt: Tree) =
         ta.assignType(untpd.ValDef(sym.name.asTermName, tpt, readRhs(localCtx)), sym)
 
       def DefDef(tparams: List[TypeDef], vparamss: List[List[ValDef]], tpt: Tree) =
-         ta.assignType(
-            untpd.DefDef(sym.name.asTermName, tparams, vparamss, tpt, readRhs(localCtx)),
-            sym)
+        tpd.DefDef(sym.asTerm, tparams, vparamss, tpt, readRhs(localCtx))
 
       def TypeDef(rhs: Tree) =
         ta.assignType(untpd.TypeDef(sym.name.asTypeName, rhs), sym)
@@ -1036,9 +1040,26 @@ class TreeUnpickler(reader: TastyReader,
             case IF =>
               If(readTerm(), readTerm(), readTerm())
             case LAMBDA =>
-              val meth = readTerm()
-              val tpt = ifBefore(end)(readTpt(), EmptyTree)
-              Closure(Nil, meth, tpt)
+              val methSym = ctx.newSymbol(ctx.owner, nme.ANON_FUN, Method | Synthetic, NoType, coord = coordAt(start))
+              val localCtx = localContext(methSym)
+              val params = readParams[ValDef](PARAM)(localCtx)
+              val resType = readType()(localCtx)
+              // println("params: " + params)
+              val body = readTerm()(localCtx)
+              // println("body: " + body)
+
+              val isImplicit = !params.isEmpty == params.head.symbol.is(Implicit)
+              val isErased = !params.isEmpty == params.head.symbol.is(Erased)
+              val maker = MethodType.maker(isImplicit = isImplicit, isErased = isErased)
+              val methType = maker.fromSymbols(params.map(_.symbol), resType)
+              // println("methType: " + methType)
+              methSym.info = methType
+              val targetType = ifBefore(end)(readType(), NoType)
+              // println("tpt: " + tpt)
+              // println("tpt.tpe: " + tpt.tpe)
+
+              val methDef = DefDef(methSym, Nil, List(params), TypeTree(resType), body)
+              Closure(methDef, targetType)
             case MATCH =>
               Match(readTerm(), readCases(end))
             case RETURN =>

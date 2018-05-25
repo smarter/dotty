@@ -687,7 +687,7 @@ class Typer extends Namer
    */
   protected def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol])(implicit ctx: Context): Tree = {
     def ascribeType(tree: Tree, pt: Type): Tree = tree match {
-      case block @ Block(stats, expr) =>
+      case block @ Block(stats, expr) if !expr.isInstanceOf[Closure] => // Preserve the shape of Closures
         val expr1 = ascribeType(expr, pt)
         cpy.Block(block)(stats, expr1) withType expr1.tpe // no assignType here because avoid is redundant
       case _ =>
@@ -2072,7 +2072,12 @@ class Typer extends Namer
       case tree: tpd.Tree @unchecked => i"$tree of type ${tree.tpe}"
       case _ => String.valueOf(x)
     }
-    adapt1(tree, pt, locked)
+    // Never adapt closures, their enclosing tree will be adapted instead.
+    // This is necessary to preserve the invariant that ...
+    if (tree.isInstanceOf[Closure])
+      tree
+    else
+      adapt1(tree, pt, locked)
   }
 
   def adapt(tree: Tree, pt: Type)(implicit ctx: Context): Tree = {

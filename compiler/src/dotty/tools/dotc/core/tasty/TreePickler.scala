@@ -406,6 +406,27 @@ class TreePickler(pickler: TastyPickler) {
         case Assign(lhs, rhs) =>
           writeByte(ASSIGN)
           withLength { pickleTree(lhs); pickleTree(rhs) }
+        case Closure(env, meth, tpt) =>
+          // This case should never be reached: all Closure nodes should be
+          // handled by the next case.
+          assert(false, "Malformed tree cannot be pickled")
+        case Block((meth: DefDef) :: Nil, closure: Closure) =>
+          writeByte(LAMBDA)
+
+          assert(meth.name eq nme.ANON_FUN)
+          assert(meth.tparams eq Nil)
+          assert(meth.vparamss.length == 1)
+          assert(closure.env.isEmpty)
+
+          withLength {
+            pickleParams(meth.vparamss.head)
+            pickleType(meth.tpt.tpe)
+            pickleTree(meth.rhs)
+            if (!closure.tpt.isEmpty)
+              pickleType(closure.tpt.tpe)
+            // else
+            //   pickleType(closure.tpe)
+          }
         case Block(stats, expr) =>
           writeByte(BLOCK)
           stats.foreach(preRegister)
@@ -413,13 +434,6 @@ class TreePickler(pickler: TastyPickler) {
         case If(cond, thenp, elsep) =>
           writeByte(IF)
           withLength { pickleTree(cond); pickleTree(thenp); pickleTree(elsep) }
-        case Closure(env, meth, tpt) =>
-          writeByte(LAMBDA)
-          assert(env.isEmpty)
-          withLength {
-            pickleTree(meth)
-            if (tpt.tpe.exists) pickleTpt(tpt)
-          }
         case Match(selector, cases) =>
           writeByte(MATCH)
           withLength { pickleTree(selector); cases.foreach(pickleTree) }

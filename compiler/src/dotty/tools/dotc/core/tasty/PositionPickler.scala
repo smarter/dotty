@@ -58,6 +58,11 @@ class PositionPickler(pickler: TastyPickler, addrOfTree: tpd.Tree => Option[Addr
 
           // package defs might be split into several Tasty files
           | _: Trees.PackageDef[_] => true
+      case Block(_, closure: Trees.Closure[_]) =>
+        // Lambdas are represented in Dotty as { def $anonfun = ...; closure($anonfun) },
+        // but the $anonfun method is not stored in TASTY, so we cannot rely
+        // on initialPos to set the position of the block.
+        true
       case _ => false
     }
 

@@ -94,15 +94,19 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
    *  where the closure's type is the target type of the expression (FunctionN, unless
    *  otherwise specified).
    */
-  def Closure(meth: TermSymbol, rhsFn: List[List[Tree]] => Tree, targs: List[Tree] = Nil, targetType: Type = NoType)(implicit ctx: Context): Block = {
+  def Closure(meth: TermSymbol, rhsFn: List[List[Tree]] => Tree, targetType: Type = NoType)(implicit ctx: Context): Block = {
+    val methDef = DefDef(meth, rhsFn)
+    Closure(methDef, targetType)
+  }
+
+  def Closure(methDef: Tree, targetType: Type)(implicit ctx: Context): Block = {
     val targetTpt = if (targetType.exists) TypeTree(targetType) else EmptyTree
-    val call =
-      if (targs.isEmpty) Ident(TermRef(NoPrefix, meth))
-      else TypeApply(Ident(TermRef(NoPrefix, meth)), targs)
+    val call = Ident(TermRef(NoPrefix, methDef.symbol))
     Block(
-      DefDef(meth, rhsFn) :: Nil,
+      List(methDef),
       Closure(Nil, call, targetTpt))
   }
+
 
   /** A closure whole anonymous function has the given method type */
   def Lambda(tpe: MethodType, rhsFn: List[Tree] => Tree)(implicit ctx: Context): Block = {
@@ -177,12 +181,15 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   def SyntheticValDef(name: TermName, rhs: Tree)(implicit ctx: Context): ValDef =
     ValDef(ctx.newSymbol(ctx.owner, name, Synthetic, rhs.tpe.widen, coord = rhs.pos), rhs)
 
-  def DefDef(sym: TermSymbol, tparams: List[TypeSymbol], vparamss: List[List[TermSymbol]],
-             resultType: Type, rhs: Tree)(implicit ctx: Context): DefDef =
+  def DefDef(sym: TermSymbol, tparams: List[TypeDef], vparamss: List[List[ValDef]],
+             resultTpt: Tree, rhs: LazyTree)(implicit ctx: Context): DefDef =
     ta.assignType(
-      untpd.DefDef(sym.name, tparams map TypeDef, vparamss.nestedMap(ValDef(_)),
-                   TypeTree(resultType), rhs),
-      sym)
+      untpd.DefDef(sym.name, tparams, vparamss, resultTpt, rhs), sym)
+
+  def DefDef(sym: TermSymbol, tparams: List[TypeSymbol], vparamss: List[List[TermSymbol]],
+             resultType: Type, rhs: LazyTree)(implicit ctx: Context): DefDef =
+    DefDef(sym, tparams.map(TypeDef), vparamss.nestedMap(ValDef(_)),
+      TypeTree(resultType), rhs)
 
   def DefDef(sym: TermSymbol, rhs: Tree = EmptyTree)(implicit ctx: Context): DefDef =
     ta.assignType(DefDef(sym, Function.const(rhs) _), sym)
