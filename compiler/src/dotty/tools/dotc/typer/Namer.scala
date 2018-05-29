@@ -1172,22 +1172,23 @@ class Namer { typer: Typer =>
       case DependentTypeTree(tpFun) =>
         tpFun(paramss.head)
       case TypedSplice(tpt: TypeTree) if !isFullyDefined(tpt.tpe, ForceDegree.none) =>
-        val rhsType = typedAheadExpr(mdef.rhs, tpt.tpe).tpe
-        mdef match {
-          case mdef: DefDef if mdef.name == nme.ANON_FUN =>
-            val hygienicType = avoid(rhsType, paramss.flatten)
-            if (!hygienicType.isValueType || !(hygienicType <:< tpt.tpe))
-              ctx.error(i"return type ${tpt.tpe} of lambda cannot be made hygienic;\n" +
-                i"it is not a supertype of the hygienic type $hygienicType", mdef.pos)
-            //println(i"lifting $rhsType over $paramss -> $hygienicType = ${tpt.tpe}")
-            //println(TypeComparer.explained { implicit ctx => hygienicType <:< tpt.tpe })
-          case _ =>
-        }
+        /*val rhsType =*/ typedAheadExpr(mdef.rhs, tpt.tpe).tpe
+        // mdef match {
+        //   case mdef: DefDef if mdef.name == nme.ANON_FUN =>
+        //     val hygienicType = avoid(rhsType, paramss.flatten)
+        //     if (!hygienicType.isValueType || !(hygienicType <:< tpt.tpe))
+        //       ctx.error(i"return type ${tpt.tpe} of lambda cannot be made hygienic;\n" +
+        //         i"it is not a supertype of the hygienic type $hygienicType", mdef.pos)
+        //     //println(i"lifting $rhsType over $paramss -> $hygienicType = ${tpt.tpe}")
+        //     //println(TypeComparer.explained { implicit ctx => hygienicType <:< tpt.tpe })
+        //   case _ =>
+        // }
         WildcardType
       case _ =>
         WildcardType
     }
-    paramFn(typedAheadType(mdef.tpt, tptProto).tpe)
+    val restpe = typedAheadType(mdef.tpt, tptProto).tpe
+    paramFn(restpe)
   }
 
   /** The type signature of a DefDef with given symbol */
