@@ -1182,6 +1182,7 @@ class Namer { typer: Typer =>
             //println(i"lifting $rhsType over $paramss -> $hygienicType = ${tpt.tpe}")
             //println(TypeComparer.explained { implicit ctx => hygienicType <:< tpt.tpe })
           case _ =>
+            assert(mdef.rhs.isEmpty, s"[$mdef] - [${mdef.show}] - [${tpt.tpe.show}]")
         }
         WildcardType
       case _ =>
