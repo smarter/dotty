@@ -730,7 +730,22 @@ class Typer extends Namer
   private def decomposeProtoFunction(pt: Type, defaultArity: Int)(implicit ctx: Context): (List[Type], untpd.Tree) = {
     def typeTree(tp: Type) = tp match {
       case _: WildcardType => untpd.TypeTree()
-      case _ => untpd.TypeTree(tp)
+      case _ =>
+        val refreshed = new mutable.HashMap[TypeVar, TypeVar]
+        val freshVars = new TypeMap {
+          def apply(tp: Type) = tp match {
+            case tvar: TypeVar if !tvar.isInstantiated && ctx.typerState.constraint.contains(tvar) =>
+              refreshed.getOrElse(tvar, {
+                val bounds = ctx.typerState.constraint.entry(tvar.origin).asInstanceOf[TypeBounds]
+                val bounds1 = mapOver(bounds)
+                newTypeVar(bounds)
+              })
+            case _ =>
+              mapOver(tp)
+          }
+        }
+
+        untpd.TypeTree(freshVars(tp))
     }
     pt.stripTypeVar match {
       case _ if defn.isNonDepFunctionType(pt) =>
