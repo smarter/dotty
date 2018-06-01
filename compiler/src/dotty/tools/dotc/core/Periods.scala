@@ -32,11 +32,11 @@ abstract class Periods extends DotClass { self: Context =>
    */
   def stablePeriod = {
     var first = phaseId
-    val nxTrans = ctx.base.nextDenotTransformerId(first)
-    while (first - 1 > NoPhaseId && (ctx.base.nextDenotTransformerId(first - 1) == nxTrans)) {
+    val nxTrans = ctx.base.nextDenotTransformerId(first + 1)
+    while (first - 1 > NoPhaseId && (ctx.base.nextDenotTransformerId(first) == nxTrans)) {
       first -= 1
     }
-    Period(runId, first, nxTrans)
+    Period(runId, first, nxTrans - 1)
   }
 
   /** Are all base types in the current period guaranteed to be the same as in period `p`? */
