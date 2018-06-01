@@ -72,9 +72,10 @@ class ExtensionMethods extends MiniPhase with DenotTransformer with FullParamete
                 if (isMethodWithExtension(decl)) {
                   val meth = createExtensionMethod(decl, moduleClassSym.symbol)
                   decls1.enter(meth)
+                  meth.validFor = thisPhase.validFor// Periods.Period(ctx.runId, thisPhase.next.id)
                   // Workaround #1895: force denotation of `meth` to be
                   // at phase where `meth` is entered into the decls of a class
-                  meth.denot(ctx.withPhase(thisPhase.next))
+                  // meth.denot(ctx.withPhase(thisPhase.next))
                 }
               }
             }
