@@ -183,7 +183,7 @@ class TreePickler(pickler: TastyPickler) {
         writeByte(if (tpe.isType) TYPEREFdirect else TERMREFdirect)
         pickleSymRef(sym)
       }
-      else if (isLocallyDefined(sym)) {
+      else if (isLocallyDefined(sym) && symRefs.contains(sym)) {
         writeByte(if (tpe.isType) TYPEREFsymbol else TERMREFsymbol)
         pickleSymRef(sym); pickleType(tpe.prefix)
       }
