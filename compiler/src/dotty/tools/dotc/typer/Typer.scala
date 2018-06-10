@@ -660,9 +660,10 @@ class Typer extends Namer
 
   def typedBlock(tree: untpd.Block, pt: Type)(implicit ctx: Context) = track("typedBlock") {
     val (exprCtx, stats1) = typedBlockStats(tree.stats)
+    val savedConstraint = ctx.typerState.constraint
     val expr1 = typedExpr(tree.expr, pt.notApplied)(exprCtx)
     ensureNoLocalRefs(
-      cpy.Block(tree)(stats1, expr1).withType(expr1.tpe), pt, localSyms(stats1))
+      cpy.Block(tree)(stats1, expr1).withType(expr1.tpe), pt, localSyms(stats1), savedConstraint)
   }
 
   def escapingRefs(block: Tree, localSyms: => List[Symbol])(implicit ctx: Context): collection.Set[NamedType] = {
@@ -680,7 +681,8 @@ class Typer extends Namer
    *  expected type of a block is the anonymous class defined inside it. In that
    *  case there's technically a leak which is not removed by the ascription.
    */
-  protected def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol])(implicit ctx: Context): Tree = {
+  protected def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol],
+      savedConstraint: Constraint)(implicit ctx: Context): Tree = {
     def ascribeType(tree: Tree, pt: Type): Tree = tree match {
       case block @ Block(stats, expr) =>
         val expr1 = ascribeType(expr, pt)
@@ -692,12 +694,16 @@ class Typer extends Namer
     if (noLeaks(tree)) tree
     else {
       fullyDefinedType(tree.tpe, "block", tree.pos)
-      var avoidingType = avoid(tree.tpe, localSyms)
-      val ptDefined = isFullyDefined(pt, ForceDegree.none)
-      if (ptDefined && !(avoidingType <:< pt)) avoidingType = pt
+      val avoidingType = avoid(tree.tpe, localSyms)
+      if (avoidingType ne tree.tpe) {
+        if (ctx.typerState.constraint ne savedConstraint) {
+          ctx.typerState.resetConstraintTo(savedConstraint)
+          assert(avoidingType <:< pt)
+        }
+      }
       val tree1 = ascribeType(tree, avoidingType)
-      assert(ptDefined || noLeaks(tree1) || tree1.tpe.widen.isErroneous,
-          // `ptDefined` needed because of special case of anonymous classes
+
+      assert(noLeaks(tree1) || tree1.tpe.widen.isErroneous,
           i"leak: ${escapingRefs(tree1, localSyms).toList}%, % in $tree1")
       tree1
     }
@@ -1039,7 +1045,9 @@ class Typer extends Namer
     def caseRest(pat: Tree)(implicit ctx: Context) = {
       val pat1 = indexPattern.transform(pat)
       val guard1 = typedExpr(tree.guard, defn.BooleanType)
-      var body1 = ensureNoLocalRefs(typedExpr(tree.body, pt), pt, ctx.scope.toList)
+      val savedConstraint = ctx.typerState.constraint
+      val tree1 = typedExpr(tree.body, pt)
+      var body1 = ensureNoLocalRefs(tree1, pt, ctx.scope.toList, savedConstraint)
       if (pt.isValueType) // insert a cast if body does not conform to expected type if we disregard gadt bounds
         body1 = body1.ensureConforms(pt)(originalCtx)
       assignType(cpy.CaseDef(tree)(pat1, guard1, body1), body1)

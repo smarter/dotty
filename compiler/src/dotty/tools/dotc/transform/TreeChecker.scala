@@ -6,6 +6,7 @@ import core.Names.Name
 import core.DenotTransformers._
 import core.Denotations._
 import core.SymDenotations._
+import core.Constraint
 import core.Contexts._
 import core.Symbols._
 import core.Types._
@@ -439,7 +440,8 @@ class TreeChecker extends Phase with SymTransformer {
       super.typedStats(trees, exprOwner)
     }
 
-    override def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol])(implicit ctx: Context): Tree =
+    override def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol],
+        savedConstraint: Constraint)(implicit ctx: Context): Tree =
       tree
 
     override def adapt(tree: Tree, pt: Type, locked: TypeVars)(implicit ctx: Context) = {
