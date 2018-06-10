@@ -387,14 +387,19 @@ class Inliner(call: tpd.Tree, rhs: tpd.Tree)(implicit ctx: Context) {
 
       // The final expansion runs a typing pass over the inlined tree. See InlineTyper for details.
       val expansion1 = InlineTyper.typed(expansion, pt)(inlineCtx)
+      val expansion2 =
+        if (expansion1.tpe ne call.tpe)
+          Typed(expansion1, TypeTree(call.tpe.widenIfUnstable))
+        else
+          expansion1
 
       /** All bindings in `bindingsBuf` except bindings of inlineable closures */
       val bindings = bindingsBuf.toList.map(_.withPos(call.pos))
 
       inlining.println(i"original bindings = $bindings%\n%")
-      inlining.println(i"original expansion = $expansion1")
+      inlining.println(i"original expansion = $expansion2")
 
-      val (finalBindings, finalExpansion) = dropUnusedDefs(bindings, expansion1)
+      val (finalBindings, finalExpansion) = dropUnusedDefs(bindings, expansion2)
 
       tpd.Inlined(call, finalBindings, finalExpansion)
     }

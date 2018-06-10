@@ -666,6 +666,7 @@ class ReifyQuotes extends MacroTransformWithImplicits with InfoTransformer {
           case expansion: Select if expansion.symbol.isSplice => Some(expansion)
           case Block(List(stat), Literal(Constant(()))) => unapply(stat)
           case Block(Nil, expr) => unapply(expr)
+          case Typed(expr, tpt) => unapply(expr)
           case _ => None
         }
       }
