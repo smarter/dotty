@@ -49,7 +49,7 @@ class TreePickler(pickler: TastyPickler) {
   }
 
   def preRegister(tree: Tree)(implicit ctx: Context): Unit = tree match {
-    case tree: MemberDef =>
+    case _: MemberDef | _: Bind =>
       if (!symRefs.contains(tree.symbol)) symRefs(tree.symbol) = NoAddr
     case _ =>
   }
@@ -420,6 +420,18 @@ class TreePickler(pickler: TastyPickler) {
           withLength { pickleTree(selector); cases.foreach(pickleTree) }
         case CaseDef(pat, guard, rhs) =>
           writeByte(CASEDEF)
+          val preRegisterBinds = new TreeTraverser {
+            override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
+              tree match {
+                case tree: Bind =>
+                  preRegister(tree)
+                  ()
+                case _ =>
+              }
+              traverseChildren(tree)
+            }
+          }
+          preRegisterBinds.traverse(pat)
           withLength { pickleTree(pat); pickleTree(rhs); pickleTreeUnlessEmpty(guard) }
         case Return(expr, from) =>
           writeByte(RETURN)
