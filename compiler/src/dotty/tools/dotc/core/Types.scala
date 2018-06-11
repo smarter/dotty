@@ -4150,7 +4150,7 @@ object Types {
             // if H#T = U, then for any x in L..H, x.T =:= U,
             // hence we can replace with U under all variances
             reapply(alias)
-          case TypeBounds(lo, hi) =>
+          case TypeBounds(lo, hi) if !((lo eq defn.NothingType) && (hi eq defn.AnyType)) =>
             // If H#T = _ >: S <: U, then for any x in L..H, S <: x.T <: U,
             // hence we can replace with S..U under all variances
             range(atVariance(-variance)(reapply(lo)), reapply(hi))
