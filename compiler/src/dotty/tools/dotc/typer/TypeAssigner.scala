@@ -135,11 +135,26 @@ trait TypeAssigner {
           tp
         else tryWiden(tp, tp.prefix).orElse {
           if (tp.isTerm && variance > 0 && !pre.isSingleton)
-          	apply(tp.info.widenExpr)
-          else if (upper(pre).member(tp.name).exists)
-            super.derivedSelect(tp, pre)
-          else
-            range(defn.NothingType, defn.AnyType)
+            apply(tp.info.widenExpr)
+          else {
+            def cb(tp: Type) = tp match {
+              case tp: TypeRef => tp.info match {
+                case cinfo: ClassInfo =>
+                  range(defn.NothingType, classBound(cinfo))
+                case _ =>
+                  NoType
+              }
+              case _ =>
+                NoType
+            }
+            val bounds = cb(tp)
+            if (upper(pre).member(tp.name).exists)
+              super.derivedSelect(tp, pre)
+            else if (bounds.exists)
+              bounds
+            else
+              range(defn.NothingType, defn.AnyType)
+          }
         }
     }
 
