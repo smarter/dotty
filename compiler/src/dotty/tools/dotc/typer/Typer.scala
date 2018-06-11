@@ -505,7 +505,13 @@ class Typer extends Namer
         }
         val x = tpnme.ANON_CLASS
         val clsDef = TypeDef(x, templ1).withFlags(Final)
-        typed(cpy.Block(tree)(clsDef :: Nil, New(Ident(x), Nil)), pt)
+        val expr = New(Ident(x), Nil)
+        val expr1 =
+          if (isFullyDefined(pt, ForceDegree.none))
+            Typed(expr, TypeTree(pt.widenIfUnstable))
+          else
+            expr
+        typed(cpy.Block(tree)(clsDef :: Nil, expr1), pt)
       case _ =>
         var tpt1 = typedType(tree.tpt)
         tpt1 = tpt1.withType(ensureAccessible(tpt1.tpe, superAccess = false, tpt1.pos))
