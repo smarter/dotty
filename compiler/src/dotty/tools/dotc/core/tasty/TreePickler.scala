@@ -627,7 +627,11 @@ class TreePickler(pickler: TastyPickler) {
   }
 
   private def isUnpicklable(owner: Symbol, ann: Annotation)(implicit ctx: Context) = ann match {
-    case Annotation.Child(sym) => sym.isInaccessibleChildOf(owner)
+    case Annotation.Child(sym) =>
+      val inaccessible = sym.isInaccessibleChildOf(owner)
+      if (!inaccessible && !symRefs.contains(sym))
+        symRefs(sym) = NoAddr
+      inaccessible
       // If child annotation refers to a local class or enum value under
       // a different toplevel class, it is impossible to pickle a reference to it.
       // Such annotations will be reconstituted when unpickling the child class.
