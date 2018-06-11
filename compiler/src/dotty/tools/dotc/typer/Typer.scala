@@ -1039,6 +1039,8 @@ class Typer extends Namer
       if (!gadtCtx.gadt.bounds.contains(sym))
         gadtCtx.gadt.setBounds(sym, TypeBounds.empty)
 
+    var wildcardSyms: List[Symbol] = Nil
+
     /** - strip all instantiated TypeVars from pattern types.
      *    run/reducable.scala is a test case that shows stripping typevars is necessary.
      *  - enter all symbols introduced by a Bind in current scope
@@ -1054,6 +1056,8 @@ class Typer extends Namer
             if (sym.name != tpnme.WILDCARD)
               if (ctx.scope.lookup(b.name) == NoSymbol) ctx.enter(sym)
               else ctx.error(new DuplicateBind(b, tree), b.pos)
+            else
+              wildcardSyms = sym :: wildcardSyms
             if (!ctx.isAfterTyper) {
               val bounds = ctx.gadt.bounds(sym)
               if (bounds != null) sym.info = bounds
@@ -1068,7 +1072,7 @@ class Typer extends Namer
       val guard1 = typedExpr(tree.guard, defn.BooleanType)
       val savedConstraint = ctx.typerState.constraint
       val tree1 = typedExpr(tree.body, pt)
-      var body1 = ensureNoLocalRefs(tree1, pt, ctx.scope.toList, savedConstraint)
+      var body1 = ensureNoLocalRefs(tree1, pt, wildcardSyms ++ ctx.scope.toList, savedConstraint)
       if (pt.isValueType) // insert a cast if body does not conform to expected type if we disregard gadt bounds
         body1 = body1.ensureConforms(pt)(originalCtx)
       assignType(cpy.CaseDef(tree)(pat1, guard1, body1), body1)
