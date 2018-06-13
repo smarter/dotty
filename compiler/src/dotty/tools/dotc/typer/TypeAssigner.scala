@@ -69,12 +69,12 @@ trait TypeAssigner {
             case TypeBounds(lo, hi) =>
               range(atVariance(-variance)(apply(lo)), apply(hi))
             case info: ClassInfo =>
-              range(defn.NothingType, apply(classBound(info)))
+              range(defn.NothingType, classBound(info))
             case _ =>
               range(defn.NothingType, defn.AnyType) // should happen only in error cases
           }
         case tp: ThisType if toAvoid(tp.cls) =>
-          range(defn.NothingType, apply(classBound(tp.cls.classInfo)))
+          range(defn.NothingType, classBound(tp.cls.classInfo))
         case tp: SkolemType if partsToAvoid(mutable.Set.empty, tp.info).nonEmpty =>
           range(defn.NothingType, apply(tp.info))
         case tp: TypeVar if ctx.typerState.constraint.contains(tp) =>
@@ -111,7 +111,12 @@ trait TypeAssigner {
                 inheritedInfo.exists && decl.info <:< inheritedInfo && !(inheritedInfo <:< decl.info)) {
               val info1 = decl.info match {
                 case info: ClassInfo =>
-                  TypeBounds.upper(classBound(info))
+                  classBound(info) match {
+                    case Range(lo, hi) =>
+                      TypeBounds(lo, hi)
+                    case cb =>
+                      TypeBounds.upper(cb)
+                  }
                 case info =>
                   info
               }

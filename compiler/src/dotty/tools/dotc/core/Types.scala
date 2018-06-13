@@ -4169,6 +4169,7 @@ object Types {
     }
 
     // Unused because widening can loose too much information: from C#T to Any in dependent-extractors.scala
+    // Maybe safe for TypeAlias, like lookupRefined ?
     /** Try to widen a named type to its info relative to given prefix `pre`, where possible.
      *  The possible cases are listed inline in the code.
      */
@@ -4355,8 +4356,9 @@ object Types {
 
   /** A range of possible types between lower bound `lo` and upper bound `hi`.
    *  Only used internally in `ApproximatingTypeMap`.
-   */
-  private case class Range(lo: Type, hi: Type) extends UncachedGroundType {
+    */
+  /** was private, should be protected in ATM */
+  case class Range(lo: Type, hi: Type) extends UncachedGroundType {
     assert(!lo.isInstanceOf[Range])
     assert(!hi.isInstanceOf[Range])
 
