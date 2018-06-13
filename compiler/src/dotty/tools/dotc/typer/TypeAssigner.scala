@@ -107,7 +107,8 @@ trait TypeAssigner {
               parentType.findMember(decl.name, cls.thisType, excluded = Private)
                 .suchThat(decl.matches(_))
             val inheritedInfo = inherited.info
-            if (!inheritedInfo.exists || decl.info <:< inheritedInfo && !(inheritedInfo <:< decl.info)) {
+            if (decl.isType ||
+                inheritedInfo.exists && decl.info <:< inheritedInfo && !(inheritedInfo <:< decl.info)) {
               val info1 = decl.info match {
                 case info: ClassInfo =>
                   TypeBounds.upper(classBound(info))
