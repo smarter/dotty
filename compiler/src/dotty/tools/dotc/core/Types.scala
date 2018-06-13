@@ -4216,12 +4216,13 @@ object Types {
       if (pre eq tp.prefix) tp
       else pre match {
         case Range(preLo, preHi) =>
-          assert(preHi.member(tp.name).exists, s"tp: $tp, pre: $pre")
           val forwarded =
             if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
             else NoType
             //else tryWiden(tp, preHi)
           forwarded.orElse {
+            // FIXME: assert is supposed to be above
+            assert(preHi.member(tp.name).exists, s"tp: $tp, pre: $pre")
             val lo = if (preLo.member(tp.name).exists) super.derivedSelect(tp, preLo) else defn.NothingType
             range(lo, super.derivedSelect(tp, preHi))
           }
