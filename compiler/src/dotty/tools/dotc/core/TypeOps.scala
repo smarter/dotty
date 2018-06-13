@@ -58,7 +58,7 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           case tp: NamedType =>
             val sym = tp.symbol
             if (sym.isStatic || (tp.prefix `eq` NoPrefix)) tp
-            else derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
+            else derivedSelect(tp, atVariance(/*variance max */0)(this(tp.prefix)))
           case tp: ThisType =>
             toPrefix(pre, cls, tp.cls)
           case _: BoundType =>
