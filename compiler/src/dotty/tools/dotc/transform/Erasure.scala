@@ -322,6 +322,9 @@ object Erasure {
       if (tree.isTerm) erasedRef(tp) else valueErasure(tp)
     }
 
+    override def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol])(implicit ctx: Context): Tree =
+      tree
+
     override def promote(tree: untpd.Tree)(implicit ctx: Context): tree.ThisTree[Type] = {
       assert(tree.hasType)
       val erasedTp = erasedType(tree)
