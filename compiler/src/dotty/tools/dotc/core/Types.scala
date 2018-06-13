@@ -4168,6 +4168,7 @@ object Types {
       case _ => tp
     }
 
+    // Unused because widening can loose too much information: from C#T to Any in dependent-extractors.scala
     /** Try to widen a named type to its info relative to given prefix `pre`, where possible.
      *  The possible cases are listed inline in the code.
      */
@@ -4213,11 +4214,14 @@ object Types {
       if (pre eq tp.prefix) tp
       else pre match {
         case Range(preLo, preHi) =>
-          val forwarded =
-            if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
-            else tryWiden(tp, preHi)
-          forwarded.orElse(
-            range(super.derivedSelect(tp, preLo), super.derivedSelect(tp, preHi)))
+          assert(preHi.member(tp.name).exists, s"tp: $tp, pre: $pre")
+          // val forwarded =
+          //   if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
+          //   else tryWiden(tp, preHi)
+          // forwarded.orElse {
+          val lo = if (preLo.member(tp.name).exists) super.derivedSelect(tp, preLo) else defn.NothingType
+          range(lo, super.derivedSelect(tp, preHi))
+          // }
         case _ =>
           super.derivedSelect(tp, pre)
       }

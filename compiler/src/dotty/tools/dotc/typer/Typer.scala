@@ -500,7 +500,7 @@ class Typer extends Namer
         if (templ1.parents.isEmpty &&
             isFullyDefined(pt, ForceDegree.noBottom) &&
             isEligible(pt.underlyingClassRef(refinementOK = false)))
-          templ1 = cpy.Template(templ)(parents = untpd.TypeTree(pt) :: Nil)
+          templ1 = cpy.Template(templ)(parents = untpd.TypeTree(pt) :: Nil) // widenIfUnstable ?
         templ1.parents foreach {
           case parent: RefTree =>
             typedAheadImpl(parent, tree => inferTypeParams(typedType(tree), pt))
@@ -696,10 +696,11 @@ class Typer extends Namer
     else {
       fullyDefinedType(tree.tpe, "block", tree.pos)
       var avoidingType = avoid(tree.tpe, localSyms)
-      val ptDefined = isFullyDefined(pt, ForceDegree.none)
-      if (ptDefined && !(avoidingType <:< pt)) avoidingType = pt
+      assert(avoidingType <:< pt)
+      // val ptDefined = isFullyDefined(pt, ForceDegree.none)
+      // if (ptDefined && !(avoidingType <:< pt)) avoidingType = pt
       val tree1 = ascribeType(tree, avoidingType)
-      assert(ptDefined || noLeaks(tree1) || tree1.tpe.widen.isErroneous,
+      assert(/*ptDefined ||*/ noLeaks(tree1) || tree1.tpe.widen.isErroneous,
           // `ptDefined` needed because of special case of anonymous classes
           i"leak: ${escapingRefs(tree1, localSyms).toList}%, % in $tree1")
       tree1

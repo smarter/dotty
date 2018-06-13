@@ -38,41 +38,6 @@ trait TypeAssigner {
     }
   }
 
-  /** An abstraction of a class info, consisting of
-   *   - the intersection of its parents,
-   *   - refined by all non-private fields, methods, and type members,
-   *   - abstracted over all type parameters (into a type lambda)
-   *   - where all references to `this` of the class are closed over in a RecType.
-   */
-  def classBound(info: ClassInfo)(implicit ctx: Context): Type = {
-    val cls = info.cls
-    val parentType = info.parents.reduceLeft(ctx.typeComparer.andType(_, _))
-
-    def addRefinement(parent: Type, decl: Symbol) = {
-      val inherited =
-        parentType.findMember(decl.name, cls.thisType, excluded = Private)
-          .suchThat(decl.matches(_))
-      val inheritedInfo = inherited.info
-      if (inheritedInfo.exists && decl.info <:< inheritedInfo && !(inheritedInfo <:< decl.info)) {
-        val r = RefinedType(parent, decl.name, decl.info)
-        typr.println(i"add ref $parent $decl --> " + r)
-        r
-      }
-      else
-        parent
-    }
-
-    def close(tp: Type) = RecType.closeOver(rt => tp.substThis(cls, rt.recThis))
-
-    def isRefinable(sym: Symbol) = !sym.is(Private) && !sym.isConstructor
-    val refinableDecls = info.decls.filter(isRefinable)
-    val raw = (parentType /: refinableDecls)(addRefinement)
-    HKTypeLambda.fromParams(cls.typeParams, raw) match {
-      case tl: HKTypeLambda => tl.derivedLambdaType(resType = close(tl.resType))
-      case tp => close(tp)
-    }
-  }
-
   /** An upper approximation of the given type `tp` that does not refer to any symbol in `symsToAvoid`.
    *  We need to approximate with ranges:
    *
@@ -121,26 +86,77 @@ trait TypeAssigner {
           mapOver(tp)
       }
 
-      /** Three deviations from standard derivedSelect:
-       *   1. We first try a widening conversion to the type's info with
-       *      the original prefix. Since the original prefix is known to
-       *      be a subtype of the returned prefix, this can improve results.
-       *   2. Then, if the approximation result is a singleton reference C#x.type, we
-       *      replace by the widened type, which is usually more natural.
-       *   3. Finally, we need to handle the case where the prefix type does not have a member
-       *      named `tp.name` anymmore. In that case, we need to fall back to Bot..Top.
-       */
-      override def derivedSelect(tp: NamedType, pre: Type) =
-        if (pre eq tp.prefix)
-          tp
-        else tryWiden(tp, tp.prefix).orElse {
-          if (tp.isTerm && variance > 0 && !pre.isSingleton)
-          	apply(tp.info.widenExpr)
-          else if (upper(pre).member(tp.name).exists)
-            super.derivedSelect(tp, pre)
-          else
-            range(defn.NothingType, defn.AnyType)
+      private[this] var seen = mutable.Set[ClassInfo]()
+      /** An abstraction of a class info, consisting of
+        *   - the intersection of its parents,
+        *   - refined by all non-private fields, methods, and type members,
+        *   - abstracted over all type parameters (into a type lambda)
+        *   - where all references to `this` of the class are closed over in a RecType.
+        */
+      def classBound(info: ClassInfo)(implicit ctx: Context): Type = {
+        if (seen.contains(info))
+          apply(info.classParents.map(p => p.appliedTo(p.typeParams.map(_ => TypeBounds.empty))).reduceLeft(ctx.typeComparer.andType(_, _)))
+        else {
+          seen += info
+
+          val cls = info.cls
+          val parentType = info.parents.reduceLeft(ctx.typeComparer.andType(_, _))
+
+          def addRefinement(parent: Type, decl: Symbol) = {
+            val inherited =
+              parentType.findMember(decl.name, cls.thisType, excluded = Private)
+                .suchThat(decl.matches(_))
+            val inheritedInfo = inherited.info
+            if (!inheritedInfo.exists || decl.info <:< inheritedInfo && !(inheritedInfo <:< decl.info)) {
+              val info1 = decl.info match {
+                case info: ClassInfo =>
+                  TypeBounds.upper(classBound(info))
+                case info =>
+                  info
+              }
+              val r = RefinedType(parent, decl.name, info1)
+              typr.println(i"add ref $parent $decl --> " + r)
+              r
+            }
+            else
+              parent
+          }
+
+          def close(tp: Type) = RecType.closeOver(rt => tp.substThis(cls, rt.recThis))
+
+          // Protected too?
+          def isRefinable(sym: Symbol) = !sym.is(Private) && !sym.isConstructor
+          val refinableDecls = info.decls.filter(isRefinable)
+          val raw = (parentType /: refinableDecls)(addRefinement)
+          val tp = HKTypeLambda.fromParams(cls.typeParams, raw) match {
+            case tl: HKTypeLambda => tl.derivedLambdaType(resType = close(tl.resType))
+            case tp => close(tp)
+          }
+          val tp1 = apply(tp)
+          seen -= info
+          tp1
         }
+      }
+      // /** Three deviations from standard derivedSelect:
+      //  *   1. We first try a widening conversion to the type's info with
+      //  *      the original prefix. Since the original prefix is known to
+      //  *      be a subtype of the returned prefix, this can improve results.
+      //  *   2. Then, if the approximation result is a singleton reference C#x.type, we
+      //  *      replace by the widened type, which is usually more natural.
+      //  *   3. Finally, we need to handle the case where the prefix type does not have a member
+      //  *      named `tp.name` anymmore. In that case, we need to fall back to Bot..Top.
+      //  */
+      // override def derivedSelect(tp: NamedType, pre: Type) =
+      //   if (pre eq tp.prefix)
+      //     tp
+      //   else tryWiden(tp, tp.prefix).orElse {
+      //     if (tp.isTerm && variance > 0 && !pre.isSingleton)
+      //     	apply(tp.info.widenExpr)
+      //     else if (upper(pre).member(tp.name).exists)
+      //       super.derivedSelect(tp, pre)
+      //     else
+      //       range(defn.NothingType, defn.AnyType)
+      //   }
     }
 
     widenMap(tp)
