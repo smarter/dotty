@@ -4171,6 +4171,7 @@ object Types {
 
     // Unused because widening can loose too much information: from C#T to Any in dependent-extractors.scala
     // Maybe safe for TypeAlias, like lookupRefined ?
+    // Actually needed for SingletonType in asSeenFrom, see tests/pos/t112606A.scala
     /** Try to widen a named type to its info relative to given prefix `pre`, where possible.
      *  The possible cases are listed inline in the code.
      */
@@ -4182,10 +4183,10 @@ object Types {
             // if H#T = U, then for any x in L..H, x.T =:= U,
             // hence we can replace with U under all variances
             reapply(alias.rewrapAnnots(tp1))
-          case TypeBounds(lo, hi) =>
-            // If H#T = _ >: S <: U, then for any x in L..H, S <: x.T <: U,
-            // hence we can replace with S..U under all variances
-            range(atVariance(-variance)(reapply(lo)), reapply(hi))
+          // case TypeBounds(lo, hi) =>
+          //   // If H#T = _ >: S <: U, then for any x in L..H, S <: x.T <: U,
+          //   // hence we can replace with S..U under all variances
+          //   range(atVariance(-variance)(reapply(lo)), reapply(hi))
           case info: SingletonType =>
             // if H#x: y.type, then for any x in L..H, x.type =:= y.type,
             // hence we can replace with y.type under all variances
@@ -4218,8 +4219,7 @@ object Types {
         case Range(preLo, preHi) =>
           val forwarded =
             if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
-            else NoType
-            //else tryWiden(tp, preHi)
+            else tryWiden(tp, preHi)
           forwarded.orElse {
             // FIXME: assert is supposed to be above
             assert(preHi.member(tp.name).exists, s"tp: $tp, pre: $pre")
