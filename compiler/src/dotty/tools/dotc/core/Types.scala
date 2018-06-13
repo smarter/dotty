@@ -4217,13 +4217,14 @@ object Types {
       else pre match {
         case Range(preLo, preHi) =>
           assert(preHi.member(tp.name).exists, s"tp: $tp, pre: $pre")
-          // val forwarded =
-          //   if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
-          //   else tryWiden(tp, preHi)
-          // forwarded.orElse {
-          val lo = if (preLo.member(tp.name).exists) super.derivedSelect(tp, preLo) else defn.NothingType
-          range(lo, super.derivedSelect(tp, preHi))
-          // }
+          val forwarded =
+            if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
+            else NoType
+            //else tryWiden(tp, preHi)
+          forwarded.orElse {
+            val lo = if (preLo.member(tp.name).exists) super.derivedSelect(tp, preLo) else defn.NothingType
+            range(lo, super.derivedSelect(tp, preHi))
+          }
         case _ =>
           super.derivedSelect(tp, pre)
       }
