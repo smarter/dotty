@@ -2059,7 +2059,8 @@ object Types {
         case sym: Symbol =>
           if (infoDependsOnPrefix(sym, prefix) && !prefix.isArgPrefixOf(sym)) {
             val candidate = reload()
-            val falseOverride = sym.isClass && candidate.symbol.exists && candidate.symbol != symbol
+            val falseOverride = sym.isClass && candidate.symbol.exists && candidate.symbol != symbol &&
+                                candidate.symbol.isClass
               // A false override happens if we rebind an inner class to another type with the same name
               // in an outer subclass. This is wrong, since classes do not override. We need to
               // return a type with the existing class info as seen from the new prefix instead.
