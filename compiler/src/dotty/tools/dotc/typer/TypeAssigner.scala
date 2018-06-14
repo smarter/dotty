@@ -57,7 +57,8 @@ trait TypeAssigner {
       def partsToAvoid = new NamedPartsAccumulator(tp => toAvoid(tp.symbol))
       def apply(tp: Type): Type = tp match {
         case tp: TermRef
-        if toAvoid(tp.symbol) || partsToAvoid(mutable.Set.empty, tp.info).nonEmpty =>
+        if toAvoid(tp.symbol) || partsToAvoid(mutable.Set.empty, tp.info).nonEmpty
+                              || partsToAvoid(mutable.Set.empty, tp.prefix).nonEmpty =>
           tp.info.widenExpr.dealias match {
             case info: SingletonType => apply(info)
             case info => range(defn.NothingType, apply(info))
