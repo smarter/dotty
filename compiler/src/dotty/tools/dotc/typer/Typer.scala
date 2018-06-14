@@ -696,9 +696,17 @@ class Typer extends Namer
     else {
       fullyDefinedType(tree.tpe, "block", tree.pos)
       var avoidingType = avoid(tree.tpe, localSyms)
-      assert(avoidingType <:< pt)
-      // val ptDefined = isFullyDefined(pt, ForceDegree.none)
-      // if (ptDefined && !(avoidingType <:< pt)) avoidingType = pt
+      val ptDefined = isFullyDefined(pt, ForceDegree.none)
+      val isAnonClass = tree match {
+        case Block(_, expr) =>
+          expr.symbol.isConstructor && expr.symbol.owner.name == tpnme.ANON_CLASS
+        case _ =>
+          false
+      }
+      val matches = avoidingType <:< pt
+      if (ptDefined && isAnonClass && !matches)
+        avoidingType = pt
+
       val tree1 = ascribeType(tree, avoidingType)
       assert(/*ptDefined ||*/ noLeaks(tree1) || tree1.tpe.widen.isErroneous,
           // `ptDefined` needed because of special case of anonymous classes
