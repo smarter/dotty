@@ -4220,7 +4220,7 @@ object Types {
           val forwarded =
             if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
             else if (tp.symbol.isType) tryWiden(tp, preHi)
-            else tp.info.widenIfUnstable
+            else apply(tp.info.widenIfUnstable)
 
           forwarded.orElse {
             // FIXME: assert is supposed to be above
