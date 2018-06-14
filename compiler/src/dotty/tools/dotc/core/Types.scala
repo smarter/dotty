@@ -4219,7 +4219,9 @@ object Types {
         case Range(preLo, preHi) =>
           val forwarded =
             if (tp.symbol.is(ClassTypeParam)) expandParam(tp, preHi)
-            else tryWiden(tp, preHi)
+            else if (tp.symbol.isType) tryWiden(tp, preHi)
+            else tp.info.widenIfUnstable
+
           forwarded.orElse {
             // FIXME: assert is supposed to be above
             assert(preHi.member(tp.name).exists, s"tp: $tp, pre: $pre")
