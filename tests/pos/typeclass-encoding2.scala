@@ -49,7 +49,7 @@ object runtime {
   trait TypeClassCommon { self =>
     type This
     type Instance <: TypeClass
-    def inject(x: This): Instance { val commons: self.type }
+    def inject(x: This): Instance { val commons: self.type; type This = commons.This }
   }
 
   trait TypeClassCompanion {
@@ -280,7 +280,7 @@ object runtime1 {
   trait TypeClassCommon1 { self =>
     type This[X]
     type Instance[X] <: TypeClass1
-    def inject[A](x: This[A]): Instance[A] { val commons: self.type }
+    def inject[A](x: This[A]): Instance[A] { val commons: self.type; type This = commons.This }
   }
 
   trait TypeClassCompanion1 {
