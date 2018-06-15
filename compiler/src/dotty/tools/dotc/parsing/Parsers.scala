@@ -904,6 +904,8 @@ object Parsers {
           val tparams = typeParamClause(ParamOwner.TypeParam)
           if (in.token == ARROW)
             atSpan(start, in.skipToken())(LambdaTypeTree(tparams, toplevelTyp()))
+          else if (isIdent && in.name.toString == "->")
+            atSpan(start, in.skipToken())(PolyFunction(tparams, toplevelTyp()))
           else { accept(ARROW); typ() }
         }
         else infixType()
