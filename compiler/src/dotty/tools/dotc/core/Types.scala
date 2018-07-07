@@ -3507,6 +3507,8 @@ object Types {
     private[this] var selfTypeCache: Type = null
     private[this] var appliedRefCache: Type = null
 
+    // assert(!classParents.exists(_.isInstanceOf[ErrorType]))
+
     /** The self type of a class is the conjunction of
      *   - the explicit self type if given (or the info of a given self symbol), and
      *   - the fully applied reference to the class itself.

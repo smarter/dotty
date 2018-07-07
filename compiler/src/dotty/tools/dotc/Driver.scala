@@ -13,9 +13,12 @@ import fromtasty.TASTYCompiler
 import io.VirtualDirectory
 
 import java.util.concurrent.Executors
+import scala.collection.mutable
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 import scala.util.{Success, Failure}
+import scala.annotation.tailrec
+import java.nio.file.{Files, Paths}
 
 /** Run the Dotty compiler.
  *
@@ -173,9 +176,10 @@ class Driver extends DotClass {
         // Second pass: split the list of files into $parallelism groups,
         // compile each group independently.
 
-
-        val maxGroupSize = Math.ceil(scalaFileNames.length.toDouble / parallelism).toInt
-        val fileGroups = scalaFileNames.grouped(maxGroupSize).toList
+        val fileGroups = distribute(scalaFileNames, parallelism)//.drop(2).take(1)
+        // println("f: " + fileGroups + " " + fileGroups.map(_.length))
+        // val maxGroupSize = Math.ceil(scalaFileNames.length.toDouble / parallelism).toInt
+        // val fileGroups = scalaFileNames.grouped(maxGroupSize).toList
         val compilers = fileGroups.length
 
         // Needed until https://github.com/sbt/zinc/pull/410 is merged.
@@ -217,6 +221,31 @@ class Driver extends DotClass {
       }
       firstPassCtx.reporter
     }
+  }
+
+  /** Split `files` into `n` list, where each list has approximately the same
+    * number of lines of code. */
+  private def distribute(files: List[String], n: Int): List[List[String]] = {
+    val locs = files.map(f => Files.lines(Paths.get(f)).count())
+    val portion = locs.sum.toDouble / n
+
+    // TODO: I'm sure someone can come up with a nice functional way to write
+    // this, please send a patch!
+    val result = new mutable.ListBuffer[List[String]]
+    var remaining = files
+    var remainingLocs = locs
+    while (remaining.nonEmpty) {
+      val group = new mutable.ListBuffer[String]
+      var groupLocs = 0L
+      while (groupLocs < portion && remaining.nonEmpty) {
+        group += remaining.head
+        groupLocs += remainingLocs.head
+        remaining = remaining.tail
+        remainingLocs = remainingLocs.tail
+      }
+      result += group.toList
+    }
+    result.toList
   }
 
   def main(args: Array[String]): Unit = {

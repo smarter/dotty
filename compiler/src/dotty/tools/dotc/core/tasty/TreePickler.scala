@@ -482,8 +482,13 @@ class TreePickler(pickler: TastyPickler) {
             case _ => false
           }
           withLength {
+            preRegister(tree.constr)
+            pickleTree(tree.constr)
             pickleParams(params)
-            tree.parents.foreach(pickleTree)
+            writeByte(PARENTS)
+            withLength {
+              tree.parents.foreach(pickleTree)
+            }
             val cinfo @ ClassInfo(_, _, _, _, selfInfo) = tree.symbol.owner.info
             if ((selfInfo ne NoType) || !tree.self.isEmpty) {
               writeByte(SELFDEF)
@@ -500,7 +505,8 @@ class TreePickler(pickler: TastyPickler) {
                 }
               }
             }
-            pickleStats(tree.constr :: rest)
+            // pickleStats(tree.constr :: rest)
+            pickleStats(rest)
           }
         case Import(expr, selectors) =>
           writeByte(IMPORT)

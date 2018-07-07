@@ -517,7 +517,7 @@ class TreeUnpickler(reader: TastyReader,
       val rhsIsEmpty = nothingButMods(end)
       if (!rhsIsEmpty) skipTree()
       val (givenFlags, annotFns, privateWithin) = readModifiers(end)
-      pickling.println(i"creating symbol $name at $start with flags $givenFlags")
+      // println(i"creating symbol $name at $start with flags $givenFlags in ${ctx.owner}")
       val flags = normalizeFlags(tag, givenFlags, name, isAbsType, rhsIsEmpty)
       def adjustIfModule(completer: LazyType) =
         if (flags is Module) ctx.adjustModuleCompleter(completer, name) else completer
@@ -697,6 +697,7 @@ class TreeUnpickler(reader: TastyReader,
     def indexTemplateParams()(implicit ctx: Context) = {
       assert(readByte() == TEMPLATE)
       readEnd()
+      skipTree() // constructor def
       indexParams(TYPEPARAM)
       indexParams(PARAM)
     }
@@ -849,9 +850,22 @@ class TreeUnpickler(reader: TastyReader,
       val parentCtx = ctx.withOwner(localDummy)
       assert(readByte() == TEMPLATE)
       val end = readEnd()
+
+      // val tparams = readIndexedParams[TypeDef](TYPEPARAM)
+      // val vparams = readIndexedParams[ValDef](PARAM)
+
+      // println("decls0: " + cls.unforcedDecls.toList)
+      val s = symbolAtCurrent() // Constructor symbol
+      // println("s: " + s)
+      // println("decls1: " + cls.unforcedDecls.toList)
+      val constr = readIndexedDef().asInstanceOf[DefDef]
+
       val tparams = readIndexedParams[TypeDef](TYPEPARAM)
       val vparams = readIndexedParams[ValDef](PARAM)
-      val parents = collectWhile(nextByte != SELFDEF && nextByte != DEFDEF) {
+
+      assert(readByte() == PARENTS)
+      val endParents = readEnd()
+      val parents = until(endParents) {
         nextUnsharedTag match {
           case APPLY | TYPEAPPLY => readTerm()(parentCtx)
           case _ => readTpt()(parentCtx)
@@ -867,7 +881,7 @@ class TreeUnpickler(reader: TastyReader,
       cls.info = ClassInfo(cls.owner.thisType, cls, parentTypes, cls.unforcedDecls,
         if (self.isEmpty) NoType else self.tpt.tpe)
       cls.setNoInitsFlags(fork.indexStats(end))
-      val constr = readIndexedDef().asInstanceOf[DefDef]
+      // val constr = readIndexedDef().asInstanceOf[DefDef]
       val mappedParents = parents.map(_.changeOwner(localDummy, constr.symbol))
 
       val lazyStats = readLater(end, rdr => implicit ctx => {
@@ -1011,7 +1025,22 @@ class TreeUnpickler(reader: TastyReader,
           val (qual, tref) = readQualId()
           untpd.This(qual).withType(ThisType.raw(tref))
         case NEW =>
-          New(readTpt())
+          val tpt = readTpt()
+          // println("tpt: " + tpt + " " + tpt.symbol + " " + tpt.tpe)
+          // tpt.tpe match {
+          //   case tp: TypeRef => tp.underlying match {
+          //     case u: TempClassInfo =>
+          //       println("u.prefix: "+ u.prefix)
+          //       println("u.cls: "+ u.cls)
+          //       println("u.decls: "+ u.decls.toList)
+          //     case u =>
+          //       println("u: " + u)
+          //   }
+          //   case _ =>
+          // }
+          val n = New(tpt)
+          // println("new: " + n + " " + n.symbol + " " + n.tpe)
+          n
         case THROW =>
           Throw(readTerm())
         case SINGLETONtpt =>
@@ -1045,7 +1074,9 @@ class TreeUnpickler(reader: TastyReader,
               val fn = readTerm()
               tpd.Apply(fn, until(end)(readTerm()))
             case TYPEAPPLY =>
-              tpd.TypeApply(readTerm(), until(end)(readTpt()))
+              val fn = readTerm()
+              // println("fn: " + fn + " " + fn.symbol + " " + fn.tpe + " " + fn.tpe.asInstanceOf[TermRef].underlying)
+              tpd.TypeApply(fn, until(end)(readTpt()))
             case TYPED =>
               val expr = readTerm()
               val tpt = readTpt()
@@ -1134,8 +1165,10 @@ class TreeUnpickler(reader: TastyReader,
       }
 
       val tree = if (tag < firstLengthTreeTag) readSimpleTerm() else readLengthTerm()
+      assert(!tree.tpe.isInstanceOf[ErrorType], s"1: ${tree} ${tree.tpe.show}")
       if (!tree.isInstanceOf[TypTree]) // FIXME: Necessary to avoid self-type cyclic reference in tasty_tools
         tree.overwriteType(tree.tpe.simplified)
+      assert(!tree.tpe.isInstanceOf[ErrorType], s"2: ${tree} ${tree.tpe.show}")
       setPos(start, tree)
     }
 

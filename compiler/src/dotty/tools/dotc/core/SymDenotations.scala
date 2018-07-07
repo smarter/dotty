@@ -219,7 +219,7 @@ object SymDenotations {
     }
 
     private def completeFrom(completer: LazyType)(implicit ctx: Context): Unit =
-      if (Config.showCompletions) {
+      if (Config.showCompletions /*|| !ctx.settings.YemitTastyOutline.value*/) {
         println(i"${"  " * indent}completing ${if (isType) "type" else "val"} $name")
         indent += 1
 
@@ -1777,6 +1777,11 @@ object SymDenotations {
     def computeMemberNames(keepOnly: NameFilter)(implicit onBehalf: MemberNames, ctx: Context): Set[Name] = {
       var names = Set[Name]()
       def maybeAdd(name: Name) = if (keepOnly(thisType, name)) names += name
+      // if (!ctx.settings.YemitTastyOutline.value && this.toString.contains("tpd")) {
+      //   println("this: " + this)
+      //   println("this.info: " + this.info)
+      //   println("p: " + classParents.map(x => (x.show, x.classSymbol)))
+      // }
       for (p <- classParents)
         for (name <- p.classSymbol.asClass.memberNames(keepOnly))
           maybeAdd(name)

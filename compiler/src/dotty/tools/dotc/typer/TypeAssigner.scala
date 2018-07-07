@@ -371,6 +371,7 @@ trait TypeAssigner {
           errorType(i"wrong number of arguments at ${ctx.phase.prev} for $fntpe: ${fn.tpe}, expected: ${fntpe.paramInfos.length}, found: ${args.length}", tree.pos)
       case t =>
         errorType(err.takesNoParamsStr(fn, ""), tree.pos)
+        ???
     }
     tree.withType(ownType)
   }
@@ -430,7 +431,7 @@ trait TypeAssigner {
       case err: ErrorType =>
         err
       case _ =>
-        //println(i"bad type: $fn: ${fn.symbol} / ${fn.symbol.isType} / ${fn.symbol.info}") // DEBUG
+        assert(false, i"bad type: $fn: ${fn.symbol} / ${fn.symbol.isType} / ${fn.symbol.info}") // DEBUG
         errorType(err.takesNoParamsStr(fn, "type "), tree.pos)
     }
 
