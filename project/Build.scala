@@ -207,7 +207,7 @@ object Build {
   // Settings used when compiling dotty using Scala 2
   lazy val commonNonBootstrappedSettings = commonSettings ++ Seq(
     version := dottyNonBootstrappedVersion,
-    scalaVersion := "0.9.0-RC1",
+    scalaVersion := "0.10.0-bin-20180719-fe8d050-NIGHTLY",
 
     autoScalaLibrary := false,
     managedScalaInstance := false,
@@ -355,7 +355,7 @@ object Build {
   lazy val scalaInstanceProject = project.in(file("out/scalaInstanceProject")).
     disablePlugins(ScriptedPlugin).
     settings(
-      scalaVersion := "0.9.0-RC1",
+      scalaVersion := "0.10.0-bin-20180719-fe8d050-NIGHTLY",
       scalaInstance := {
         import sbt.internal.inc.ScalaInstance
         import sbt.internal.inc.classpath.ClasspathUtilities
