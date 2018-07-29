@@ -22,5 +22,7 @@ val `dist-bootstrapped` = Build.`dist-bootstrapped`
 val `sbt-dotty` = Build.`sbt-dotty`
 val `vscode-dotty` = Build.`vscode-dotty`
 
+val scalaInstanceProject = Build.scalaInstanceProject
+
 inThisBuild(Build.thisBuildSettings)
 inScope(Global)(Build.globalSettings)

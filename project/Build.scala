@@ -185,7 +185,17 @@ object Build {
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % Test,
 
     // enable verbose exception messages for JUnit
-    testOptions in Test += Tests.Argument(TestFrameworks.JUnit, "-a", "-v")
+    testOptions in Test += Tests.Argument(TestFrameworks.JUnit, "-a", "-v"),
+
+
+    // Prevent sbt from setting the Scala bootclasspath, otherwise it will
+    // contain `scalaInstance.value.libraryJar` which in our case is the
+    // non-bootstrapped dotty-library that will then take priority over
+    // the bootstrapped dotty-library on the classpath or sourcepath.
+    classpathOptions ~= (_.withAutoBoot(false)),
+    // We still need a Scala bootclasspath equal to the JVM bootclasspath,
+    // otherwise sbt 0.13 incremental compilation breaks (https://github.com/sbt/sbt/issues/3142)
+    scalacOptions ++= Seq("-bootclasspath", sys.props("sun.boot.class.path")),
   )
 
   // Settings used for projects compiled only with Scala 2
@@ -197,7 +207,36 @@ object Build {
   // Settings used when compiling dotty using Scala 2
   lazy val commonNonBootstrappedSettings = commonSettings ++ Seq(
     version := dottyNonBootstrappedVersion,
-    scalaVersion := "0.9.0-RC1"
+    scalaVersion := "0.9.0-RC1",
+
+    autoScalaLibrary := false,
+    managedScalaInstance := false,
+    scalaInstance := (scalaInstance in scalaInstanceProject).value
+      // import sbt.internal.inc.ScalaInstance
+      // import sbt.internal.inc.classpath.ClasspathUtilities
+
+      // val updateReport = update.value
+      // val jars = updateReport.select(
+      //   configuration = configurationFilter(Configurations.ScalaTool.name),
+      //   module = moduleFilter(),
+      //   artifact = artifactFilter(extension = "jar")
+      // ).toList
+      // val libraryJar  = jars.find(_.getName.startsWith(s"dotty-library_${scalaBinaryVersion.value}")).get
+      // val compilerJar = jars.find(_.getName.startsWith(s"dotty-compiler_${scalaBinaryVersion.value}")).get
+      // // println("l: " + libraryJar)
+      // // println("c: " + compilerJar)
+
+      // val classLoader = state.value.classLoaderCache(jars)
+      // new ScalaInstance(
+      //   scalaVersion.value,
+      //   classLoader,
+      //   classLoader,//ClasspathUtilities.rootLoader,
+      //   libraryJar,
+      //   compilerJar,
+      //   jars.toArray,
+      //   None
+      // )
+      // }
   )
 
   // Settings used when compiling dotty with a non-bootstrapped dotty
@@ -217,15 +256,6 @@ object Build {
 
     // Use the same name as the non-bootstrapped projects for the artifacts
     moduleName ~= { _.stripSuffix("-bootstrapped") },
-
-    // Prevent sbt from setting the Scala bootclasspath, otherwise it will
-    // contain `scalaInstance.value.libraryJar` which in our case is the
-    // non-bootstrapped dotty-library that will then take priority over
-    // the bootstrapped dotty-library on the classpath or sourcepath.
-    classpathOptions ~= (_.withAutoBoot(false)),
-    // We still need a Scala bootclasspath equal to the JVM bootclasspath,
-    // otherwise sbt 0.13 incremental compilation breaks (https://github.com/sbt/sbt/issues/3142)
-    scalacOptions ++= Seq("-bootclasspath", sys.props("sun.boot.class.path")),
 
     // Enforce that the only Scala 2 classfiles we unpickle come from scala-library
     scalacOptions ++= {
@@ -319,6 +349,38 @@ object Build {
   )
 
   /** Projects -------------------------------------------------------------- */
+
+  // A dummy project whose sole purpose is to provide a scalaInstance task that can
+  // be used for the first stage of bootstrapping
+  lazy val scalaInstanceProject = project.in(file("out/scalaInstanceProject")).
+    disablePlugins(ScriptedPlugin).
+    settings(
+      scalaVersion := "0.9.0-RC1",
+      scalaInstance := {
+        import sbt.internal.inc.ScalaInstance
+        import sbt.internal.inc.classpath.ClasspathUtilities
+
+        val updateReport = update.value
+        val jars = updateReport.select(
+          configuration = configurationFilter(Configurations.ScalaTool.name),
+          module = moduleFilter(),
+          artifact = artifactFilter(extension = "jar")
+        ).toList
+        val fixedLibraryJar  = jars.find(_.getName.startsWith(s"dotty-library_${scalaBinaryVersion.value}")).get
+        val fixedCompilerJar = jars.find(_.getName.startsWith(s"dotty-compiler_${scalaBinaryVersion.value}")).get
+
+        val base = scalaInstance.value
+        new ScalaInstance(
+          version = base.version,
+          loader = base.loader,
+          loaderLibraryOnly = base.loaderLibraryOnly,
+          libraryJar = fixedLibraryJar,
+          compilerJar = fixedCompilerJar,
+          allJars = base.allJars,
+          explicitActual = base.explicitActual
+        )
+      }
+    )
 
   // Needed because the dotty project aggregates dotty-sbt-bridge but dotty-sbt-bridge
   // currently refers to dotty in its scripted task and "aggregate" does not take by-name
@@ -738,7 +800,9 @@ object Build {
 
   // Settings shared between dotty-library and dotty-library-bootstrapped
   lazy val dottyLibrarySettings = Seq(
-      libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion
+    libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion,
+    // Needed so that the library sources are visible when `dotty.tools.dotc.core.Definitions#init` is called.
+    scalacOptions in Compile ++= Seq("-sourcepath", (scalaSource in Compile).value.getAbsolutePath)
   )
 
   lazy val `dotty-library` = project.in(file("library")).asDottyLibrary(NonBootstrapped)
@@ -1235,11 +1299,7 @@ object Build {
 
     def asDottyLibrary(implicit mode: Mode): Project = project.withCommonSettings.
       disablePlugins(ScriptedPlugin).
-      settings(dottyLibrarySettings).
-      bootstrappedSettings(
-        // Needed so that the library sources are visible when `dotty.tools.dotc.core.Definitions#init` is called.
-        scalacOptions in Compile ++= Seq("-sourcepath", (scalaSource in Compile).value.getAbsolutePath)
-      )
+      settings(dottyLibrarySettings)
 
     def asDottyDoc(implicit mode: Mode): Project = project.withCommonSettings.
       disablePlugins(ScriptedPlugin).
