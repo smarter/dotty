@@ -197,7 +197,7 @@ object Build {
   // Settings used when compiling dotty using Scala 2
   lazy val commonNonBootstrappedSettings = commonSettings ++ Seq(
     version := dottyNonBootstrappedVersion,
-    scalaVersion := scalacVersion
+    scalaVersion := "0.9.0-RC1"
   )
 
   // Settings used when compiling dotty with a non-bootstrapped dotty
