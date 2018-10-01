@@ -8,6 +8,9 @@ object Test extends App {
       it.copyToArray(arr, start, len)
       "ok"
     } catch {
+      case e: ArrayIndexOutOfBoundsException =>
+        // Special-case printing this exception because the toString changed in Java 11
+        s"ArrayIndexOutOfBoundsException: ${e.index}"
       case e: Exception => e.toString
     }
     println("%s: %s" format (label, status))
