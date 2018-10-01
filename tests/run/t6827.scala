@@ -10,11 +10,11 @@ object Test extends App {
     } catch {
       case e: ArrayIndexOutOfBoundsException =>
         // Special-case printing this exception because the toString changed in Java 11
-        val java11toString = """ArrayIndexOutOfBoundsException: Index (-?\d+).*""".r
+        val java11toString = """java.lang.ArrayIndexOutOfBoundsException: Index (-?\d+).*""".r
 
         e.toString match {
           case java11toString(index) =>
-            s"ArrayIndexOutOfBoundsException: $index"
+            s"java.lang.ArrayIndexOutOfBoundsException: $index"
           case str =>
             str
         }
