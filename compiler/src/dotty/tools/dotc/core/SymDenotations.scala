@@ -18,6 +18,7 @@ import config.Config
 import reporting.diagnostic.Message
 import reporting.diagnostic.messages.BadSymbolicReference
 import reporting.trace
+import typer.Inferencing.isFullyDefined, typer.ForceDegree
 
 import scala.annotation.internal.sharable
 
@@ -1703,7 +1704,11 @@ object SymDenotations {
                   case tparams: List[Symbol @unchecked] =>
                     recur(tycon).subst(tparams, args)
                 }
-              record(tp, baseTp)
+
+              if (!tp.isProvisional)
+                record(tp, baseTp)
+              else
+                btrCache.remove(tp) // Remove the "NoPrefix" sentinel value
               baseTp
             }
             computeApplied
