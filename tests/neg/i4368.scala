@@ -103,7 +103,7 @@ object Test7 {
   }
 
   object App {
-    type Nat = Fix[Option]#T
+    type Nat = Fix[Option]#T // error: recursion limit exceeded
   }
 }
 object Test8 {

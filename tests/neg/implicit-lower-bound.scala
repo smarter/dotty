@@ -10,5 +10,5 @@ class Test {
   def get2(implicit lf: List[_ >: Bar]) = {}
 
   get1
-  get2
+  get2 // error: |no implicit argument of type List[Any]
 }
