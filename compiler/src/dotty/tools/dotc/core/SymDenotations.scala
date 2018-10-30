@@ -1699,14 +1699,27 @@ object SymDenotations {
             def computeApplied = {
               btrCache.put(tp, NoPrefix)
               val baseTp =
-              	if (tycon.typeSymbol eq symbol) tp
+              	if (tycon.typeSymbol eq symbol) {
+                  record(tp, tp)
+                  tp
+                }
               	else (tycon.typeParams: @unchecked) match {
                   case LambdaParam(_, _) :: _ =>
-                    recur(tp.superType)
+                    val superTp = tp.superType
+                    val baseTp = recur(superTp)
+                    if (inCache(superTp))
+                      record(tp, baseTp)
+                    else
+                      btrCache.remove(tp) // Remove any potential sentinel value
+                    baseTp
                   case tparams: List[Symbol @unchecked] =>
-                    recur(tycon).subst(tparams, args)
+                    val baseTp = recur(tycon).subst(tparams, args)
+                    if (inCache(tycon))
+                      record(tp, baseTp)
+                    else
+                      btrCache.remove(tp) // Remove any potential sentinel value
+                    baseTp
                 }
-              record(tp, baseTp)
               baseTp
             }
             computeApplied
