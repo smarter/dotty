@@ -1709,15 +1709,19 @@ object SymDenotations {
                     val baseTp = recur(superTp)
                     if (inCache(superTp))
                       record(tp, baseTp)
-                    else
+                    else {
                       btrCache.remove(tp) // Remove any potential sentinel value
+                      assert(!baseTp.exists || tp.isProvisional, i"tp=[$tp], superTp=[$superTp], baseTp=[$baseTp")
+                    }
                     baseTp
                   case tparams: List[Symbol @unchecked] =>
                     val baseTp = recur(tycon).subst(tparams, args)
                     if (inCache(tycon))
                       record(tp, baseTp)
-                    else
+                    else {
                       btrCache.remove(tp) // Remove any potential sentinel value
+                      assert(!baseTp.exists || tp.isProvisional, i"tp=[$tp], tycon=[$tycon], baseTp=[$baseTp")
+                    }
                     baseTp
                 }
               baseTp
