@@ -1642,7 +1642,9 @@ object SymDenotations {
         baseTp
       }
 
-      def recur(tp: Type): Type = try {
+      def recur(tp: Type): Type = {
+      def h: Type = {
+      try {
         tp match {
           case tp: CachedType =>
             val baseTp = btrCache.get(tp)
@@ -1685,7 +1687,7 @@ object SymDenotations {
                 case _ =>
                   val superTp = tp.superType
                   val baseTp = recur(superTp)
-                  if (inCache(superTp) && tp.symbol.maybeOwner.isType)
+                  if (inCache(superTp) /*&& tp.symbol.maybeOwner.isType*/)
                     record(tp, baseTp)
                   else {
                     assert(tp.isProvisional || !baseTp.exists, i"TR tp=[$tp], superTp=[$superTp], baseTp=[$baseTp], this=[$this]")
@@ -1750,7 +1752,11 @@ object SymDenotations {
                     case _ => combined
                   }
                 }
-              if (baseTp.exists && inCache(tp1) && inCache(tp2)) record(tp, baseTp)
+              // if (baseTp.exists && inCache(tp1) && inCache(tp2)) record(tp, baseTp)
+              if (baseTp.exists) {
+                val superInCache = if (tp.isAnd) inCache(tp1) || inCache(tp2) else inCache(tp1) && inCache(tp2)
+                if (superInCache) record(tp, baseTp)
+              }
               baseTp
             }
             computeAndOrType
@@ -1766,14 +1772,15 @@ object SymDenotations {
           btrCache.remove(tp)
           throw ex
       }
-
-
+      }
+        // println(s"$tp.baseType($this)")
+        val z = h
+        // println(s"##$tp.baseType($this) = $z")
+        z
+      }
       /*>|>*/ trace.onDebug(s"$tp.baseType($this)") /*<|<*/ {
         Stats.record("baseTypeOf")
-        println(s"$tp.baseType($this)")
-        val z = recur(tp)
-        println(s"#$tp.baseType($this) = $z")
-        z
+        recur(tp)
       }
     }
 
