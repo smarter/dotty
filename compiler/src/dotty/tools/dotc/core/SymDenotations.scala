@@ -1685,10 +1685,12 @@ object SymDenotations {
                 case _ =>
                   val superTp = tp.superType
                   val baseTp = recur(superTp)
-                  if (inCache(superTp))
+                  if (inCache(superTp) && tp.symbol.maybeOwner.isType)
                     record(tp, baseTp)
-                  else
+                  else {
+                    assert(tp.isProvisional || !baseTp.exists, i"TR tp=[$tp], superTp=[$superTp], baseTp=[$baseTp], this=[$this]")
                     btrCache.remove(tp)
+                  }
                   baseTp
               }
             }
@@ -1720,7 +1722,10 @@ object SymDenotations {
               val baseTp = recur(superTp)
               tp match {
                 case tp: CachedType if baseTp.exists && inCache(superTp) =>
-                  record(tp, baseTp)
+                  if (inCache(superTp))
+                    record(tp, baseTp)
+                  else
+                    assert(tp.isProvisional || !baseTp.exists, i"TP tp=[$tp], superTp=[$superTp], baseTp=[$baseTp], this=[$this]")
                 case _ =>
               }
               baseTp
@@ -1765,7 +1770,10 @@ object SymDenotations {
 
       /*>|>*/ trace.onDebug(s"$tp.baseType($this)") /*<|<*/ {
         Stats.record("baseTypeOf")
-        recur(tp)
+        println(s"$tp.baseType($this)")
+        val z = recur(tp)
+        println(s"#$tp.baseType($this) = $z")
+        z
       }
     }
 
