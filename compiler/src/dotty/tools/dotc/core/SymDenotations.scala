@@ -1768,7 +1768,7 @@ object SymDenotations {
               val superTp = tp.superType
               val baseTp = recur(superTp)
               tp match {
-                case tp: CachedType if baseTp.exists && inCache(superTp) =>
+                case tp: CachedType if inCache(superTp) =>
                   record(tp, baseTp)
                 case _ =>
               }
@@ -1794,7 +1794,7 @@ object SymDenotations {
                     case _ => combined
                   }
                 }
-              if (baseTp.exists && inCache(tp1) && inCache(tp2)) record(tp, baseTp)
+              if (inCache(tp1) && inCache(tp2)) record(tp, baseTp)
               baseTp
             }
             computeAndOrType
