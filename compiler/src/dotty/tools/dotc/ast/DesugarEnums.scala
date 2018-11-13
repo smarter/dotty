@@ -4,7 +4,7 @@ package ast
 
 import core._
 import util.Positions._, Types._, Contexts._, Constants._, Names._, NameOps._, Flags._
-import Symbols._, StdNames._, Trees._
+import Symbols._, StdNames._, Trees._, Variance._
 import Decorators._
 import util.Property
 import typer.ErrorReporting._
@@ -54,7 +54,7 @@ object DesugarEnums {
         tparam.info.bounds.hi
       else {
         def problem =
-          if (tparam.variance == 0) "is non variant"
+          if (tparam.variance == Invariance) "is non variant"
           else "has bounds that depend on a type parameter in the same parameter list"
         errorType(i"""cannot determine type argument for enum parent $enumClass,
                      |type parameter $tparam $problem""", pos)

@@ -2,7 +2,7 @@ package dotty.tools.dotc
 package printing
 
 import core._
-import Texts._, Types._, Flags._, Names._, Symbols._, NameOps._, Constants._, Denotations._
+import Texts._, Types._, Flags._, Names._, Symbols._, NameOps._, Constants._, Denotations._, Variance._
 import Contexts.Context, Scopes.Scope, Denotations.Denotation, Annotations.Annotation
 import StdNames.nme
 import ast.Trees._
@@ -400,9 +400,10 @@ class PlainPrinter(_ctx: Context) extends Printer {
   /** String representation of symbol's variance or "" if not applicable */
   protected def varianceString(sym: Symbol): String = varianceString(sym.variance)
 
-  protected def varianceString(v: Int): String = v match {
-    case -1 => "-"
-    case 1 => "+"
+  protected def varianceString(v: Variance): String = v match {
+    case Bivariance => "+-"
+    case Covariance => "+"
+    case Contravariance => "-"
     case _ => ""
   }
 

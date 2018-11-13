@@ -5,7 +5,7 @@ package typer
 import core._
 import ast._
 import Trees._, StdNames._, Scopes._, Denotations._, Comments._
-import Contexts._, Symbols._, Types._, SymDenotations._, Names._, NameOps._, Flags._, Decorators._
+import Contexts._, Symbols._, Types._, SymDenotations._, Names._, NameOps._, Flags._, Decorators._, Variance._
 import NameKinds.DefaultGetterName
 import ast.desugar, ast.desugar._
 import ProtoTypes._
@@ -1120,7 +1120,7 @@ class Namer { typer: Typer =>
       val deskolemize = new ApproximatingTypeMap {
         def apply(tp: Type) = /*trace(i"deskolemize($tp) at $variance", show = true)*/ {
           tp match {
-            case tp: SkolemType => range(defn.NothingType, atVariance(1)(apply(tp.info)))
+            case tp: SkolemType => range(defn.NothingType, atVariance(Covariance)(apply(tp.info)))
             case _ => mapOver(tp)
           }
         }

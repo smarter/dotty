@@ -7,6 +7,7 @@ import Names._, StdNames._, Contexts._, Symbols._, Flags._, NameKinds._, Types._
 import scala.tasty.util.Chars
 import Chars.isOperatorPart
 import Definitions._
+import Variance._
 
 object NameOps {
 
@@ -138,24 +139,24 @@ object NameOps {
 
     def errorName: N = likeSpacedN(name ++ nme.ERROR)
 
-    /** Map variance value -1, +1 to 0, 1 */
-    private def varianceToNat(v: Int) = (v + 1) / 2
+    /** Map variance value -1, +1, +2 to 0, 1, 2 */
+    private def varianceToNat(v: Variance) = if (v.bits == -1) 0 else v.bits
 
-    /** Map 0, 1 to variance value -1, +1 */
-    private def natToVariance(n: Int) = n * 2 - 1
+    /** Map 0, 1, 2 to variance value -1, +1, +2 */
+    private def natToVariance(n: Int): Variance = Variance(if (n == 0) -1 else n)
 
-    /** Name with variance prefix: `+` for covariant, `-` for contravariant */
-    def withVariance(v: Int): N = {
+    /** Name with variance prefix: `+-` for bivariance, `+` for covariance, `-` for contravariance */
+    def withVariance(v: Variance): N = {
       val underlying = name.exclude(VariantName)
       likeSpacedN(
-          if (v == 0) underlying
+          if (v == Invariance) underlying
           else VariantName(underlying.toTermName, varianceToNat(v)))
     }
 
     /** The variance as implied by the variance prefix, or 0 if there is
      *  no variance prefix.
      */
-    def variance: Int = name.collect { case VariantName(_, n) => natToVariance(n) }.getOrElse(0)
+    def variance: Variance = name.collect { case VariantName(_, n) => natToVariance(n) }.getOrElse(Invariance)
 
     def freshened(implicit ctx: Context): N = likeSpacedN {
       name.toTermName match {

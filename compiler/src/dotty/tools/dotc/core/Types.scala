@@ -25,6 +25,7 @@ import printing.Texts._
 import printing.Printer
 import Hashable._
 import Uniques._
+import Variance._
 import collection.{mutable, Seq}
 import config.Config
 import annotation.tailrec
@@ -2022,7 +2023,7 @@ object Types {
           var tp1 = argForParam(base.tp1)
           var tp2 = argForParam(base.tp2)
           val variance = tparam.paramVariance
-          if (tp1.isInstanceOf[TypeBounds] || tp2.isInstanceOf[TypeBounds] || variance == 0) {
+          if (tp1.isInstanceOf[TypeBounds] || tp2.isInstanceOf[TypeBounds] || variance == Invariance) {
             // compute argument as a type bounds instead of a point type
             tp1 = tp1.bounds
             tp2 = tp2.bounds
@@ -3025,7 +3026,7 @@ object Types {
         val dropDependencies = new ApproximatingTypeMap {
           def apply(tp: Type) = tp match {
             case tp @ TermParamRef(thisLambdaType, _) =>
-              range(defn.NothingType, atVariance(1)(apply(tp.underlying)))
+              range(defn.NothingType, atVariance(Covariance)(apply(tp.underlying)))
             case _ => mapOver(tp)
           }
         }
@@ -3329,7 +3330,7 @@ object Types {
     def paramInfo(implicit ctx: Context): tl.PInfo = tl.paramInfos(n)
     def paramInfoAsSeenFrom(pre: Type)(implicit ctx: Context): tl.PInfo = paramInfo
     def paramInfoOrCompleter(implicit ctx: Context): Type = paramInfo
-    def paramVariance(implicit ctx: Context): Int = tl.paramNames(n).variance
+    def paramVariance(implicit ctx: Context): Variance = tl.paramNames(n).variance
     def paramRef(implicit ctx: Context): Type = tl.paramRefs(n)
   }
 
@@ -4264,9 +4265,9 @@ object Types {
 
   /** Common base class of TypeMap and TypeAccumulator */
   abstract class VariantTraversal {
-    protected[core] var variance: Int = 1
+    protected[core] var variance: Variance = Covariance
 
-    @forceInline protected def atVariance[T](v: Int)(op: => T): T = {
+    @forceInline protected def atVariance[T](v: Variance)(op: => T): T = {
       val saved = variance
       variance = v
       val res = op
@@ -4325,7 +4326,7 @@ object Types {
         case tp: NamedType =>
           if (stopAtStatic && tp.symbol.isStatic || (tp.prefix `eq` NoPrefix)) tp
           else {
-            val prefix1 = atVariance(variance max 0)(this(tp.prefix))
+            val prefix1 = atVariance(variance.dropContravariance)(this(tp.prefix))
               // A prefix is never contravariant. Even if say `p.A` is used in a contravariant
               // context, we cannot assume contravariance for `p` because `p`'s lower
               // bound might not have a binding for `A` (e.g. the lower bound could be `Nothing`).
@@ -4343,7 +4344,7 @@ object Types {
             case arg :: otherArgs =>
               val arg1 = arg match {
                 case arg: TypeBounds => this(arg)
-                case arg => atVariance(variance * tparams.head.paramVariance)(this(arg))
+                case arg => atVariance(tparams.head.paramVariance.compose(variance))(this(arg))
               }
               val otherArgs1 = mapArgs(otherArgs, tparams.tail)
               if ((arg1 eq arg) && (otherArgs1 eq otherArgs)) args
@@ -4357,7 +4358,7 @@ object Types {
           derivedRefinedType(tp, this(tp.parent), this(tp.refinedInfo))
 
         case tp: AliasingBounds =>
-          derivedAlias(tp, atVariance(0)(this(tp.alias)))
+          derivedAlias(tp, atVariance(Invariance)(this(tp.alias)))
 
         case tp: TypeBounds =>
           variance = -variance
@@ -4584,7 +4585,7 @@ object Types {
           if (parent.isBottomType) parent
           else info match {
             case Range(infoLo: TypeBounds, infoHi: TypeBounds) =>
-              assert(variance == 0)
+              assert(variance == Invariance)
               if (!infoLo.isTypeAlias && !infoHi.isTypeAlias) propagate(infoLo, infoHi)
               else range(defn.NothingType, tp.parent)
             case Range(infoLo, infoHi) =>
@@ -4640,7 +4641,7 @@ object Types {
               def distributeArgs(args: List[Type], tparams: List[ParamInfo]): Boolean = args match {
                 case Range(lo, hi) :: args1 =>
                   val v = tparams.head.paramVariance
-                  if (v == 0) false
+                  if (v == Invariance) false
                   else {
                     if (v > 0) { loBuf += lo; hiBuf += hi }
                     else { loBuf += hi; hiBuf += lo }
@@ -4723,7 +4724,7 @@ object Types {
     protected def applyToAnnot(x: T, annot: Annotation): T = x // don't go into annotations
 
     protected final def applyToPrefix(x: T, tp: NamedType): T =
-      atVariance(variance max 0)(this(x, tp.prefix)) // see remark on NamedType case in TypeMap
+      atVariance(variance.dropContravariance)(this(x, tp.prefix)) // see remark on NamedType case in TypeMap
 
     def foldOver(x: T, tp: Type): T = {
       record(s"foldOver $getClass")
@@ -4746,7 +4747,7 @@ object Types {
             val tparam = tparams.head
             val acc = args.head match {
               case arg: TypeBounds => this(x, arg)
-              case arg => atVariance(variance * tparam.paramVariance)(this(x, arg))
+              case arg => atVariance(tparam.paramVariance.compose(variance))(this(x, arg))
             }
             foldArgs(acc, tparams.tail, args.tail)
           }
@@ -4771,7 +4772,7 @@ object Types {
         this(x, restpe)
 
       case bounds @ TypeBounds(lo, hi) =>
-        if (lo eq hi) atVariance(0)(this(x, lo))
+        if (lo eq hi) atVariance(Invariance)(this(x, lo))
         else {
           variance = -variance
           val y = this(x, lo)

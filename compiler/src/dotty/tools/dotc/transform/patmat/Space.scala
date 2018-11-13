@@ -17,6 +17,7 @@ import typer._
 import Applications._
 import Inferencing._
 import ProtoTypes._
+import Variance._
 import transform.SymUtils._
 import reporting.diagnostic.messages._
 import config.Printers.{exhaustivity => debug}
@@ -616,9 +617,9 @@ class SpaceEngine(implicit ctx: Context) extends SpaceLogic {
   /** expose abstract type references to their bounds or tvars according to variance */
   private class AbstractTypeMap(maximize: Boolean)(implicit ctx: Context) extends TypeMap {
     def expose(lo: Type, hi: Type): Type =
-      if (variance == 0)
+      if (variance == Invariance)
         newTypeVar(TypeBounds(lo, hi))
-      else if (variance == 1)
+      else if (variance > 0)
         if (maximize) hi else lo
       else
         if (maximize) lo else hi

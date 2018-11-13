@@ -4,7 +4,7 @@ package typer
 
 import core._
 import ast._
-import Contexts._, Constants._, Types._, Symbols._, Names._, Flags._, Decorators._
+import Contexts._, Constants._, Types._, Symbols._, Names._, Flags._, Decorators._, Variance._
 import ErrorReporting._, Annotations._, Denotations._, SymDenotations._, StdNames._
 import util.Positions._
 import config.Printers.typr
@@ -113,7 +113,7 @@ trait TypeAssigner {
           range(defn.NothingType, apply(tp.info))
         case tp: TypeVar if ctx.typerState.constraint.contains(tp) =>
           val lo = ctx.typeComparer.instanceType(
-            tp.origin, fromBelow = variance > 0 || variance == 0 && tp.hasLowerBound)
+            tp.origin, fromBelow = variance > 0 || variance == Invariance && tp.hasLowerBound)
           val lo1 = apply(lo)
           if (lo1 ne lo) lo1 else tp
         case _ =>

@@ -4,7 +4,7 @@ package typer
 
 import core._
 import ast._
-import Contexts._, Types._, Flags._, Symbols._
+import Contexts._, Types._, Flags._, Symbols._, Variance._
 import Trees._
 import ProtoTypes._
 import NameKinds.UniqueName
@@ -197,7 +197,7 @@ object Inferencing {
       def apply(tp: Type) = mapOver(tp) match {
         case tp @ AppliedType(tycon, args) =>
           val args1 = args.zipWithConserve(tycon.typeParams)((arg, tparam) =>
-            if (tparam.paramVariance != 0) TypeBounds.empty else arg
+            if (tparam.paramVariance != Invariance) TypeBounds.empty else arg
           )
           tp.derivedAppliedType(tycon, args1)
         case tp =>
@@ -328,14 +328,14 @@ object Inferencing {
     val constraint = ctx.typerState.constraint
 
     object accu extends TypeAccumulator[VarianceMap] {
-      def setVariance(v: Int) = variance = v
+      def setVariance(v: Variance) = variance = v
       def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
         case t: TypeVar
         if !t.isInstantiated && ctx.typerState.constraint.contains(t) =>
           val v = vmap(t)
-          if (v == null) vmap.updated(t, variance)
-          else if (v == variance || v == 0) vmap
-          else vmap.updated(t, 0)
+          if (v == null) vmap.updated(t, variance.bits)
+          else if (v == variance.bits || v == Invariance.bits) vmap
+          else vmap.updated(t, Invariance.bits)
         case _ =>
           foldOver(vmap, t)
       }
@@ -357,7 +357,7 @@ object Inferencing {
       vmap.foreachBinding { (tvar, v) =>
         val param = tvar.origin
         val e = constraint.entry(param)
-        accu.setVariance(v)
+        accu.setVariance(Variance(v))
         if (v >= 0) {
           traverse(e.bounds.lo)
           constraint.lower(param).foreach(p => traverse(constraint.typeVarOfParam(p)))

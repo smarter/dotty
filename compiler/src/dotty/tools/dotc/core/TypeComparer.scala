@@ -1614,7 +1614,7 @@ class TypeComparer(initctx: Context) extends ConstraintHandling {
       HKTypeLambda(
         paramNames = (HKTypeLambda.syntheticParamNames(tparams1.length), tparams1, tparams2)
           .zipped.map((pname, tparam1, tparam2) =>
-            pname.withVariance((tparam1.paramVariance + tparam2.paramVariance) / 2)))(
+            pname.withVariance(tparam1.paramVariance.glb(tparam2.paramVariance))))(
         paramInfosExp = tl => (tparams1, tparams2).zipped.map((tparam1, tparam2) =>
           tl.integrate(tparams1, tparam1.paramInfoAsSeenFrom(tp1)).bounds &
           tl.integrate(tparams2, tparam2.paramInfoAsSeenFrom(tp2)).bounds),

@@ -2,7 +2,7 @@ package dotty.tools
 package dotc
 package core
 
-import Types._, Contexts._, Symbols._
+import Types._, Contexts._, Symbols._, Variance._
 import Decorators._
 import config.Config
 import config.Printers.{constr, typr}
@@ -238,7 +238,7 @@ trait ConstraintHandling {
             //  from below  | lo  lo  hi
             //  from above  | hi  lo  lo
             //
-            if (variance == 0 || fromBelow == (variance < 0)) bounds.lo else bounds.hi
+            if (variance == Invariance || fromBelow == (variance < 0)) bounds.lo else bounds.hi
           case _ => tp
         }
       }
@@ -396,7 +396,7 @@ trait ConstraintHandling {
       def pruneLambdaParams(tp: Type) =
         if (comparedTypeLambdas.nonEmpty) {
           val approx = new ApproximatingTypeMap {
-            if (fromBelow) variance = -1
+            if (fromBelow) variance = Invariance
             def apply(t: Type): Type = t match {
               case t @ TypeParamRef(tl: TypeLambda, n) if comparedTypeLambdas contains tl =>
                 val bounds = tl.paramInfos(n)

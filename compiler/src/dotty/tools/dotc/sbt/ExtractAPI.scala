@@ -13,6 +13,7 @@ import Types._
 import Symbols._
 import NameOps._
 import NameKinds.DefaultGetterName
+import Variance._
 import typer.Inliner
 import transform.ValueClasses
 import transform.SymUtils._
@@ -365,7 +366,7 @@ private class ExtractAPICollector(implicit val ctx: Context) extends ThunkHolder
     val tparams = sym.info match {
       case pt: TypeLambda =>
         (pt.paramNames, pt.paramInfos).zipped.map((pname, pbounds) =>
-          apiTypeParameter(pname.toString, 0, pbounds.lo, pbounds.hi))
+          apiTypeParameter(pname.toString, Invariance, pbounds.lo, pbounds.hi))
       case _ =>
         Nil
     }
@@ -434,7 +435,7 @@ private class ExtractAPICollector(implicit val ctx: Context) extends ThunkHolder
               val name = "_"
               val ref = api.ParameterRef.of(name)
               api.Existential.of(ref,
-                Array(apiTypeParameter(name, 0, lo, hi)))
+                Array(apiTypeParameter(name, Invariance, lo, hi)))
             }
           case _ =>
             apiType(arg)
@@ -547,12 +548,13 @@ private class ExtractAPICollector(implicit val ctx: Context) extends ThunkHolder
     apiTypeParameter(tparam.paramName.toString, tparam.paramVariance,
       tparam.paramInfo.bounds.lo, tparam.paramInfo.bounds.hi)
 
-  def apiTypeParameter(name: String, variance: Int, lo: Type, hi: Type): api.TypeParameter =
+  def apiTypeParameter(name: String, variance: Variance, lo: Type, hi: Type): api.TypeParameter =
     api.TypeParameter.of(name, Array(), Array(), apiVariance(variance),
       apiType(lo), apiType(hi))
 
-  def apiVariance(v: Int): api.Variance = {
+  def apiVariance(v: Variance): api.Variance = {
     import api.Variance._
+    // FIXME: Need a hack to encode Bivariance
     if (v < 0) Contravariant
     else if (v > 0) Covariant
     else Invariant

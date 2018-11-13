@@ -17,6 +17,7 @@ import config.Printers.{checks, noPrinter}
 import scala.util.Failure
 import config.NoScalaVersion
 import Decorators._
+import Variance._
 import typer.ErrorReporting._
 
 object RefChecks {
@@ -671,7 +672,7 @@ object RefChecks {
       def checkCaseClassInheritanceInvariant() = {
         for (caseCls <- clazz.info.baseClasses.tail.find(_.is(Case)))
           for (baseCls <- caseCls.info.baseClasses.tail)
-            if (baseCls.typeParams.exists(_.paramVariance != 0))
+            if (baseCls.typeParams.exists(_.paramVariance != Invariance))
               for (problem <- variantInheritanceProblems(baseCls, caseCls, "non-variant", "case "))
                 ctx.errorOrMigrationWarning(problem(), clazz.pos)
       }

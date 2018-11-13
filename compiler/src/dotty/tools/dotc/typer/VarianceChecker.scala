@@ -5,9 +5,8 @@ import dotty.tools.dotc.ast.{ Trees, tpd }
 import core._
 import Types._, Contexts._, Flags._, Symbols._, Trees._
 import Decorators._
-import Variances._
+import Variance._
 import NameKinds._
-import TypeApplications.varianceConforms
 import util.Positions._
 import config.Printers.variances
 import reporting.trace
@@ -29,24 +28,19 @@ object VarianceChecker {
     case tl: HKTypeLambda =>
       val checkOK = new TypeAccumulator[Boolean] {
         def error(tref: TypeParamRef) = {
-          val VariantName(paramName, v) = tl.paramNames(tref.paramNum).toTermName
-          val paramVarianceStr = if (v == 0) "contra" else "co"
-          val occursStr = variance match {
-            case -1 => "contra"
-            case 0 => "non"
-            case 1 => "co"
-          }
+          val param = tl.typeParams(tref.paramNum)
+          val paramName = param.paramName
           val pos = tree.tparams
             .find(_.name.toTermName == paramName)
             .map(_.pos)
             .getOrElse(tree.pos)
-          ctx.error(em"${paramVarianceStr}variant type parameter $paramName occurs in ${occursStr}variant position in ${tl.resType}", pos)
+          ctx.error(em"${param.paramVariance} type parameter $paramName occurs in ${variance} position in ${tl.resType}", pos)
         }
         def apply(x: Boolean, t: Type) = x && {
           t match {
             case tref: TypeParamRef if tref.binder `eq` tl =>
               val v = tl.typeParams(tref.paramNum).paramVariance
-              varianceConforms(variance, v) || { error(tref); false }
+              variance.conforms(v) || { error(tref); false }
             case _ =>
               foldOver(x, t)
           }
@@ -75,12 +69,12 @@ class VarianceChecker()(implicit ctx: Context) {
      *  The search proceeds from `base` to the owner of `tvar`.
      *  Initially the state is covariant, but it might change along the search.
      */
-    def relativeVariance(tvar: Symbol, base: Symbol, v: Variance = Covariant): Variance = /*trace(i"relative variance of $tvar wrt $base, so far: $v")*/ {
+    def relativeVariance(tvar: Symbol, base: Symbol, v: Variance = Covariance): Variance = /*trace(i"relative variance of $tvar wrt $base, so far: $v")*/ {
       if (base == tvar.owner) v
       else if ((base is Param) && base.owner.isTerm)
-        relativeVariance(tvar, paramOuter(base.owner), flip(v))
-      else if (ignoreVarianceIn(base.owner)) Bivariant
-      else if (base.isAliasType) relativeVariance(tvar, base.owner, Invariant)
+        relativeVariance(tvar, paramOuter(base.owner), v.flip)
+      else if (ignoreVarianceIn(base.owner)) Bivariance
+      else if (base.isAliasType) relativeVariance(tvar, base.owner, Invariance)
       else relativeVariance(tvar, base.owner, v)
     }
 
@@ -99,16 +93,16 @@ class VarianceChecker()(implicit ctx: Context) {
     /** Check variance of abstract type `tvar` when referred from `base`. */
     private def checkVarianceOfSymbol(tvar: Symbol): Option[VarianceError] = {
       val relative = relativeVariance(tvar, base)
-      if (relative == Bivariant) None
+      if (relative == Bivariance) None
       else {
-        val required = compose(relative, this.variance)
-        def tvar_s = s"$tvar (${varianceString(tvar.flags)} ${tvar.showLocated})"
+        val required = relative.compose(this.variance)
+        def tvar_s = s"$tvar (${tvar.flags.variance} ${tvar.showLocated})"
         def base_s = s"$base in ${base.owner}" + (if (base.owner.isClass) "" else " in " + base.owner.enclosingClass)
-        ctx.log(s"verifying $tvar_s is ${varianceString(required)} at $base_s")
-        ctx.log(s"relative variance: ${varianceString(relative)}")
-        ctx.log(s"current variance: ${this.variance}")
+        ctx.log(s"verifying $tvar_s is $required at $base_s")
+        ctx.log(s"relative variance: $relative")
+        ctx.log(s"current variance: $variance")
         ctx.log(s"owner chain: ${base.ownersIterator.toList}")
-        if (tvar is required) None
+        if (tvar.variance.conforms(required)) None
         else Some(VarianceError(tvar, required))
       }
     }
@@ -123,7 +117,7 @@ class VarianceChecker()(implicit ctx: Context) {
         else tp match {
           case tp: TypeRef =>
             val sym = tp.symbol
-            if (sym.variance != 0 && base.isContainedIn(sym.owner)) checkVarianceOfSymbol(sym)
+            if (sym.variance != Invariance && base.isContainedIn(sym.owner)) checkVarianceOfSymbol(sym)
             else if (sym.isAliasType) this(status, sym.info.bounds.hi)
             else foldOver(status, tp)
           case tp: MethodOrPoly =>
@@ -153,7 +147,7 @@ class VarianceChecker()(implicit ctx: Context) {
   private object Traverser extends TreeTraverser {
     def checkVariance(sym: Symbol, pos: Position) = Validator.validateDefinition(sym) match {
       case Some(VarianceError(tvar, required)) =>
-        def msg = i"${varianceString(tvar.flags)} $tvar occurs in ${varianceString(required)} position in type ${sym.info} of $sym"
+        def msg = i"${tvar.flags.variance} $tvar occurs in $required position in type ${sym.info} of $sym"
         if (ctx.scala2Mode &&
             (sym.owner.isConstructor || sym.ownersIterator.exists(_.is(ProtectedLocal)))) {
           ctx.migrationWarning(s"According to new variance rules, this is no longer accepted; need to annotate with @uncheckedVariance:\n$msg", pos)

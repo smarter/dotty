@@ -639,7 +639,7 @@ object Symbols {
     def paramInfo(implicit ctx: Context): Type = denot.info
     def paramInfoAsSeenFrom(pre: Type)(implicit ctx: Context): Type = pre.memberInfo(this)
     def paramInfoOrCompleter(implicit ctx: Context): Type = denot.infoOrCompleter
-    def paramVariance(implicit ctx: Context): Int = denot.variance
+    def paramVariance(implicit ctx: Context): Variance = denot.variance
     def paramRef(implicit ctx: Context): TypeRef = denot.typeRef
 
 // -------- Printing --------------------------------------------------------

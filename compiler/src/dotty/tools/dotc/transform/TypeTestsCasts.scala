@@ -71,8 +71,8 @@ object TypeTestsCasts {
       def apply(tp: Type) = tp match {
         case tref: TypeRef
         if isPatternTypeSymbol(tref.typeSymbol) =>
-          if (variance == 1) tref.info.hiBound
-          else if (variance == -1) tref.info.loBound
+          if (variance > 0) tref.info.hiBound
+          else if (variance < 0) tref.info.loBound
           else OrType(defn.AnyType, defn.NothingType)
         case _ => mapOver(tp)
       }

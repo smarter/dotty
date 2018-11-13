@@ -23,6 +23,7 @@ import Decorators._
 import ErrorReporting._
 import Checking._
 import Inferencing._
+import Variance._
 import EtaExpansion.etaExpand
 import util.Positions._
 import util.common._
@@ -993,7 +994,7 @@ class Typer extends Namer
     val accu = new TypeAccumulator[Set[Symbol]] {
       def apply(tsyms: Set[Symbol], t: Type): Set[Symbol] = {
         val tsyms1 = t match {
-          case tr: TypeRef if (tr.symbol is TypeParam) && tr.symbol.owner.isTerm && variance == 0 =>
+          case tr: TypeRef if (tr.symbol is TypeParam) && tr.symbol.owner.isTerm && variance == Invariance =>
             tsyms + tr.symbol
           case _ =>
             tsyms

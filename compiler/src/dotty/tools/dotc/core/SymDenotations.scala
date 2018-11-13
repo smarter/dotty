@@ -1217,13 +1217,10 @@ object SymDenotations {
     override def termRef(implicit ctx: Context): TermRef =
       TermRef(owner.thisType, symbol)
 
-    /** The variance of this type parameter or type member as an Int, with
-     *  +1 = Covariant, -1 = Contravariant, 0 = Nonvariant, or not a type parameter
-     */
-    final def variance(implicit ctx: Context): Int =
-      if (this is Covariant) 1
-      else if (this is Contravariant) -1
-      else 0
+    /** The variance of this type parameter or type member. */
+    final def variance(implicit ctx: Context): Variance =
+      if (isCurrent(VarianceFlags)) myFlags.variance
+      else flags.variance
 
     /** The flags to be used for a type parameter owned by this symbol.
      *  Overridden by ClassDenotation.

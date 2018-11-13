@@ -10,6 +10,7 @@ import Decorators._
 import util.Stats._
 import Names._
 import NameOps._
+import Variance._
 import dotty.tools.dotc.config.Config
 
 object TypeApplications {
@@ -22,16 +23,10 @@ object TypeApplications {
     case _ => tp
   }
 
-  /** Does variance `v1` conform to variance `v2`?
-   *  This is the case if the variances are the same or `sym` is nonvariant.
-   */
-  def varianceConforms(v1: Int, v2: Int): Boolean =
-    v1 == v2 || v2 == 0
-
   /** Does the variance of type parameter `tparam1` conform to the variance of type parameter `tparam2`?
    */
   def varianceConforms(tparam1: TypeParamInfo, tparam2: TypeParamInfo)(implicit ctx: Context): Boolean =
-    varianceConforms(tparam1.paramVariance, tparam2.paramVariance)
+    tparam1.paramVariance.conforms(tparam2.paramVariance)
 
   /** Do the variances of type parameters `tparams1` conform to the variances
    *  of corresponding type parameters `tparams2`?

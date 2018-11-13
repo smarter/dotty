@@ -115,6 +115,21 @@ object Flags {
       else rawStrings
     }
 
+    def variance: Variance = {
+      import Variance._
+
+      if (this is Covariant) {
+        if (this is Contravariant)
+          Bivariance
+        else
+          Covariance
+      }
+      else if (this is Contravariant)
+        Contravariance
+      else
+        Invariance
+    }
+
     /** The string representation of this flag set */
     override def toString: String = flagStrings.mkString(" ")
   }

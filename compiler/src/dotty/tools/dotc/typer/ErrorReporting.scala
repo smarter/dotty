@@ -5,7 +5,7 @@ package typer
 import ast._
 import core._
 import Types._, ProtoTypes._, Contexts._, Decorators._, Denotations._, Symbols._
-import Implicits._, Flags._
+import Implicits._, Flags._, Variance._
 import util.Positions._
 import java.util.regex.Matcher.quoteReplacement
 import reporting.diagnostic.Message
@@ -119,7 +119,7 @@ object ErrorReporting {
       // the type mismatch on the bounds instead of the original TypeParamRefs, since
       // these are usually easier to analyze.
       object reported extends TypeMap {
-        def setVariance(v: Int) = variance = v
+        def setVariance(v: Variance) = variance = v
         val constraint = ctx.typerState.constraint
         def apply(tp: Type): Type = tp match {
           case tp: TypeParamRef =>
@@ -136,7 +136,7 @@ object ErrorReporting {
         }
       }
       val found1 = reported(found)
-      reported.setVariance(-1)
+      reported.setVariance(Contravariance)
       val expected1 = reported(expected)
       val (found2, expected2) =
         if (found1 frozen_<:< expected1) (found, expected) else (found1, expected1)
