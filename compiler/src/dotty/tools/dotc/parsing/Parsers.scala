@@ -1941,7 +1941,7 @@ object Parsers {
           val hkparams = typeParamClauseOpt(ParamOwner.TypeParam)
           val bounds =
             if (isConcreteOwner) typeParamBounds(name)
-            else typeBounds()
+            else typeBounds() // atPos(in.offset) ?
           TypeDef(name, lambdaAbstract(hkparams, bounds)).withMods(mods)
         }
       }
