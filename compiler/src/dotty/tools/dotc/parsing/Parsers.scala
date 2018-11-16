@@ -83,8 +83,10 @@ object Parsers {
      *  but wait for its position to be determined by `setChildPositions` when the
      *  parent node is positioned.
      */
-    def atPos[T <: Positioned](start: Offset, point: Offset)(t: T): T =
+    def atPos[T <: Positioned](start: Offset, point: Offset)(t: T): T = {
+      assert(in.lastOffset > start, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
       if (in.lastOffset > start) atPos(start, point, in.lastOffset)(t) else t
+    }
 
     def atPos[T <: Positioned](start: Offset)(t: T): T =
       atPos(start, start)(t)
