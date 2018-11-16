@@ -62,7 +62,6 @@ object Parsers {
     else new Parser(source)
 
   abstract class ParserCommon(val source: SourceFile)(implicit ctx: Context) {
-
     val in: ScannerCommon
 
     /* ------------- POSITIONS ------------------------------------------- */
@@ -70,8 +69,14 @@ object Parsers {
     /** Positions tree.
      *  If `t` does not have a position yet, set its position to the given one.
      */
-    def atPos[T <: Positioned](pos: Position)(t: T): T =
+    def atPos[T <: Positioned](pos: Position)(t: T): T = {
+      // checker.get(t).asInstanceOf[Any] match {
+      //   case oldPos: Position =>
+      //     assert(oldPos == pos, s"tree=[$t], old=[$oldPos], newPos=[$pos]")
+      //   case null =>
+      // }
       if (t.pos.isSourceDerived) t else t.withPos(pos)
+    }
 
     def atPos[T <: Positioned](start: Offset, point: Offset, end: Offset)(t: T): T =
       atPos(Position(start, end, point))(t)
@@ -84,8 +89,27 @@ object Parsers {
      *  parent node is positioned.
      */
     def atPos[T <: Positioned](start: Offset, point: Offset)(t: T): T = {
-      assert(in.lastOffset > start, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+      // assert(in.lastOffset >= start, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+      // if (in.lastOffset < start && !t.isInstanceOf[Modifiers] && !t.isInstanceOf[TypeBoundsTree] && !t.isInstanceOf[Enum]) {
+      // System.err.println(s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+      // if (in.lastOffset <= start) {
+      val isOK = t match {
+        case TypeBoundsTree(EmptyTree, EmptyTree) => true
+        case t: DefDef => t.name.toString == "<init>"
+        case _=> false
+      }
+      if (in.lastOffset == start && !isOK) {
+        // System.err.println(s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+        // t.firstTryPos = Some(Position(start, point, point))
+        assert(start == point, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+        t.firstTryPos = Some(Position(in.lastOffset, in.lastOffset))
+
+        // System.err.println(s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+        // Thread.dumpStack
+        // ???
+      }
       if (in.lastOffset > start) atPos(start, point, in.lastOffset)(t) else t
+      // atPos(start, point, in.lastOffset)(t)
     }
 
     def atPos[T <: Positioned](start: Offset)(t: T): T =
@@ -313,7 +337,7 @@ object Parsers {
             accept(SEMI)
         }
 
-    def errorTermTree: Literal = atPos(in.offset) { Literal(Constant(null)) }
+    def errorTermTree: Literal = atPos(in.lastOffset) { Literal(Constant(null)) }
 
     private[this] var inFunReturnType = false
     private def fromWithinReturnType[T](body: => T): T = {
@@ -657,8 +681,10 @@ object Parsers {
      */
     def literal(negOffset: Int = in.offset, inPattern: Boolean = false): Tree = {
       def finish(value: Any): Tree = {
-        val t = atPos(negOffset) { Literal(Constant(value)) }
-        in.nextToken()
+        val t = atPos(negOffset) {
+          in.nextToken()
+          Literal(Constant(value))
+        }
         t
       }
       val isNegated = negOffset < in.offset

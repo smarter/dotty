@@ -15,6 +15,8 @@ abstract class Positioned extends Product {
 
   setPos(initialPos)
 
+  var firstTryPos: Option[Position] = None
+
   /** The item's position.
    */
   def pos: Position = curPos
@@ -24,6 +26,7 @@ abstract class Positioned extends Product {
    */
   protected def setPos(pos: Position): Unit = {
     setPosUnchecked(pos)
+    assert(firstTryPos match { case Some(oldPos) => oldPos.toSynthetic == pos.toSynthetic; case _ => true }, s"tree=[$this], old=[${firstTryPos.get}], new=[$pos]")
     if (pos.exists) setChildPositions(pos.toSynthetic)
   }
 
