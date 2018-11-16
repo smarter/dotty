@@ -61,9 +61,10 @@ trait MessageRendering {
     }
 
     val syntax =
-      if (ctx.settings.color.value != "never")
-        SyntaxHighlighting.highlight(new String(pos.linesSlice)).toCharArray
-      else pos.linesSlice
+      // if (ctx.settings.color.value != "never")
+      //   SyntaxHighlighting.highlight(new String(pos.linesSlice)).toCharArray
+      // else
+        pos.linesSlice
     val lines = linesFrom(syntax)
     val (before, after) = pos.beforeAndAfterPoint
 

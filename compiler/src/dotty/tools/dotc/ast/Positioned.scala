@@ -110,6 +110,9 @@ abstract class Positioned extends Product {
           else outstanding = p :: outstanding
         case xs: List[_] =>
           elems = elems ::: xs.reverse
+        // case n: Names.Name =>
+        //   // FIXME: actually useful for something ?
+        //   assert(false, n)
         case _ =>
       }
     }

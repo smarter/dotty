@@ -96,9 +96,13 @@ object Parsers {
       val isOK = t match {
         case TypeBoundsTree(EmptyTree, EmptyTree) => true
         case t: DefDef => t.name.toString == "<init>"
+        // case t: Modifiers => true // not actually OK
         case _=> false
       }
-      if (in.lastOffset == start && !isOK) {
+      // problematic: when parsing the empty modifiers of a def, lastOffset is a tree before the def
+      // XX ^^ the above appears to be false, was just special case of modifiers having position edited
+      // OK for the bounds of a type member, because lastOffset is the name of the type member
+      if (in.lastOffset <= start && !isOK) {
         // System.err.println(s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
         // t.firstTryPos = Some(Position(start, point, point))
         assert(start == point, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
@@ -1998,6 +2002,7 @@ object Parsers {
             if (in.token == EQUALS) { in.nextToken(); expr() }
             else EmptyTree
           if (implicitOffset >= 0) {
+            mods.firstTryPos = None
             mods = mods.withPos(mods.pos.union(Position(implicitOffset, implicitOffset)))
             implicitOffset = -1
           }
