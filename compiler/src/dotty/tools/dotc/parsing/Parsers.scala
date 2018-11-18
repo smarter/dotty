@@ -92,21 +92,38 @@ object Parsers {
       // assert(in.lastOffset >= start, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
       // if (in.lastOffset < start && !t.isInstanceOf[Modifiers] && !t.isInstanceOf[TypeBoundsTree] && !t.isInstanceOf[Enum]) {
       // System.err.println(s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
-      // if (in.lastOffset <= start) {
-      val isOK = t match {
-        case TypeBoundsTree(EmptyTree, EmptyTree) => true
-        case t: DefDef => t.name.toString == "<init>"
-        // case t: Modifiers => true // not actually OK
-        case _=> false
+      if (in.lastOffset <= start) {
+        assert(start == point)
+        t match {
+          case t: DefDef if t.name.toString == "<init>" =>
+            assert(in.lastOffset == start)
+            atPos(start, point, point)(t)
+          // case TypeBoundsTree(EmptyTree, EmptyTree) =>
+          //   assert(in.lastOffset == start)
+          //   atPos(start, point, point)(t)
+          case t: Modifiers if !t.pos.exists =>
+            t.firstTryPos = Some(Position(start, point, point))
+          case t: Mod/* if !t.pos.exists*/ =>
+            t.firstTryPos = Some(Position(start, point, point))
+          case _ =>
+            println(s"t=[$t], oldPos=[${t.pos}], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+            assert(false)
+        }
       }
+      // val isOK = t match {
+      //   case TypeBoundsTree(EmptyTree, EmptyTree) => true
+      //   case t: DefDef => t.name.toString == "<init>"
+      //   // case t: Modifiers => true // not actually OK
+      //   case _=> false
+      // }
       // problematic: when parsing the empty modifiers of a def, lastOffset is a tree before the def
       // XX ^^ the above appears to be false, was just special case of modifiers having position edited
       // OK for the bounds of a type member, because lastOffset is the name of the type member
-      if (in.lastOffset <= start && !isOK) {
+      if (in.lastOffset <= start) {
         // System.err.println(s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
         // t.firstTryPos = Some(Position(start, point, point))
-        assert(start == point, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
-        t.firstTryPos = Some(Position(in.lastOffset, in.lastOffset))
+        // assert(start == point, s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
+        // t.firstTryPos = Some(Position(in.lastOffset, in.lastOffset))
 
         // System.err.println(s"t=[$t], in.lastOffset=[${in.lastOffset}], start=[$start], point=[$point]")
         // Thread.dumpStack
@@ -1024,12 +1041,19 @@ object Parsers {
 
     /** TypeBounds ::= [`>:' Type] [`<:' Type]
      */
-    def typeBounds(): TypeBoundsTree =
-      atPos(in.offset) { TypeBoundsTree(bound(SUPERTYPE), bound(SUBTYPE)) }
+    def typeBounds(): TypeBoundsTree = {
+      val bounds = TypeBoundsTree(bound(SUPERTYPE), bound(SUBTYPE))
+      if (bounds.lo == EmptyTree && bounds.hi == EmptyTree)
+        bounds.withPos(Position(in.lastOffset)) // Synthetic position just after the name of the type
+      else
+        bounds
+    }
 
     private def bound(tok: Int): Tree =
-      if (in.token == tok) { in.nextToken(); toplevelTyp() }
-      else EmptyTree
+      if (in.token == tok)
+        atPos(in.offset) { in.nextToken(); toplevelTyp() }
+      else
+        EmptyTree
 
     /** TypeParamBounds   ::=  TypeBounds {`<%' Type} {`:' Type}
      */
