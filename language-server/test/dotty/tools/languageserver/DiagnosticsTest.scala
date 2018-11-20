@@ -14,4 +14,14 @@ class DiagnosticsTest {
         (m1 to m2, """found:    String("foo")
                      |required: Int""".stripMargin, Error, Some(7))
       )
+
+  @Test def diagnosticMissingLambdaBody: Unit =
+    code"""object Test {
+          |  Nil.map(x => x).filter(x$m1 =>$m2)
+          |$m3}""".withSource
+      .diagnostics(m1,
+        (m2 to m3, "illegal start of simple expression", Error, Some(18)),
+        (m1 to m1, """found:    Null
+                     |required: Boolean""".stripMargin, Error, Some(7))
+      )
 }
