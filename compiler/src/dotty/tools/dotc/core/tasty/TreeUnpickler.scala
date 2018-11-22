@@ -560,7 +560,7 @@ class TreeUnpickler(reader: TastyReader,
       registerSym(start, sym)
       if (isClass) {
         sym.completer.withDecls(newScope)
-        forkAt(templateStart).indexTemplateParams()(localContext(sym))
+        forkAt(templateStart).indexTemplateParamsAndConstructor()(localContext(sym))
       }
       else if (sym.isInlineMethod)
         sym.addAnnotation(LazyBodyAnnotation { ctx0 =>
@@ -706,15 +706,20 @@ class TreeUnpickler(reader: TastyReader,
         skipTree()
       }
 
-    /** Create symbols for all type and value parameters of template starting
-     *  at current address.
+    /** Create symbols for the type parameters, term parameters and primary
+     *  constructor of template starting at current address.
      */
-    def indexTemplateParams()(implicit ctx: Context): Unit = {
+    def indexTemplateParamsAndConstructor()(implicit ctx: Context): Unit = {
       assert(readByte() == TEMPLATE)
       readEnd()
-      skipTree() // Skip the constructor def
+      // skipTree() // Skip the constructor def
       indexParams(TYPEPARAM)
       indexParams(PARAM)
+
+      // index the primary constructor
+      assert(nextByte == DEFDEF)
+      symbolAtCurrent()
+      skipTree()
     }
 
     /** If definition was already read by a completer, return the previously read tree
@@ -869,12 +874,12 @@ class TreeUnpickler(reader: TastyReader,
       assert(readByte() == TEMPLATE)
       val end = readEnd()
 
-      val s = symbolAtCurrent() // Constructor symbol
-      println("s: " + s)
-      val constr = readIndexedDef().asInstanceOf[DefDef]
-
       val tparams = readIndexedParams[TypeDef](TYPEPARAM)
       val vparams = readIndexedParams[ValDef](PARAM)
+
+      // val s = symbolAtCurrent() // Constructor symbol
+      // println("#s: " + s + " " + s.owner)
+      val constr = readIndexedDef().asInstanceOf[DefDef]
 
       assert(readByte() == PARENTS)
       val endParents = readEnd()

@@ -508,9 +508,9 @@ class TreePickler(pickler: TastyPickler) {
             case _ => false
           }
           withLength {
+            pickleParams(params)
             preRegister(tree.constr)
             pickleTree(tree.constr)
-            pickleParams(params)
             writeByte(PARENTS)
             withLength {
               tree.parents.foreach(pickleTree)

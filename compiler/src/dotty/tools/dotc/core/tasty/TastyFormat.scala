@@ -60,8 +60,8 @@ Standard-Section: "ASTs" TopLevelStat*
                   OBJECTDEF      Length NameRef Template Modifier*
                   IMPORT         Length qual_Term Selector*
   ValOrDefDef   = VALDEF         Length NameRef type_Term rhs_Term? Modifier*
-                  DEFDEF         Length NameRef TypeParam* Params* returnType_Term rhs_Term?
-                                        Modifier*
+                  DefDef
+  DefDef        = DEFDEF         Length NameRef TypeParam* Params* returnType_Term rhs_Term? Modifier*
   Selector      = IMPORTED              name_NameRef
                   RENAMED               to_NameRef
 
@@ -70,7 +70,8 @@ Standard-Section: "ASTs" TopLevelStat*
   TypeParam     = TYPEPARAM      Length NameRef type_Term Modifier*
   Params        = PARAMS         Length Param*
   Param         = PARAM          Length NameRef type_Term rhs_Term? Modifier*  // rhs_Term is present in the case of an aliased class parameter
-  Template      = TEMPLATE       Length TypeParam* Param* parent_Term* Self? Stat* // Stat* always starts with the primary constructor.
+  Parents       = PARENTS        Length Stat*
+  Template      = TEMPLATE       Length TypeParam* Param* constr_DefDef Parents Self? Stat*
   Self          = SELFDEF               selfName_NameRef selfType_Term
 
   Term          = Path
