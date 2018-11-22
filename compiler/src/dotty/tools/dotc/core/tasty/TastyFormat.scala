@@ -413,6 +413,7 @@ object TastyFormat {
   final val TERMREFin = 174
   final val TYPEREFin = 175
   final val OBJECTDEF = 176
+  final val PARENTS = 177
 
   // In binary: 101101EI
   // I = implicit method type
@@ -573,6 +574,7 @@ object TastyFormat {
     case IMPORT => "IMPORT"
     case TYPEPARAM => "TYPEPARAM"
     case PARAMS => "PARAMS"
+    case PARENTS => "PARENTS"
     case PARAM => "PARAM"
     case IMPORTED => "IMPORTED"
     case RENAMED => "RENAMED"

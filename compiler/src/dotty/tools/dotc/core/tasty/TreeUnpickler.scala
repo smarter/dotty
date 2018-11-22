@@ -712,6 +712,7 @@ class TreeUnpickler(reader: TastyReader,
     def indexTemplateParams()(implicit ctx: Context): Unit = {
       assert(readByte() == TEMPLATE)
       readEnd()
+      skipTree() // Skip the constructor def
       indexParams(TYPEPARAM)
       indexParams(PARAM)
     }
@@ -867,9 +868,17 @@ class TreeUnpickler(reader: TastyReader,
       val parentCtx = ctx.withOwner(localDummy)
       assert(readByte() == TEMPLATE)
       val end = readEnd()
+
+      val s = symbolAtCurrent() // Constructor symbol
+      println("s: " + s)
+      val constr = readIndexedDef().asInstanceOf[DefDef]
+
       val tparams = readIndexedParams[TypeDef](TYPEPARAM)
       val vparams = readIndexedParams[ValDef](PARAM)
-      val parents = collectWhile(nextByte != SELFDEF && nextByte != DEFDEF) {
+
+      assert(readByte() == PARENTS)
+      val endParents = readEnd()
+      val parents = until(endParents) {
         nextUnsharedTag match {
           case APPLY | TYPEAPPLY | BLOCK => readTerm()(parentCtx)
           case _ => readTpt()(parentCtx)
@@ -885,7 +894,7 @@ class TreeUnpickler(reader: TastyReader,
       cls.info = ClassInfo(cls.owner.thisType, cls, parentTypes, cls.unforcedDecls,
         if (self.isEmpty) NoType else self.tpt.tpe)
       cls.setNoInitsFlags(parentsKind(parents), fork.indexStats(end))
-      val constr = readIndexedDef().asInstanceOf[DefDef]
+      // val constr = readIndexedDef().asInstanceOf[DefDef]
       val mappedParents = parents.map(_.changeOwner(localDummy, constr.symbol))
 
       val lazyStats = readLater(end, rdr => implicit ctx => {
