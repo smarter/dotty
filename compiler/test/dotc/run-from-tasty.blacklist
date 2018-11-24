@@ -1,8 +1,8 @@
-# Closure type miss match
-eff-dependent.scala
+# # Closure type miss match
+# eff-dependent.scala
 
-# It seems we still harmonize types in fromTasty. Not sure where this happens
-puzzle.scala
+# # It seems we still harmonize types in fromTasty. Not sure where this happens
+# puzzle.scala
 
-# Need to print empty tree for implicit match
-implicitMatch.scala
+# # Need to print empty tree for implicit match
+# implicitMatch.scala

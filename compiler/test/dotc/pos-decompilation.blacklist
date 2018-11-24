@@ -1,14 +1,14 @@
-# Stackoverflow on bootstrapped
-large.scala
-large2.scala
+# # Stackoverflow on bootstrapped
+# large.scala
+# large2.scala
 
-# NPE
-i2888.scala
-tcpoly_overloaded.scala
-tcpoly_boundedmonad.scala
-tcpoly_checkkinds_mix.scala
+# # NPE
+# i2888.scala
+# tcpoly_overloaded.scala
+# tcpoly_boundedmonad.scala
+# tcpoly_checkkinds_mix.scala
 
-# Did not survive addition of type ascriptions
-i3050.scala
-i4006b.scala
-i4006c.scala
+# # Did not survive addition of type ascriptions
+# i3050.scala
+# i4006b.scala
+# i4006c.scala
