@@ -395,7 +395,7 @@ class TreePickler(pickler: TastyPickler) {
           withLength {
             pickleTree(qual);
             if (!mix.isEmpty) {
-              val SuperType(_, mixinType: TypeRef) = tree.tpe
+              val SuperType(_, mixinType) = tree.tpe
               pickleTree(mix.withType(mixinType))
             }
           }

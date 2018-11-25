@@ -322,16 +322,16 @@ trait TypeAssigner {
         val cls = qtype.cls
         def findMixinSuper(site: Type): Type = site.parents filter (_.typeSymbol.name == mix.name) match {
           case p :: Nil =>
-            p.typeConstructor
+            p
           case Nil =>
             errorType(SuperQualMustBeParent(mix, cls), tree.pos)
           case p :: q :: _ =>
             errorType("ambiguous parent class qualifier", tree.pos)
         }
         val owntype =
-          if (mixinClass.exists) mixinClass.typeRef
+          if (mixinClass.exists) mixinClass.appliedRef
           else if (!mix.isEmpty) findMixinSuper(cls.info)
-          else if (inConstrCall || ctx.erasedTypes) cls.info.firstParent.typeConstructor
+          else if (inConstrCall || ctx.erasedTypes) cls.info.firstParent
           else {
             val ps = cls.classInfo.parents
             if (ps.isEmpty) defn.AnyType else ps.reduceLeft((x: Type, y: Type) => x & y)
