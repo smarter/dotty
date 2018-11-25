@@ -246,6 +246,25 @@ class TreeChecker extends Phase with SymTransformer {
       case _ =>
     }
 
+    /** Check that all invariants related to Super and SuperType are met */
+    def checkSuper(tree: Tree)(implicit ctx: Context): Unit = tree match {
+      case Super(qual, mix) =>
+        tree.tpe match {
+          case tp @ SuperType(thistpe, supertpe) =>
+            if (!mix.isEmpty)
+              assert(supertpe.isInstanceOf[TypeRef],
+                s"Precondition of pickling violated: the supertpe in $tp is not a TypeRef even though $tree has a non-empty mix")
+          case tp =>
+            assert(false, s"The type of a Super tree must be a SuperType, but $tree has type $tp")
+        }
+      case _ =>
+        tree.tpe match {
+          case tp: SuperType =>
+            assert(false, s"The type of a non-Super tree must not be a SuperType, but $tree has type $tp")
+          case _ =>
+        }
+    }
+
     /** Exclude from double definition checks any erased symbols that were
      *  made `private` in phase `UnlinkErasedDecls`. These symbols will be removed
      *  completely in phase `Erasure` if they are defined in a currently compiled unit.
@@ -256,6 +275,7 @@ class TreeChecker extends Phase with SymTransformer {
     override def typed(tree: untpd.Tree, pt: Type = WildcardType)(implicit ctx: Context): Tree = {
       val tpdTree = super.typed(tree, pt)
       checkIdentNotJavaClass(tpdTree)
+      checkSuper(tpdTree)
       tpdTree
     }
 
