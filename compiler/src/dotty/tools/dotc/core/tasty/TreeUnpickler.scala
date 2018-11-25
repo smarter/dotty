@@ -345,6 +345,7 @@ class TreeUnpickler(reader: TastyReader,
             case ORtype =>
               OrType(readType(), readType())
             case SUPERtype =>
+              ???
               SuperType(readType(), readType())
             case MATCHtype =>
               MatchType(readType(), readType(), until(end)(readType()))

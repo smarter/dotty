@@ -208,6 +208,8 @@ class TreePickler(pickler: TastyPickler) {
         pickleType(tpe.tref)
       }
     case tpe: SuperType =>
+      assert(false, s"a SuperType should never be pickled: $tpe")
+      ???
       writeByte(SUPERtype)
       withLength { pickleType(tpe.thistpe); pickleType(tpe.supertpe) }
     case tpe: RecThis =>
