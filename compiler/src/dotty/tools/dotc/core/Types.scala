@@ -2343,6 +2343,8 @@ object Types {
    *  by `super`.
    */
   abstract case class SuperType(thistpe: Type, supertpe: Type) extends CachedProxyType with SingletonType {
+    assert(!supertpe.isInstanceOf[AppliedType])
+
     override def underlying(implicit ctx: Context): Type = supertpe
     override def superType(implicit ctx: Context): Type =
       thistpe.baseType(supertpe.typeSymbol)
