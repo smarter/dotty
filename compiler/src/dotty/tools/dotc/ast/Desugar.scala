@@ -337,6 +337,10 @@ object desugar {
     def isEnumCase = mods.isEnumCase
     val isValueClass = parents.nonEmpty && isAnyVal(parents.head)
       // This is not watertight, but `extends AnyVal` will be replaced by `inline` later.
+    val isSimulacrumTypeclass = !mods.is(Module) && mods.annotations.map(methPart).exists {
+      case Select(New(Ident(tpnme.typeclass)), _) => true
+      case _ => false
+    }
 
     val originalTparams = constr1.tparams
     val originalVparamss = constr1.vparamss
@@ -598,6 +602,121 @@ object desugar {
           case (_ :: Nil) :: _ => companionDefs(anyRef, Nil)
           case _ => Nil // error will be emitted in typer
         }
+      }
+      else if (isSimulacrumTypeclass) {
+        assert(originalTparams.length == 1)
+        val methTparam = derivedTparams.head
+        val classTparam = methTparam.withFlags(methTparam.mods.flags | PrivateLocal)
+        val tparamRef = Ident(methTparam.name)
+
+        // def apply[A](implicit instance: C[A]): C[A] = instance
+        val applyMeth =
+          DefDef(nme.apply, List(methTparam),
+            List(List(makeParameter(nme.instance, classTypeRef, Modifiers(Implicit)))),
+            classTypeRef, Ident(nme.instance))
+            .withFlags(Synthetic)
+
+        // trait Ops[A] { ... }
+        val opsTrait = {
+          // val opsParam = derivedTypeParam(constrTparams.head).withFlags(Param | PrivateLocal)
+          // println("tparam.mods: " + tparam.mods)
+          // val opsParam = methTparam.withFlags(methTparam.mods.flags | PrivateLocal)
+          val opsParam = classTparam
+          // val opsParam = TypeDef(tparam.name, TypeBoundsTree(EmptyTree, EmptyTree)).withFlags(Param | PrivateLocal)
+          val opsParamRef = Ident(opsParam.name)
+          val tcRef = appliedRef(classTycon, List(opsParam))
+
+          // def typeClassInstance: C[A]
+          val typeClassInstanceMeth = DefDef(nme.typeClassInstance, Nil, Nil, tcRef, EmptyTree)
+            .withFlags(Synthetic | Deferred)
+
+          // def self: A
+          val selfMeth = DefDef(nme.self, Nil, Nil, opsParamRef, EmptyTree)
+            .withFlags(Synthetic | Deferred)
+
+          // Given:
+          //
+          // trait C[A] {
+          //   @op("<opName>") def <name>(x: A, v_1: T_1, ..., v_N: T_N): <tpt>
+          // }
+          // 
+          // Generate:
+          // 
+          // def <opName>(v_1: T_1, ..., v_N: T_N): <tpt> =
+          //   typeClassInstance.<name>(self, v_1, ..., v_N)
+          def opMethod(tree: Tree): Option[DefDef] = tree match {
+            case tree: DefDef =>
+              val (opAnn, otherAnns) = tree.mods.annotations.partition({
+                case Apply(Select(New(Ident(tpnme.op)), nme.CONSTRUCTOR), _) =>
+                  true
+                case _ =>
+                  false
+              })
+              opAnn.headOption.collect {
+                case Apply(_, Literal(c: Constant) :: rest) =>
+                  val opName = c.stringValue
+                  val List(vparams) = tree.vparamss
+                  // XX: needs to map over types tparam -> opsParam
+                  cpy.DefDef(tree)(
+                    name = opName.toTermName,
+                    vparamss = List(vparams.tail),
+                    rhs = Apply(
+                      Select(Ident(nme.typeClassInstance), tree.name),
+                      Ident(nme.self) :: vparams.tail.map(v => Ident(v.name))
+                    )
+                  ).withMods(tree.rawMods.withAnnotations(otherAnns))
+              }
+            case _ =>
+              None
+          }
+
+          val opMeths = impl.body.flatMap(opMethod)
+
+          TypeDef(tpnme.Ops, Template(
+            makeConstructor(List(opsParam), Nil),
+            parents = Nil,
+            self = EmptyValDef,
+            body = typeClassInstanceMeth :: selfMeth :: opMeths
+          )).withFlags(Trait)
+        }
+
+        // trait To${C}Ops { ... }
+        val toOpsTrait = {
+          // val toOpsParam = derivedTypeParam(tparam)
+          // val toOpsParam = derivedTypeParam(constrTparams.head)
+          // val toOpsParam = TypeDef(methTparam.name, TypeBoundsTree(EmptyTree, EmptyTree)).withFlags(Param)
+          val toOpsParam = methTparam
+          val toOpsParamRef = Ident(toOpsParam.name)
+          val opsRef = appliedRef(Ident(tpnme.Ops), List(toOpsParam))
+          val tcRef = appliedRef(classTycon, List(toOpsParam))
+          // implicit def to${C}Ops[A](target: A)(implicit tc: C[A]): Ops[A] = new Ops[A] {
+          //   val self = target
+          //   val typeClassInstance = tc
+          // }
+          val toOpsDef = DefDef(
+            s"to${className}Ops".toTermName,
+            List(toOpsParam),
+            List(
+              List(makeParameter(nme.target, toOpsParamRef)),
+              List(makeParameter(nme.tc, tcRef, Modifiers(Implicit)))
+            ),
+            opsRef,
+            New(Template(emptyConstructor, List(opsRef), EmptyValDef, List(
+              ValDef(nme.self, TypeTree(), Ident(nme.target)),
+              ValDef(nme.typeClassInstance, TypeTree(), Ident(nme.tc))
+            )))
+          ).withFlags(Implicit)
+
+          TypeDef(
+            s"To${className}Ops".toTypeName,
+            Template(emptyConstructor, Nil, EmptyValDef, List(
+              toOpsDef
+            ))
+          ).withFlags(Trait)
+        }
+
+        // companionDefs(anyRef, List(applyMeth/*, opsTrait*//*, toOpsTrait*/))
+        companionDefs(anyRef, List(applyMeth, opsTrait, toOpsTrait))
       }
       else Nil
 
