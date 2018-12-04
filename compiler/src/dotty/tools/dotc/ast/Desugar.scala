@@ -618,20 +618,12 @@ object desugar {
 
         // trait Ops[A] { ... }
         val opsTrait = {
-          // val opsParam = derivedTypeParam(constrTparams.head).withFlags(Param | PrivateLocal)
-          // println("tparam.mods: " + tparam.mods)
-          // val opsParam = methTparam.withFlags(methTparam.mods.flags | PrivateLocal)
-          val opsParam = classTparam
-          // val opsParam = TypeDef(tparam.name, TypeBoundsTree(EmptyTree, EmptyTree)).withFlags(Param | PrivateLocal)
-          val opsParamRef = Ident(opsParam.name)
-          val tcRef = appliedRef(classTycon, List(opsParam))
-
           // def typeClassInstance: C[A]
-          val typeClassInstanceMeth = DefDef(nme.typeClassInstance, Nil, Nil, tcRef, EmptyTree)
+          val typeClassInstanceMeth = DefDef(nme.typeClassInstance, Nil, Nil, classTypeRef, EmptyTree)
             .withFlags(Synthetic | Deferred)
 
           // def self: A
-          val selfMeth = DefDef(nme.self, Nil, Nil, opsParamRef, EmptyTree)
+          val selfMeth = DefDef(nme.self, Nil, Nil, tparamRef, EmptyTree)
             .withFlags(Synthetic | Deferred)
 
           // Given:
@@ -673,7 +665,7 @@ object desugar {
           val opMeths = impl.body.flatMap(opMethod)
 
           TypeDef(tpnme.Ops, Template(
-            makeConstructor(List(opsParam), Nil),
+            makeConstructor(List(classTparam), Nil),
             parents = Nil,
             self = EmptyValDef,
             body = typeClassInstanceMeth :: selfMeth :: opMeths
@@ -682,28 +674,23 @@ object desugar {
 
         // trait To${C}Ops { ... }
         val toOpsTrait = {
-          // val toOpsParam = derivedTypeParam(tparam)
-          // val toOpsParam = derivedTypeParam(constrTparams.head)
-          // val toOpsParam = TypeDef(methTparam.name, TypeBoundsTree(EmptyTree, EmptyTree)).withFlags(Param)
-          val toOpsParam = methTparam
-          val toOpsParamRef = Ident(toOpsParam.name)
-          val opsRef = appliedRef(Ident(tpnme.Ops), List(toOpsParam))
-          val tcRef = appliedRef(classTycon, List(toOpsParam))
+          val opsAppliedRef = appliedRef(Ident(tpnme.Ops), List(methTparam))
+
           // implicit def to${C}Ops[A](target: A)(implicit tc: C[A]): Ops[A] = new Ops[A] {
-          //   val self = target
-          //   val typeClassInstance = tc
+          //   val self: A = target
+          //   val typeClassInstance: C[A] = tc
           // }
           val toOpsDef = DefDef(
             s"to${className}Ops".toTermName,
-            List(toOpsParam),
+            List(methTparam),
             List(
-              List(makeParameter(nme.target, toOpsParamRef)),
-              List(makeParameter(nme.tc, tcRef, Modifiers(Implicit)))
+              List(makeParameter(nme.target, tparamRef)),
+              List(makeParameter(nme.tc, classTypeRef, Modifiers(Implicit)))
             ),
-            opsRef,
-            New(Template(emptyConstructor, List(opsRef), EmptyValDef, List(
-              ValDef(nme.self, TypeTree(), Ident(nme.target)),
-              ValDef(nme.typeClassInstance, TypeTree(), Ident(nme.tc))
+            opsAppliedRef,
+            New(Template(emptyConstructor, List(opsAppliedRef), EmptyValDef, List(
+              ValDef(nme.self, tparamRef, Ident(nme.target)),
+              ValDef(nme.typeClassInstance, classTypeRef, Ident(nme.tc))
             )))
           ).withFlags(Implicit)
 
@@ -715,7 +702,6 @@ object desugar {
           ).withFlags(Trait)
         }
 
-        // companionDefs(anyRef, List(applyMeth/*, opsTrait*//*, toOpsTrait*/))
         companionDefs(anyRef, List(applyMeth, opsTrait, toOpsTrait))
       }
       else Nil
