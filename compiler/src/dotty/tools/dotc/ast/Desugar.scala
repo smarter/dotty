@@ -400,11 +400,13 @@ object desugar {
       (if (args.isEmpty) tycon else AppliedTypeTree(tycon, args))
         .withPos(cdef.pos.startPos)
 
-    def isHK(tparam: Tree): Boolean = tparam match {
-      case TypeDef(_, LambdaTypeTree(tparams, body)) => true
-      case TypeDef(_, rhs: DerivedTypeTree) => isHK(rhs.watched)
-      case _ => false
+    def typeParameters(tparam: Tree): List[TypeDef] = tparam match {
+      case TypeDef(_, LambdaTypeTree(tparams, body)) => tparams
+      case TypeDef(_, rhs: DerivedTypeTree) => typeParameters(rhs.watched)
+      case _ => Nil
     }
+
+    def isHK(tparam: Tree): Boolean = !typeParameters(tparam).isEmpty
 
     def appliedRef(tycon: Tree, tparams: List[TypeDef] = constrTparams, widenHK: Boolean = false) = {
       val targs = for (tparam <- tparams) yield {
@@ -606,57 +608,123 @@ object desugar {
       else if (isSimulacrumTypeclass) {
         assert(originalTparams.length == 1)
         val methTparam = derivedTparams.head
-        val classTparam = methTparam.withFlags(methTparam.mods.flags | PrivateLocal)
-        val tparamRef = Ident(methTparam.name)
+        val hkMethTparams = typeParameters(methTparam).map(rename(_, UniqueName.fresh(methTparam.name)))
 
-        // def apply[A](implicit instance: C[A]): C[A] = instance
+        val classTparam = methTparam.withFlags(methTparam.mods.flags | PrivateLocal)
+        val hkClassTparams = hkMethTparams.map(tparam => tparam.withFlags(tparam.mods.flags | PrivateLocal))
+
+        val tparamRef = Ident(methTparam.name)
+        val hkTparamRefs = hkMethTparams.map(p => Ident(p.name))
+        val appliedTparamRef = appliedTypeTree(tparamRef, hkTparamRefs)
+
+        // def apply[F[_]](implicit instance: C[F]): C[F] = instance
+        // FIXME: return instance.type instead to preserve dependent types
+        // (hopefully better solution than https://github.com/mpilquist/simulacrum/pull/74)
         val applyMeth =
           DefDef(nme.apply, List(methTparam),
             List(List(makeParameter(nme.instance, classTypeRef, Modifiers(Implicit)))),
             classTypeRef, Ident(nme.instance))
             .withFlags(Synthetic)
 
-        // trait Ops[A] { ... }
+        // trait Ops[F[_], F$1] { ... }
         val opsTrait = {
-          // def typeClassInstance: C[A]
+          // def typeClassInstance: C[F]
           val typeClassInstanceMeth = DefDef(nme.typeClassInstance, Nil, Nil, classTypeRef, EmptyTree)
             .withFlags(Synthetic | Deferred)
 
-          // def self: A
-          val selfMeth = DefDef(nme.self, Nil, Nil, tparamRef, EmptyTree)
+          // def self: F[F$1]
+          val selfMeth = DefDef(nme.self, Nil, Nil, appliedTparamRef, EmptyTree)
             .withFlags(Synthetic | Deferred)
 
           // Given:
           //
-          // trait C[A] {
-          //   @op("<opName>") def <name>(x: A, v_1: T_1, ..., v_N: T_N): <tpt>
+          // trait C[F[_]] {
+          //   @op("<opName>") def <name>[X, Y](a: F[X], b: X, c: Y): R
           // }
-          // 
+          //
           // Generate:
-          // 
-          // def <opName>(v_1: T_1, ..., v_N: T_N): <tpt> =
+          //
+          // def <opName>[Y](b: A, c: Y): R' =
           //   typeClassInstance.<name>(self, v_1, ..., v_N)
           def opMethod(tree: Tree): Option[DefDef] = tree match {
             case tree: DefDef =>
+              // FIXME: if a method doesn't have an op name, it should also get forwarded
               val (opAnn, otherAnns) = tree.mods.annotations.partition({
                 case Apply(Select(New(Ident(tpnme.op)), nme.CONSTRUCTOR), _) =>
                   true
                 case _ =>
                   false
               })
+
+              /** The current tree applied to given argument lists:
+               *  `tree (argss(0)) ... (argss(argss.length -1))`
+               */
+              def appliedToArgss(tree: Tree, argss: List[List[Tree]])(implicit ctx: Context): Tree =
+                argss.foldLeft(tree)(Apply(_, _))
+
               opAnn.headOption.collect {
                 case Apply(_, Literal(c: Constant) :: rest) =>
                   val opName = c.stringValue
-                  val List(vparams) = tree.vparamss
-                  // XX: needs to map over types tparam -> opsParam
-                  cpy.DefDef(tree)(
-                    name = opName.toTermName,
-                    vparamss = List(vparams.tail),
-                    rhs = Apply(
-                      Select(Ident(nme.typeClassInstance), tree.name),
-                      Ident(nme.self) :: vparams.tail.map(v => Ident(v.name))
-                    )
-                  ).withMods(tree.rawMods.withAnnotations(otherAnns) | Synthetic)
+                  tree.vparamss match {
+                    case (firstParam :: rest1) :: rest2 =>
+
+                      val tparamNames = tree.tparams.map(_.name)
+
+                      // Given:
+                      // trait C[F[_]] {
+                      //   def foo[X, Y](a: F[X], b: X, c: Y): <tpt>
+                      // }
+                      // F[X]
+                      // F[X] ~ F[A]  => X -> A
+                      // F[X[Y]] ~ F[A] =>
+                      def substMap(original: Tree, proto: Tree): Map[Name, Name] = (original, proto) match {
+                        case (AppliedTypeTree(tpt1: Ident, args1), AppliedTypeTree(tpt2: Ident, args2)) if tpt1.name == tpt2.name =>
+                          (args1, args2).zipped.foldLeft(Map[Name, Name]()) {
+                            case (acc, (arg1: Ident, arg2: Ident)) =>
+                              if (tparamNames.contains(arg1.name))
+                                acc + (arg1.name -> arg2.name)
+                              else
+                                acc
+                            case (acc, _) =>
+                              acc
+                          }
+                        case _ =>
+                          Map()
+                      }
+                      val tparamsMap = substMap(firstParam.tpt, appliedTparamRef)
+                      // type parameters of `def <opName>`
+                      val opTparams = tree.tparams.filterNot(tparam => tparamsMap.contains(tparam.name))
+
+                      def renameParamss(paramss: List[List[ValDef]]): List[List[ValDef]] = {
+                        val renamer = new UntypedTreeMap {
+                          override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
+                            case tree: NameTree if tparamsMap.contains(tree.name) =>
+                              rename(tree, tparamsMap(tree.name))
+                            case _ =>
+                              super.transform(tree)
+                          }
+                        }
+                        paramss.nestedMapconserve(renamer.transform).asInstanceOf[List[List[ValDef] @unchecked]]
+                      }
+
+                      // parameters of `def <opName>`
+                      val opVparamss = renameParamss(rest1 :: rest2)
+
+                      // Arguments to `typeClassInstance.<name>`
+                      val instanceArgss = (Ident(nme.self) :: rest1.map(v => Ident(v.name))) :: rest2.nestedMap(v => Ident(v.name))
+
+                      cpy.DefDef(tree)(
+                        name = opName.toTermName,
+                        opTparams,
+                        opVparamss,
+                        rhs = appliedToArgss(
+                          Select(Ident(nme.typeClassInstance), tree.name),
+                          instanceArgss
+                        )
+                      ).withMods(tree.rawMods.withAnnotations(otherAnns) | Synthetic)
+                    case _ =>
+                      ???
+                  }
               }
             case _ =>
               None
@@ -665,32 +733,32 @@ object desugar {
           val opMeths = impl.body.flatMap(opMethod)
 
           TypeDef(tpnme.Ops, Template(
-            makeConstructor(List(classTparam), Nil),
+            makeConstructor(classTparam :: hkClassTparams, Nil),
             parents = Nil,
             self = EmptyValDef,
             body = typeClassInstanceMeth :: selfMeth :: opMeths
           )).withFlags(Synthetic | Trait)
         }
-        // Ops[A]
-        val opsAppliedRef = appliedTypeTree(Ident(tpnme.Ops), List(tparamRef))
+        // Ops[F, F$1]
+        val opsAppliedRef = appliedTypeTree(Ident(tpnme.Ops), tparamRef :: hkTparamRefs)
 
         // trait To${C}Ops { ... }
         val toOpsTrait = {
 
-          // implicit def to${C}Ops[A](target: A)(implicit tc: C[A]): Ops[A] = new Ops[A] {
-          //   val self: A = target
-          //   val typeClassInstance: C[A] = tc
+          // implicit def to${C}Ops[F[_], F$1](target: F[F$1])(implicit tc: C[F]): Ops[F] = new Ops[F] {
+          //   val self: F[F$1] = target
+          //   val typeClassInstance: C[F] = tc
           // }
           val toOpsMeth = DefDef(
             s"to${className}Ops".toTermName,
-            List(methTparam),
+            methTparam :: hkMethTparams,
             List(
-              List(makeParameter(nme.target, tparamRef)),
+              List(makeParameter(nme.target, appliedTparamRef)),
               List(makeParameter(nme.tc, classTypeRef, Modifiers(Implicit)))
             ),
             opsAppliedRef,
             New(Template(emptyConstructor, List(opsAppliedRef), EmptyValDef, List(
-              ValDef(nme.self, tparamRef, Ident(nme.target)),
+              ValDef(nme.self, appliedTparamRef, Ident(nme.target)),
               ValDef(nme.typeClassInstance, classTypeRef, Ident(nme.tc))
             )))
           ).withFlags(Synthetic | Implicit)
@@ -711,35 +779,35 @@ object desugar {
 
 
         // FIXME: mix in AllOps from super
-        // trait AllOps[A] extends Ops[A] { ... }
+        // trait AllOps[F[_], A] extends Ops[F, A] { ... }
         val allOpsTrait = {
           // FIXME: do we actually need the typeClassInstance member if we mix-in in the other order ?
           // def typeClassInstance: Semigroup[A]
           // val typeClassInstanceMeth =
           TypeDef(tpnme.AllOps, Template(
-            makeConstructor(List(classTparam), Nil),
+            makeConstructor(classTparam :: hkClassTparams, Nil),
             List(opsAppliedRef), EmptyValDef, Nil
           )).withFlags(Synthetic | Trait)
         }
-        // AllOps[A]
-        val allOpsAppliedRef = appliedTypeTree(Ident(tpnme.Ops), List(tparamRef))
+        // AllOps[F, F$1]
+        val allOpsAppliedRef = appliedTypeTree(Ident(tpnme.Ops), tparamRef :: hkTparamRefs)
 
         // object ops { ... }
         val opsObject = {
-          // implicit def toAllSemigroupOps[A](target: A)(implicit tc: Semigroup[A]): AllOps[A] = new AllOps[A] {
-          //   val self = target
-          //   val typeClassInstance = tc
+          // implicit def toAllSemigroupOps[F[_], F$1](target: F[F$1])(implicit tc: Semigroup[F]): AllOps[F] = new AllOps[F, A] {
+          //   val self: F[F$1] = target
+          //   val typeClassInstance: C[F] = tc
           // }
           val toAllOpsMeth = DefDef(
             s"toAll${className}Ops".toTermName,
-            List(methTparam),
+            methTparam :: hkMethTparams,
             List(
-              List(makeParameter(nme.target, tparamRef)),
+              List(makeParameter(nme.target, appliedTparamRef)),
               List(makeParameter(nme.tc, classTypeRef, Modifiers(Implicit)))
             ),
             allOpsAppliedRef,
             New(Template(emptyConstructor, List(allOpsAppliedRef), EmptyValDef, List(
-              ValDef(nme.self, tparamRef, Ident(nme.target)),
+              ValDef(nme.self, appliedTparamRef, Ident(nme.target)),
               ValDef(nme.typeClassInstance, classTypeRef, Ident(nme.tc))
             )))
           ).withFlags(Synthetic | Implicit)
@@ -749,7 +817,10 @@ object desugar {
             .withFlags(Synthetic)
         }
 
-        companionDefs(anyRef, List(applyMeth, opsTrait, toOpsTrait, nonInheritedOpsObject, allOpsTrait, opsObject))
+        companionDefs(anyRef, List(
+          applyMeth,
+          opsTrait, toOpsTrait, nonInheritedOpsObject,
+          allOpsTrait, opsObject))
       }
       else Nil
 
