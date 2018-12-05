@@ -656,7 +656,7 @@ object desugar {
                       Select(Ident(nme.typeClassInstance), tree.name),
                       Ident(nme.self) :: vparams.tail.map(v => Ident(v.name))
                     )
-                  ).withMods(tree.rawMods.withAnnotations(otherAnns))
+                  ).withMods(tree.rawMods.withAnnotations(otherAnns) | Synthetic)
               }
             case _ =>
               None
@@ -669,18 +669,19 @@ object desugar {
             parents = Nil,
             self = EmptyValDef,
             body = typeClassInstanceMeth :: selfMeth :: opMeths
-          )).withFlags(Trait)
+          )).withFlags(Synthetic | Trait)
         }
+        // Ops[A]
+        val opsAppliedRef = appliedTypeTree(Ident(tpnme.Ops), List(tparamRef))
 
         // trait To${C}Ops { ... }
         val toOpsTrait = {
-          val opsAppliedRef = appliedRef(Ident(tpnme.Ops), List(methTparam))
 
           // implicit def to${C}Ops[A](target: A)(implicit tc: C[A]): Ops[A] = new Ops[A] {
           //   val self: A = target
           //   val typeClassInstance: C[A] = tc
           // }
-          val toOpsDef = DefDef(
+          val toOpsMeth = DefDef(
             s"to${className}Ops".toTermName,
             List(methTparam),
             List(
@@ -692,17 +693,63 @@ object desugar {
               ValDef(nme.self, tparamRef, Ident(nme.target)),
               ValDef(nme.typeClassInstance, classTypeRef, Ident(nme.tc))
             )))
-          ).withFlags(Implicit)
+          ).withFlags(Synthetic | Implicit)
 
           TypeDef(
             s"To${className}Ops".toTypeName,
             Template(emptyConstructor, Nil, EmptyValDef, List(
-              toOpsDef
+              toOpsMeth
             ))
-          ).withFlags(Trait)
+          ).withFlags(Synthetic | Trait)
         }
 
-        companionDefs(anyRef, List(applyMeth, opsTrait, toOpsTrait))
+        // object nonInheritedOps extends ToSemigroupOps
+        val nonInheritedOpsObject =
+          ModuleDef(
+            nme.nonInheritedOps, Template(emptyConstructor, List(Ident(toOpsTrait.name)), EmptyValDef, Nil))
+            .withFlags(Synthetic)
+
+
+        // FIXME: mix in AllOps from super
+        // trait AllOps[A] extends Ops[A] { ... }
+        val allOpsTrait = {
+          // FIXME: do we actually need the typeClassInstance member if we mix-in in the other order ?
+          // def typeClassInstance: Semigroup[A]
+          // val typeClassInstanceMeth =
+          TypeDef(tpnme.AllOps, Template(
+            makeConstructor(List(classTparam), Nil),
+            List(opsAppliedRef), EmptyValDef, Nil
+          )).withFlags(Synthetic | Trait)
+        }
+        // AllOps[A]
+        val allOpsAppliedRef = appliedTypeTree(Ident(tpnme.Ops), List(tparamRef))
+
+        // object ops { ... }
+        val opsObject = {
+          // implicit def toAllSemigroupOps[A](target: A)(implicit tc: Semigroup[A]): AllOps[A] = new AllOps[A] {
+          //   val self = target
+          //   val typeClassInstance = tc
+          // }
+          val toAllOpsMeth = DefDef(
+            s"toAll${className}Ops".toTermName,
+            List(methTparam),
+            List(
+              List(makeParameter(nme.target, tparamRef)),
+              List(makeParameter(nme.tc, classTypeRef, Modifiers(Implicit)))
+            ),
+            allOpsAppliedRef,
+            New(Template(emptyConstructor, List(allOpsAppliedRef), EmptyValDef, List(
+              ValDef(nme.self, tparamRef, Ident(nme.target)),
+              ValDef(nme.typeClassInstance, classTypeRef, Ident(nme.tc))
+            )))
+          ).withFlags(Synthetic | Implicit)
+
+          ModuleDef(
+            nme.ops, Template(emptyConstructor, Nil, EmptyValDef, List(toAllOpsMeth)))
+            .withFlags(Synthetic)
+        }
+
+        companionDefs(anyRef, List(applyMeth, opsTrait, toOpsTrait, nonInheritedOpsObject, allOpsTrait, opsObject))
       }
       else Nil
 
