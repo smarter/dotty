@@ -1891,7 +1891,7 @@ class Typer extends Namer
               else typedValDef(tree, sym)(ctx.localContext(tree, sym).setNewScope)
             case tree: untpd.DefDef =>
               val typer1 = localTyper(sym)
-              typer1.typedDefDef(tree, sym)(ctx.localContext(tree, sym).setTyper(typer1))
+              typer1.typedDefDef(tree, sym)(ctx.localContext(tree, sym).setTyper(typer1).setNewScope)
             case tree: untpd.TypeDef =>
               if (tree.isClassDef)
                 typedClassDef(tree, sym.asClass)(ctx.localContext(tree, sym).setMode(ctx.mode &~ Mode.InSuperCall))

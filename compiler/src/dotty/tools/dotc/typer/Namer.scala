@@ -711,7 +711,7 @@ class Namer { typer: Typer =>
       case original: DefDef =>
         val typer1 = ctx.typer.newLikeThis
         nestedTyper(sym) = typer1
-        typer1.defDefSig(original, sym)(localContext(sym).setTyper(typer1))
+        typer1.defDefSig(original, sym)(localContext(sym).setTyper(typer1).setNewScope)
       case imp: Import =>
         try {
           val expr1 = typedAheadExpr(imp.expr, AnySelectionProto)
