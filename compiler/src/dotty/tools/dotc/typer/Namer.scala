@@ -214,10 +214,10 @@ class Namer { typer: Typer =>
   // lazy val typedTree = new mutable.AnyRefMap[Tree, tpd.Tree]
 
   /** A map from method symbols to nested typers.
-   *  Populated when methods are completed. Emptied when they are typechecked.
+   *  Populated when methods are completed and classes are created. Emptied when they are typechecked.
    *  The nested typer contains new versions of the four maps above including this
-   *  one, so that trees that are shared between different DefDefs can be independently
-   *  used as indices. It also contains a scope that contains nested parameters.
+   *  one, so that trees that are shared between different DefDefs and/or class TypeDefs can be independently
+   *  used as indices. It also contains a scope that contains nested parameters (only used for DefDefs).
    */
   lazy val nestedTyper: mutable.AnyRefMap[Symbol, Typer] = new mutable.AnyRefMap
 
@@ -328,7 +328,12 @@ class Namer { typer: Typer =>
         val flags = checkFlags(tree.mods.flags &~ Implicit)
         val cls =
           createOrRefine[ClassSymbol](tree, name, flags,
-            cls => adjustIfModule(new ClassCompleter(cls, tree)(ctx), tree),
+            cls => {
+              val typer1 = ctx.typer.newLikeThis
+              nestedTyper(cls) = typer1
+              val ctx1 = ctx.fresh.setTyper(typer1)
+              adjustIfModule(new typer1.ClassCompleter(cls, tree)(ctx1), tree)
+            },
             ctx.newClassSymbol(ctx.owner, name, _, _, _, tree.namePos, ctx.source.file))
         cls.completer.asInstanceOf[ClassCompleter].init()
         cls
