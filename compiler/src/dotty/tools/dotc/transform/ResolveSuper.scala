@@ -93,6 +93,7 @@ object ResolveSuper {
    *
    *  @param base       The class in which everything is mixed together
    *  @param acc        The symbol statically referred to by the superaccessor in the trait
+   *  @param mixin      The trait where the superaccessor is defined
    */
   def rebindSuper(base: Symbol, acc: Symbol)(implicit ctx: Context): Symbol = {
     var bcs = base.info.baseClasses.dropWhile(acc.owner != _).tail
@@ -100,10 +101,52 @@ object ResolveSuper {
     val SuperAccessorName(memberName) = acc.name.unexpandedName
     ctx.debuglog(i"starting rebindsuper from $base of ${acc.showLocated}: ${acc.info} in $bcs, name = $memberName")
     while (bcs.nonEmpty && sym == NoSymbol) {
-      val other = bcs.head.info.nonPrivateDecl(memberName)
+      val cur = bcs.head
+      val other = cur.info.nonPrivateDecl(memberName)
       if (ctx.settings.Ydebug.value)
         ctx.log(i"rebindsuper ${bcs.head} $other deferred = ${other.symbol.is(Deferred)}")
-      sym = other.matchingDenotation(base.thisType, base.thisType.memberInfo(acc)).symbol
+      val otherMember = other.matchingDenotation(base.thisType, base.thisType.memberInfo(acc))
+      if (otherMember.exists) {
+        sym = otherMember.symbol
+        // Having a matching denotation is not enough: it should also be a subtype
+        // of the superaccessor's type, see i5433.scala for an example where this matters
+        val otherTp = otherMember.asSeenFrom(base.typeRef).info
+        val accTp = acc.asSeenFrom(base.typeRef).info
+        if (!(otherTp <:< accTp)) {
+          val superCall = i"super.$memberName"
+          val accSuperCall = i"super[${acc.owner.name}].$memberName"
+          val resolvedSuperCall = i"super[${cur.name}].$memberName"
+          val overriddenOwnerName = {
+            val overriddenIterator = other.symbol.allOverriddenSymbols
+            if (overriddenIterator.hasNext)
+              overriddenIterator.next.owner.name
+            else
+              "SomeParent"
+          }
+          val overriddenSuperCall = i"super[$overriddenOwnerName].$memberName"
+          ctx.error(
+            hl"""$base cannot be instantiated due to a conflict between its parents when
+                |resolving a super-call:
+                |
+                |1. One of its parent (${acc.owner}) contains a call $superCall in its body.
+                |2. Because ${cur.name} comes before ${acc.owner.name} in the linearization
+                |   order of ${base.name}, and because ${cur.name} overrides $memberName,
+                |   this is resolved as a call to $resolvedSuperCall in ${base.name}.
+                |3. However:
+                |   ${otherTp.widenExpr} (the type of $resolvedSuperCall in ${base.name})
+                |   is not a subtype of
+                |   ${accTp.widenExpr} (the type of $accSuperCall in ${base.name})
+                |
+                |Here are two possible ways to resolve this:
+                |
+                |1. Change the linearization order of ${base.name} such that
+                |   ${acc.owner.name} comes before ${cur.name}.
+                |2. Alternatively, replace $superCall in the body of ${acc.owner} by a
+                |   super-call to a specific parent, e.g. $overriddenSuperCall
+                |""".stripMargin, base.sourcePos)
+        }
+      }
+
       bcs = bcs.tail
     }
     assert(sym.exists)
