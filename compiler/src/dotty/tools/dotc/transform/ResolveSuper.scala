@@ -103,7 +103,7 @@ object ResolveSuper {
       val other = bcs.head.info.nonPrivateDecl(memberName)
       if (ctx.settings.Ydebug.value)
         ctx.log(i"rebindsuper ${bcs.head} $other deferred = ${other.symbol.is(Deferred)}")
-      sym = other.matchingDenotation(base.thisType, base.thisType.memberInfo(acc)).symbol
+      sym = other.matchingDenotation(base.thisType, base.thisType.memberInfo(acc), neverRelaxed = true).symbol
       bcs = bcs.tail
     }
     assert(sym.exists)

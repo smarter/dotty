@@ -322,8 +322,8 @@ object Denotations {
     /** The alternative of this denotation that has a type matching `targetType` when seen
      *  as a member of type `site`, `NoDenotation` if none exists.
      */
-    def matchingDenotation(site: Type, targetType: Type)(implicit ctx: Context): SingleDenotation = {
-      def qualifies(sym: Symbol) = site.memberInfo(sym).matchesLoosely(targetType)
+    def matchingDenotation(site: Type, targetType: Type, neverRelaxed: Boolean = false)(implicit ctx: Context): SingleDenotation = {
+      def qualifies(sym: Symbol) = site.memberInfo(sym).matchesLoosely(targetType, neverRelaxed)
       if (isOverloaded) {
         atSignature(targetType.signature, site, relaxed = true) match {
           case sd: SingleDenotation => sd.matchingDenotation(site, targetType)

@@ -883,24 +883,24 @@ object Types {
      *      and matching result types after renaming corresponding parameter types
      *      if the method types are dependent.
      *    - Or both types are =:=-equivalent
-     *    - Or phase.erasedTypes is false, and neither type takes
+     *    - Or both `neverRelaxed` and phase.erasedTypes are false, and neither type takes
      *      term or type parameters.
      *
      *  (*) when matching with a Java method, we also regard Any and Object as equivalent
      *      parameter types.
      */
-    def matches(that: Type)(implicit ctx: Context): Boolean = track("matches") {
-      ctx.typeComparer.matchesType(this, that, relaxed = !ctx.phase.erasedTypes)
+    def matches(that: Type, neverRelaxed: Boolean = false)(implicit ctx: Context): Boolean = track("matches") {
+      ctx.typeComparer.matchesType(this, that, relaxed = !neverRelaxed && !ctx.phase.erasedTypes)
     }
 
     /** This is the same as `matches` except that it also matches => T with T and
      *  vice versa.
      */
-    def matchesLoosely(that: Type)(implicit ctx: Context): Boolean =
-      (this matches that) || {
+    def matchesLoosely(that: Type, neverRelaxed: Boolean = false)(implicit ctx: Context): Boolean =
+      this.matches(that, neverRelaxed) || {
         val thisResult = this.widenExpr
         val thatResult = that.widenExpr
-        (this eq thisResult) != (that eq thatResult) && (thisResult matchesLoosely thatResult)
+        (this eq thisResult) != (that eq thatResult) && thisResult.matchesLoosely(thatResult, neverRelaxed)
       }
 
     /** The basetype of this type with given class symbol, NoType if `base` is not a class. */
