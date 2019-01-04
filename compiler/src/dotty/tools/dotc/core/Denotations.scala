@@ -500,7 +500,15 @@ object Denotations {
          *   - does not depend on textual order or other arbitrary choices
          *   - minimizes raising of doubleDef errors
          */
-        def preferSym(sym1: Symbol, sym2: Symbol) =
+        def preferSym(sym1: Symbol, sym2: Symbol) = {
+          if (sym1.exists && sym2.exists) {
+            // if (sym1.info.isInstanceOf[MethodType])
+            //   assert(sym2.info.isInstanceOf[MethodType] || sym2.info.isInstanceOf[ExprType], i"$sym1 - $sym2 -- [${sym1.info}] - [${sym2.info}]")
+            if (sym1.info.isInstanceOf[PolyType])
+              assert(sym2.info.isInstanceOf[PolyType], i"$sym1 - $sym2 -- [${sym1.info}] - [${sym2.info}]")
+            if (sym2.info.isInstanceOf[PolyType])
+              assert(sym1.info.isInstanceOf[PolyType], i"$sym1 - $sym2 -- [${sym1.info}] - [${sym2.info}]")
+          }
           sym1.eq(sym2) ||
           sym1.exists &&
             (!sym2.exists ||
@@ -512,6 +520,7 @@ object Denotations {
                 sym1.is(Method) && !sym2.is(Method)) ||
                 sym1.info.isInstanceOf[MethodType] && sym2.info.isInstanceOf[PolyType] ||
               sym1.info.isErroneous)
+        }
 
         /** Sym preference provided types also override */
         def prefer(sym1: Symbol, sym2: Symbol, info1: Type, info2: Type) =
