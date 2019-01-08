@@ -8,6 +8,7 @@ import collection.mutable
 import printing.Printer
 import printing.Texts._
 import config.Config
+import config.Printers.typr
 import reflect.ClassTag
 import annotation.tailrec
 
@@ -431,6 +432,17 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           bounds.derivedTypeBounds(replaceIn(lo, isUpper = false), replaceIn(hi, isUpper = true))
         case _ =>
           tp.substParam(param, replacement)
+      }
+
+      typeVarOfParam(param) match {
+        case tvar: TypeVar if !tvar.isInstantiated && tvar.owningState != null =>
+          val permanent =
+            ctx.typerState == tvar.owningState.get && !ctx.typeComparer.subtypeCheckInProgress
+          val which = if (permanent) "permanent" else "non-permanent"
+          typr.println(i"$which instantation of $tvar with $tp")
+          if (permanent)
+            tvar.inst = replacement
+        case _ =>
       }
 
       var current =
