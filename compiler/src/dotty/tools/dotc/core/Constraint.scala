@@ -121,6 +121,9 @@ abstract class Constraint extends Showable {
   /** The type lambda parameters constrained by this constraint */
   def domainParams: List[TypeParamRef]
 
+  /** True if this constraint contains no type variables at all, even instantiated ones. */
+  def isEmpty: Boolean
+
   /** Check whether predicate holds for all parameters in constraint */
   def forallParams(p: TypeParamRef => Boolean): Boolean
 

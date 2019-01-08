@@ -4,6 +4,7 @@ package typer
 
 import core._
 import Phases._
+import Decorators._
 import Contexts._
 import Symbols._
 import dotty.tools.dotc.parsing.JavaParsers.JavaParser
@@ -58,6 +59,8 @@ class FrontEnd extends Phase {
 
   def typeCheck(implicit ctx: Context): Unit = monitor("typechecking") {
     val unit = ctx.compilationUnit
+    assert(ctx.typerState.constraint.isEmpty,
+      i"Attempted to typecheck $unit with a non-empty constraint set ${ctx.typerState.constraint}")
     unit.tpdTree = ctx.typer.typedExpr(unit.untpdTree)
     typr.println("typed: " + unit.source)
     record("retained untyped trees", unit.untpdTree.treeSize)
