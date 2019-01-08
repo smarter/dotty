@@ -3645,9 +3645,8 @@ object Types {
     def instantiateWith(tp: Type)(implicit ctx: Context): Type = {
       assert(tp ne this, s"self instantiation of ${tp.show}, constraint = ${ctx.typerState.constraint.show}")
       typr.println(s"instantiating ${this.show} with ${tp.show}")
-      if ((ctx.typerState eq owningState.get) && !ctx.typeComparer.subtypeCheckInProgress)
-        inst = tp
-      ctx.typerState.constraint = ctx.typerState.constraint.replace(origin, tp)
+      // ctx.typerState.tryInstantiate(this, tp)
+      ctx.typerState.unsafeSetConstraintTo(ctx.typerState.constraint.replace(origin, tp))
       tp
     }
 

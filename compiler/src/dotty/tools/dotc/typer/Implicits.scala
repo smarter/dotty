@@ -580,9 +580,9 @@ trait Implicits { self: Typer =>
     && (ctx.mode is Mode.ImplicitsEnabled)
     && from.isValueType
     && (  from.isValueSubType(to)
-       || inferView(dummyTreeOfType(from), to)
-            (ctx.fresh.addMode(Mode.ImplicitExploration).setDisposableTyperState()).isSuccess
-          // TODO: investigate why we can't TyperState#test here
+        || ctx.fresh.addMode(Mode.ImplicitExploration).test { implicit ctx =>
+             inferView(dummyTreeOfType(from), to).isSuccess
+           }
        )
     )
 
@@ -1144,7 +1144,7 @@ trait Implicits { self: Typer =>
           result match {
             case _: SearchFailure =>
               SearchSuccess(ref(defn.Not_value), defn.Not_value.termRef, 0)(
-                ctx.typerState.fresh().setCommittable(true),
+                ctx.typerState.fresh(committable = true),
                 ctx.gadt
               )
             case _: SearchSuccess =>

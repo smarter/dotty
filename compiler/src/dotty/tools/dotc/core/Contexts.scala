@@ -479,9 +479,9 @@ object Contexts {
     def setScope(scope: Scope): this.type = { this.scope = scope; this }
     def setNewScope: this.type = { this.scope = newScope; this }
     def setTyperState(typerState: TyperState): this.type = { this.typerState = typerState; this }
-    def setNewTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(true))
-    def setDisposableTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(false))
-    def setReporter(reporter: Reporter): this.type = setTyperState(typerState.fresh().setReporter(reporter))
+    def setNewTyperState(): this.type = setTyperState(typerState.fresh(committable = true))
+    def setDisposableTyperState(): this.type = setTyperState(typerState.fresh(committable = false))
+    def setReporter(reporter: Reporter): this.type = setTyperState(typerState.fresh(committable = typerState.isCommittable).setReporter(reporter))
     def setTypeAssigner(typeAssigner: TypeAssigner): this.type = { this.typeAssigner = typeAssigner; this }
     def setTyper(typer: Typer): this.type = { this.scope = typer.scope; setTypeAssigner(typer) }
     def setImportInfo(importInfo: ImportInfo): this.type = { this.importInfo = importInfo; this }

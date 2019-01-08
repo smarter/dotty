@@ -1647,11 +1647,13 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
    */
   def harmonic[T](harmonize: List[T] => List[T], pt: Type)(op: => List[T])(implicit ctx: Context): List[T] =
     if (!isFullyDefined(pt, ForceDegree.none)) {
-      val origConstraint = ctx.typerState.constraint
-      val origElems = op
-      val harmonizedElems = harmonize(origElems)
-      if (harmonizedElems ne origElems) ctx.typerState.constraint = origConstraint
-      harmonizedElems
+      ctx.typerState.explore { rollbackConstraint =>
+        val origConstraint = ctx.typerState.constraint
+        val origElems = op
+        val harmonizedElems = harmonize(origElems)
+        if (harmonizedElems ne origElems) rollbackConstraint()
+        harmonizedElems
+      }
     }
     else op
 

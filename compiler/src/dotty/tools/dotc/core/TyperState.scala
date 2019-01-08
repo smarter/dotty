@@ -11,6 +11,7 @@ import collection.mutable
 import java.lang.ref.WeakReference
 
 import scala.annotation.internal.sharable
+import scala.util.control.NonFatal
 
 object TyperState {
   @sharable private var nextId: Int = 0
@@ -20,6 +21,8 @@ class TyperState(previous: TyperState /* | Null */) {
 
   val id: Int = TyperState.nextId
   TyperState.nextId += 1
+
+  private var needsGc: Boolean = false
 
   private[this] var myReporter =
     if (previous == null) new ConsoleReporter() else previous.reporter
@@ -34,13 +37,18 @@ class TyperState(previous: TyperState /* | Null */) {
     else previous.constraint
 
   def constraint: Constraint = myConstraint
-  def constraint_=(c: Constraint)(implicit ctx: Context): Unit = {
+  protected def constraint_=(c: Constraint)(implicit ctx: Context): Unit = {
     if (Config.debugCheckConstraintsClosed && isGlobalCommittable) c.checkClosed()
+    myConstraint = c
+  }
+
+  def unsafeSetConstraintTo(c: Constraint): Unit = {
     myConstraint = c
   }
 
   /** Reset constraint to `c` and mark current constraint as retracted if it differs from `c` */
   def resetConstraintTo(c: Constraint): Unit = {
+    assert(isRetractable)
     if (c `ne` myConstraint) myConstraint.markRetracted()
     myConstraint = c
   }
@@ -48,11 +56,30 @@ class TyperState(previous: TyperState /* | Null */) {
   private val previousConstraint =
     if (previous == null) constraint else previous.constraint
 
+  private/*[this]*/ var myIsRetractable = false
+
+  def isRetractable: Boolean = myIsRetractable
+
+  def tryInstantiate(tvar: TypeVar, tp: Type)(implicit ctx: Context): Unit = {
+    assert(!tvar.isInstantiated)
+    if (ctx.typerState == tvar.owningState.get) {
+      if (isCommittable && !isRetractable)
+        tvar.inst = tp
+      else if (isCommittable)
+        needsGc = true
+    }
+  }
+
   private[this] var myIsCommittable = true
 
   def isCommittable: Boolean = myIsCommittable
 
-  def setCommittable(committable: Boolean): this.type = { this.myIsCommittable = committable; this }
+  def setCommittable(committable: Boolean): this.type = {
+    this.myIsCommittable = committable
+    if (!committable)
+      this.myIsRetractable = true
+    this
+  }
 
   def isGlobalCommittable: Boolean =
     isCommittable && (previous == null || previous.isGlobalCommittable)
@@ -65,11 +92,12 @@ class TyperState(previous: TyperState /* | Null */) {
    */
   def markShared(): Unit = isShared = true
 
+  /** Once set, nothing left to do. */
   private[this] var isCommitted = false
 
   /** A fresh typer state with the same constraint as this one. */
-  def fresh(): TyperState =
-    new TyperState(this).setReporter(new StoreReporter(reporter)).setCommittable(isCommittable)
+  def fresh(committable: Boolean): TyperState =
+    new TyperState(this).setReporter(new StoreReporter(reporter)).setCommittable(committable)
 
   /** The uninstantiated variables */
   def uninstVars: Seq[TypeVar] = constraint.uninstVars
@@ -87,6 +115,26 @@ class TyperState(previous: TyperState /* | Null */) {
 
   private[this] var testReporter: TestReporter = null
 
+  def explore[T](op: (() => Unit) => T)(implicit ctx: Context): T = {
+    val savedRetractable = isRetractable
+    val savedConstraint = constraint
+
+    def rollbackConstraint() = resetConstraintTo(savedConstraint)
+
+    myIsRetractable = true
+    try op(() => rollbackConstraint())
+    catch {
+      case NonFatal(ex) =>
+        rollbackConstraint()
+        throw ex
+    }
+    finally {
+      myIsRetractable = savedRetractable
+      if (!isRetractable && needsGc)
+        gc()
+    }
+  }
+
   /** Test using `op`. If current typerstate is shared, run `op` in a fresh exploration
    *  typerstate. If it is unshared, run `op` in current typerState, restoring typerState
    *  to previous state afterwards.
@@ -98,8 +146,9 @@ class TyperState(previous: TyperState /* | Null */) {
       val savedConstraint = myConstraint
       val savedReporter = myReporter
       val savedCommittable = myIsCommittable
-      val savedCommitted = isCommitted
+      val savedRetractable = myIsRetractable
       myIsCommittable = false
+      myIsRetractable = true
       myReporter = {
         if (testReporter == null || testReporter.inUse) {
           testReporter = new TestReporter(reporter)
@@ -115,7 +164,7 @@ class TyperState(previous: TyperState /* | Null */) {
         resetConstraintTo(savedConstraint)
         myReporter = savedReporter
         myIsCommittable = savedCommittable
-        isCommitted = savedCommitted
+        myIsRetractable = savedRetractable
       }
     }
 
@@ -138,30 +187,42 @@ class TyperState(previous: TyperState /* | Null */) {
    * many parts of dotty itself.
    */
   def commit()(implicit ctx: Context): Unit = {
+    assert(!isCommitted)
     val targetState = ctx.typerState
-    assert(isCommittable)
-    targetState.constraint =
-      if (targetState.constraint eq previousConstraint) constraint
-      else targetState.constraint & (constraint, otherHasErrors = reporter.errorsReported)
-    constraint foreachTypeVar { tvar =>
-      if (tvar.owningState.get eq this) tvar.owningState = new WeakReference(targetState)
+    if (this ne targetState) {
+      assert(!isRetractable)
+      assert(isCommittable)
+      targetState.constraint =
+        if (targetState.constraint eq previousConstraint) constraint
+        else targetState.constraint & (constraint, otherHasErrors = reporter.errorsReported)
+      constraint foreachTypeVar { tvar =>
+        if (tvar.owningState.get eq this)
+          tvar.owningState = new WeakReference(targetState)
+
+        if ((tvar.owningState.get eq targetState) && ctx.typeComparer.instType(tvar).exists)
+          targetState.needsGc = true
+      }
+      targetState.ownedVars ++= ownedVars
+      if (!targetState.isRetractable && targetState.isCommittable)
+        targetState.gc()
+      reporter.flush()
+      isCommitted = true
     }
-    targetState.ownedVars ++= ownedVars
-    targetState.gc()
-    reporter.flush()
-    isCommitted = true
   }
 
   /** Make type variable instances permanent by assigning to `inst` field if
    *  type variable instantiation cannot be retracted anymore. Then, remove
    *  no-longer needed constraint entries.
    */
-  def gc()(implicit ctx: Context): Unit = {
+  private def gc()(implicit ctx: Context): Unit = {
+    assert(!isRetractable)
+    assert(isCommittable)
     val toCollect = new mutable.ListBuffer[TypeLambda]
     constraint foreachTypeVar { tvar =>
       if (!tvar.inst.exists) {
         val inst = ctx.typeComparer.instType(tvar)
         if (inst.exists && (tvar.owningState.get eq this)) {
+          assert(needsGc, s"$this - $tvar - $inst") // sanity check
           tvar.inst = inst
           val lam = tvar.origin.binder
           if (constraint.isRemovable(lam)) toCollect += lam
@@ -170,6 +231,8 @@ class TyperState(previous: TyperState /* | Null */) {
     }
     for (poly <- toCollect)
       constraint = constraint.remove(poly)
+
+    needsGc = false
   }
 
   override def toString: String = s"TS[$id]"

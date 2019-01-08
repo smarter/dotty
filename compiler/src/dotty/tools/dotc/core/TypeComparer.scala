@@ -29,28 +29,12 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
   implicit def ctx(implicit nc: AbsentContext): Context = initctx
 
   val state = ctx.typerState
-  def constraint: Constraint = state.constraint
-  def constraint_=(c: Constraint): Unit = state.constraint = c
+  protected def constraint: Constraint = state.constraint
+  protected def constraint_=(c: Constraint): Unit = state.unsafeSetConstraintTo(c)
 
   private[this] var pendingSubTypes: mutable.Set[(Type, Type)] = null
   private[this] var recCount = 0
   private[this] var monitored = false
-
-  private[this] var needsGc = false
-
-  /** Is a subtype check in progress? In that case we may not
-   *  permanently instantiate type variables, because the corresponding
-   *  constraint might still be retracted and the instantiation should
-   *  then be reversed.
-   */
-  def subtypeCheckInProgress: Boolean = {
-    val result = recCount > 0
-    if (result) {
-      constr.println("*** needsGC ***")
-      needsGc = true
-    }
-    result
-  }
 
   /** For statistics: count how many isSubTypes are part of successful comparisons */
   private[this] var successCount = 0
@@ -956,27 +940,26 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
     if (tp2 eq NoType) false
     else if (tp1 eq tp2) true
     else {
-      val saved = constraint
       val savedSuccessCount = successCount
-      try {
-        recCount = recCount + 1
-        if (recCount >= Config.LogPendingSubTypesThreshold) monitored = true
-        val result = if (monitored) monitoredIsSubType else firstTry
-        recCount = recCount - 1
-        if (!result) state.resetConstraintTo(saved)
-        else if (recCount == 0 && needsGc) {
-          state.gc()
-          needsGc = false
+      state.explore { rollbackConstraint =>
+        try {
+          recCount = recCount + 1
+          if (recCount >= Config.LogPendingSubTypesThreshold) monitored = true
+          val result = if (monitored) monitoredIsSubType else firstTry
+          recCount = recCount - 1
+          if (!result)
+            rollbackConstraint()
+          if (Stats.monitored)
+            recordStatistics(result, savedSuccessCount)
+          result
         }
-        if (Stats.monitored) recordStatistics(result, savedSuccessCount)
-        result
-      } catch {
-        case NonFatal(ex) =>
-          if (ex.isInstanceOf[AssertionError]) showGoal(tp1, tp2)
-          recCount -= 1
-          state.resetConstraintTo(saved)
-          successCount = savedSuccessCount
-          throw ex
+        catch {
+          case NonFatal(ex) =>
+            if (ex.isInstanceOf[AssertionError]) showGoal(tp1, tp2)
+            recCount -= 1
+            successCount = savedSuccessCount
+            throw ex
+        }
       }
     }
   }
@@ -1896,9 +1879,9 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
       }
     }
 
-    val saved = constraint
-    try {
-      inFrozenConstraint {
+    assert(caseLambda eq NoType)
+    inFrozenConstraint {
+      state.explore { rollbackConstraint =>
         val cas1 = cas match {
           case cas: HKTypeLambda =>
             caseLambda = constrained(cas)
@@ -1907,18 +1890,24 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
             cas
         }
         val defn.FunctionOf(pat :: Nil, body, _, _) = cas1
-        if (isSubType(scrut, pat))
-          caseLambda match {
-            case caseLambda: HKTypeLambda if instantiate =>
-              val instances = paramInstances(new Array(caseLambda.paramNames.length), pat)
-              instantiateParams(instances)(body)
-            case _ =>
-              body
-          }
-        else NoType
+        val res =
+          if (isSubType(scrut, pat))
+            caseLambda match {
+              case caseLambda: HKTypeLambda if instantiate =>
+                val instances = paramInstances(new Array(caseLambda.paramNames.length), pat)
+                instantiateParams(instances)(body)
+              case _ =>
+                body
+            }
+          else
+            NoType
+
+        // Unconditional rollback to remove any constraints related to `caseLambda`
+        rollbackConstraint()
+
+        res
       }
     }
-    finally constraint = saved
   }
 }
 
