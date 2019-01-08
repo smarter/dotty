@@ -472,6 +472,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     }
     yield poly.paramRefs(n)
 
+  def isEmpty: Boolean = boundsMap.size == 0
+
   def forallParams(p: TypeParamRef => Boolean): Boolean =
     boundsMap.forallBinding { (poly, entries) =>
       !0.until(paramCount(entries)).exists(i => isBounds(entries(i)) && !p(poly.paramRefs(i)))
