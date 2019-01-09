@@ -48,7 +48,7 @@ class TyperState(previous: TyperState /* | Null */) {
 
   /** Reset constraint to `c` and mark current constraint as retracted if it differs from `c` */
   def resetConstraintTo(c: Constraint): Unit = {
-    assert(isRetractable)
+    // assert(isRetractable)
     if (c `ne` myConstraint) myConstraint.markRetracted()
     myConstraint = c
   }
