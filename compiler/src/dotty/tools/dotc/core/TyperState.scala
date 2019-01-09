@@ -22,7 +22,7 @@ class TyperState(previous: TyperState /* | Null */) {
   val id: Int = TyperState.nextId
   TyperState.nextId += 1
 
-  private[this] var needsGc: Boolean = false
+  private/*[this]*/ var needsGc: Boolean = false
 
   private[this] var myReporter =
     if (previous == null) new ConsoleReporter() else previous.reporter
@@ -142,7 +142,8 @@ class TyperState(previous: TyperState /* | Null */) {
       finally {
         // Abstract these in a method that moves from Retractable -> Committable ?
         myIsRetractable = false
-        if (needsGc)
+        // Turned off for sanity check
+        // if (needsGc)
           gc()
       }
     }
@@ -210,6 +211,14 @@ class TyperState(previous: TyperState /* | Null */) {
         else targetState.constraint & (constraint, otherHasErrors = reporter.errorsReported)
       constraint foreachTypeVar { tvar =>
         if (tvar.owningState.get eq this) tvar.owningState = new WeakReference(targetState)
+
+        // FOR SANITY CHECK OF gc()
+        // Actually this is needed: if we're retractable then we'll need to gc later
+        if (tvar.owningState.get eq targetState) {
+          if (ctx.typeComparer.instType(tvar).exists) {
+            targetState.needsGc = true
+          }
+        }
       }
       targetState.ownedVars ++= ownedVars
       if (!targetState.isRetractable && targetState.isCommittable)
@@ -227,12 +236,12 @@ class TyperState(previous: TyperState /* | Null */) {
     TyperState.gcCount += 1
     assert(!isRetractable)
     assert(isCommittable)
-    needsGc = false
     val toCollect = new mutable.ListBuffer[TypeLambda]
     constraint foreachTypeVar { tvar =>
       if (!tvar.inst.exists) {
         val inst = ctx.typeComparer.instType(tvar)
         if (inst.exists && (tvar.owningState.get eq this)) {
+          assert(needsGc, s"$this - $tvar - $inst") // sanity check
           tvar.inst = inst
           val lam = tvar.origin.binder
           if (constraint.isRemovable(lam)) toCollect += lam
@@ -241,6 +250,8 @@ class TyperState(previous: TyperState /* | Null */) {
     }
     for (poly <- toCollect)
       constraint = constraint.remove(poly)
+
+    needsGc = false
   }
 
   override def toString: String = s"TS[$id]"
