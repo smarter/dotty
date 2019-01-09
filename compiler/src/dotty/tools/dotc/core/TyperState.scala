@@ -14,6 +14,7 @@ import scala.annotation.internal.sharable
 
 object TyperState {
   @sharable private var nextId: Int = 0
+  @sharable var gcCount: Int = 0
 }
 
 class TyperState(previous: TyperState /* | Null */) {
@@ -213,6 +214,7 @@ class TyperState(previous: TyperState /* | Null */) {
    *  no-longer needed constraint entries.
    */
   def gc()(implicit ctx: Context): Unit = {
+    TyperState.gcCount += 1
     assert(!isRetractable)
     assert(isCommittable)
     val toCollect = new mutable.ListBuffer[TypeLambda]
