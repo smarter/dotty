@@ -64,7 +64,12 @@ class TyperState(previous: TyperState /* | Null */) {
   /** Rename to isTemporary, meaning will never be committed */
   def isCommittable: Boolean = myIsCommittable
 
-  def setCommittable(committable: Boolean): this.type = { this.myIsCommittable = committable; this }
+  def setCommittable(committable: Boolean): this.type = {
+    this.myIsCommittable = committable
+    if (!committable)
+      this.myIsRetractable = true
+    this
+  }
 
   def isGlobalCommittable: Boolean =
     isCommittable && (previous == null || previous.isGlobalCommittable)
@@ -119,13 +124,14 @@ class TyperState(previous: TyperState /* | Null */) {
     //     opCtx.typerState.commit(/*XX: this*/)
     //   }
     else {
+      assert(isCommittable)
       val savedConstraint = constraint
       myIsRetractable = true
       try op(ctx)
       finally {
         // Abstract these in a method that moves from Retractable -> Committable ?
         myIsRetractable = false
-        if (constraint ne savedConstraint)
+        if ((constraint ne savedConstraint))
           gc()
       }
     }

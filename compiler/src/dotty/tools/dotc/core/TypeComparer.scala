@@ -960,7 +960,6 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
           case NonFatal(ex) =>
             if (ex.isInstanceOf[AssertionError]) showGoal(tp1, tp2)
             recCount -= 1
-            println("ctx: " + ctx.typerState + " " + ctx.typerState.isRetractable)
             state.resetConstraintTo(saved)
             successCount = savedSuccessCount
             throw ex
