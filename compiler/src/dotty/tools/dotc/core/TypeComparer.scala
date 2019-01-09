@@ -1883,7 +1883,7 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
       }
     }
 
-    state.retractable { implicit ctx =>
+    // state.retractable { implicit ctx =>
       val saved = constraint
       try {
         inFrozenConstraint {
@@ -1907,7 +1907,7 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
         }
       }
       finally state.resetConstraintTo(saved)
-    }
+    // }
   }
 }
 
