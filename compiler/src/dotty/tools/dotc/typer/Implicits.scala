@@ -580,9 +580,9 @@ trait Implicits { self: Typer =>
     && (ctx.mode is Mode.ImplicitsEnabled)
     && from.isValueType
     && (  from.isValueSubType(to)
-       || inferView(dummyTreeOfType(from), to)
-            (ctx.fresh.addMode(Mode.ImplicitExploration).setExploreTyperState()).isSuccess
-          // TODO: investigate why we can't TyperState#test here
+        || ctx.fresh.addMode(Mode.ImplicitExploration).test { implicit ctx =>
+             inferView(dummyTreeOfType(from), to).isSuccess
+           }
        )
     )
 
