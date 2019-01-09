@@ -116,6 +116,14 @@ class TyperState(previous: TyperState /* | Null */) {
 
   private[this] var testReporter: TestReporter = null
 
+  // def explore[T](op: (() => Unit) => T)(implicit ctx: Context): T = {
+  //   def rollbackConstraint() = resetConstraintTo(savedConstraint)
+  //   op(() => rollbackConstraint())
+  // }
+  // ctx.typerState.explore { rollbackConstraint =>
+  //    // ...
+  //    rollbackConstraint()
+  // }
   def retractable[T](op: Context => T)(implicit ctx: Context): T = {
     // assert(!isShared)
     if (isRetractable)
