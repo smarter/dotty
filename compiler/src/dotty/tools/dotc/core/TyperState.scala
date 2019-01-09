@@ -22,6 +22,8 @@ class TyperState(previous: TyperState /* | Null */) {
   val id: Int = TyperState.nextId
   TyperState.nextId += 1
 
+  private[this] var needsGc: Boolean = false
+
   private[this] var myReporter =
     if (previous == null) new ConsoleReporter() else previous.reporter
 
@@ -60,8 +62,12 @@ class TyperState(previous: TyperState /* | Null */) {
 
   def tryInstantiate(tvar: TypeVar, tp: Type)(implicit ctx: Context): Unit = {
     assert(!tvar.isInstantiated)
-    if (ctx.typerState == tvar.owningState.get && isCommittable && !isRetractable)
-      tvar.inst = tp
+    if (ctx.typerState == tvar.owningState.get) {
+      if (isCommittable && !isRetractable)
+        tvar.inst = tp
+      else if (isCommittable)
+        needsGc = true
+    }
   }
 
   private[this] var myIsCommittable = true
@@ -136,7 +142,7 @@ class TyperState(previous: TyperState /* | Null */) {
       finally {
         // Abstract these in a method that moves from Retractable -> Committable ?
         myIsRetractable = false
-        if ((constraint ne savedConstraint))
+        if (needsGc)
           gc()
       }
     }
@@ -221,6 +227,7 @@ class TyperState(previous: TyperState /* | Null */) {
     TyperState.gcCount += 1
     assert(!isRetractable)
     assert(isCommittable)
+    needsGc = false
     val toCollect = new mutable.ListBuffer[TypeLambda]
     constraint foreachTypeVar { tvar =>
       if (!tvar.inst.exists) {
