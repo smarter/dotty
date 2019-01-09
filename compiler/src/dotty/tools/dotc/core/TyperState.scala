@@ -35,8 +35,12 @@ class TyperState(previous: TyperState /* | Null */) {
     else previous.constraint
 
   def constraint: Constraint = myConstraint
-  def constraint_=(c: Constraint)(implicit ctx: Context): Unit = {
+  protected def constraint_=(c: Constraint)(implicit ctx: Context): Unit = {
     if (Config.debugCheckConstraintsClosed && isGlobalCommittable) c.checkClosed()
+    myConstraint = c
+  }
+
+  def unsafeSetConstraintTo(c: Constraint): Unit = {
     myConstraint = c
   }
 

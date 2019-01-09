@@ -29,8 +29,8 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
   implicit def ctx(implicit nc: AbsentContext): Context = initctx
 
   val state = ctx.typerState
-  def constraint: Constraint = state.constraint
-  def constraint_=(c: Constraint): Unit = state.constraint = c
+  protected def constraint: Constraint = state.constraint
+  protected def constraint_=(c: Constraint): Unit = state.unsafeSetConstraintTo(c)
 
   private[this] var pendingSubTypes: mutable.Set[(Type, Type)] = null
   private[this] var recCount = 0
