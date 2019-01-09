@@ -100,25 +100,36 @@ class TyperState(previous: TyperState /* | Null */) {
 
   private[this] var testReporter: TestReporter = null
 
-  def retractable[T](op: Context => T)(implicit ctx: Context): T =
+  def retractable[T](op: Context => T)(implicit ctx: Context): T = {
+    // assert(!isShared)
     if (isRetractable)
       op(ctx)
-    else if (isShared) {
-      val opCtx = ctx.fresh.setNewTyperState() // XX: use this instead of ctx.typerState, same for test
-      opCtx.typerState.myIsRetractable = true // child of retractable should automatically be retractable
-      try op(opCtx)
-      finally opCtx.typerState.commit(/*XX: this*/)
-    } else {
+    // else if (isShared) {
+    //   assert(this == ctx.typerState)
+
+    //   val opCtx = ctx.fresh.setNewTyperState() // XX: use this instead of ctx.typerState, same for test
+    //   println("new: " + opCtx.typerState)
+    //   opCtx.typerState.myIsRetractable = true // child of retractable should automatically be retractable
+    //   try op(opCtx)
+    //   finally {
+    //     opCtx.typerState.myIsRetractable = false
+    //     if (opCtx.typerState.constraint ne constraint)
+    //       opCtx.typerState.gc()
+
+    //     opCtx.typerState.commit(/*XX: this*/)
+    //   }
+    else {
       val savedConstraint = constraint
       myIsRetractable = true
       try op(ctx)
       finally {
-        // Abstract these three lines in a method that moves from Retractable -> Committable
+        // Abstract these in a method that moves from Retractable -> Committable ?
         myIsRetractable = false
         if (constraint ne savedConstraint)
           gc()
       }
     }
+  }
 
   /** Test using `op`. If current typerstate is shared, run `op` in a fresh exploration
    *  typerstate. If it is unshared, run `op` in current typerState, restoring typerState
@@ -174,6 +185,7 @@ class TyperState(previous: TyperState /* | Null */) {
   def commit()(implicit ctx: Context): Unit = {
     assert(!isCommitted)
     assert(!isRetractable)
+    assert(isCommittable)
     val targetState = ctx.typerState
     targetState.constraint =
       if (targetState.constraint eq previousConstraint) constraint
@@ -182,7 +194,7 @@ class TyperState(previous: TyperState /* | Null */) {
       if (tvar.owningState.get eq this) tvar.owningState = new WeakReference(targetState)
     }
     targetState.ownedVars ++= ownedVars
-    if (!targetState.isRetractable)
+    if (!targetState.isRetractable && targetState.isCommittable)
       targetState.gc()
     reporter.flush()
     isCommitted = true
@@ -193,7 +205,8 @@ class TyperState(previous: TyperState /* | Null */) {
    *  no-longer needed constraint entries.
    */
   def gc()(implicit ctx: Context): Unit = {
-    assert(!isRetractable && isCommittable)
+    assert(!isRetractable)
+    assert(isCommittable)
     val toCollect = new mutable.ListBuffer[TypeLambda]
     constraint foreachTypeVar { tvar =>
       if (!tvar.inst.exists) {
