@@ -36,22 +36,6 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
   private[this] var recCount = 0
   private[this] var monitored = false
 
-  private[this] var needsGc = false
-
-  /** Is a subtype check in progress? In that case we may not
-   *  permanently instantiate type variables, because the corresponding
-   *  constraint might still be retracted and the instantiation should
-   *  then be reversed.
-   */
-  def subtypeCheckInProgress: Boolean = {
-    val result = recCount > 0
-    if (result) {
-      constr.println("*** needsGC ***")
-      needsGc = true
-    }
-    result
-  }
-
   /** For statistics: count how many isSubTypes are part of successful comparisons */
   private[this] var successCount = 0
   private[this] var totalCount = 0

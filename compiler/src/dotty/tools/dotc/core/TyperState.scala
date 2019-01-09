@@ -55,7 +55,7 @@ class TyperState(previous: TyperState /* | Null */) {
 
   def tryInstantiate(tvar: TypeVar, tp: Type)(implicit ctx: Context): Unit = {
     assert(!tvar.isInstantiated)
-    if (ctx.typerState == tvar.owningState.get && !isRetractable)
+    if (ctx.typerState == tvar.owningState.get && isCommittable && !isRetractable)
       tvar.inst = tp
   }
 
