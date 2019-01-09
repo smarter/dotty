@@ -190,20 +190,22 @@ class TyperState(previous: TyperState /* | Null */) {
    */
   def commit()(implicit ctx: Context): Unit = {
     assert(!isCommitted)
-    assert(!isRetractable)
-    assert(isCommittable)
     val targetState = ctx.typerState
-    targetState.constraint =
-      if (targetState.constraint eq previousConstraint) constraint
-      else targetState.constraint & (constraint, otherHasErrors = reporter.errorsReported)
-    constraint foreachTypeVar { tvar =>
-      if (tvar.owningState.get eq this) tvar.owningState = new WeakReference(targetState)
+    if (this ne targetState) {
+      assert(!isRetractable)
+      assert(isCommittable)
+      targetState.constraint =
+        if (targetState.constraint eq previousConstraint) constraint
+        else targetState.constraint & (constraint, otherHasErrors = reporter.errorsReported)
+      constraint foreachTypeVar { tvar =>
+        if (tvar.owningState.get eq this) tvar.owningState = new WeakReference(targetState)
+      }
+      targetState.ownedVars ++= ownedVars
+      if (!targetState.isRetractable && targetState.isCommittable)
+        targetState.gc()
+      reporter.flush()
+      isCommitted = true
     }
-    targetState.ownedVars ++= ownedVars
-    if (!targetState.isRetractable && targetState.isCommittable)
-      targetState.gc()
-    reporter.flush()
-    isCommitted = true
   }
 
   /** Make type variable instances permanent by assigning to `inst` field if
