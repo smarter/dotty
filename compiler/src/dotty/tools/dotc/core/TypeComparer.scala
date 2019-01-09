@@ -942,7 +942,7 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
     else {
       val saved = constraint
       val savedSuccessCount = successCount
-      ctx.typerState.retractable { implicit ctx =>
+      state.retractable { implicit ctx =>
         try {
           recCount = recCount + 1
           if (recCount >= Config.LogPendingSubTypesThreshold) monitored = true
@@ -1883,29 +1883,31 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
       }
     }
 
-    val saved = constraint
-    try {
-      inFrozenConstraint {
-        val cas1 = cas match {
-          case cas: HKTypeLambda =>
-            caseLambda = constrained(cas)
-            caseLambda.resultType
-          case _ =>
-            cas
-        }
-        val defn.FunctionOf(pat :: Nil, body, _, _) = cas1
-        if (isSubType(scrut, pat))
-          caseLambda match {
-            case caseLambda: HKTypeLambda if instantiate =>
-              val instances = paramInstances(new Array(caseLambda.paramNames.length), pat)
-              instantiateParams(instances)(body)
+    state.retractable { implicit ctx =>
+      val saved = constraint
+      try {
+        inFrozenConstraint {
+          val cas1 = cas match {
+            case cas: HKTypeLambda =>
+              caseLambda = constrained(cas)
+              caseLambda.resultType
             case _ =>
-              body
+              cas
           }
-        else NoType
+          val defn.FunctionOf(pat :: Nil, body, _, _) = cas1
+          if (isSubType(scrut, pat))
+            caseLambda match {
+              case caseLambda: HKTypeLambda if instantiate =>
+                val instances = paramInstances(new Array(caseLambda.paramNames.length), pat)
+                instantiateParams(instances)(body)
+              case _ =>
+                body
+            }
+            else NoType
+        }
       }
+      finally state.resetConstraintTo(saved)
     }
-    finally constraint = saved
   }
 }
 
