@@ -958,25 +958,29 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
     else {
       val saved = constraint
       val savedSuccessCount = successCount
-      try {
-        recCount = recCount + 1
-        if (recCount >= Config.LogPendingSubTypesThreshold) monitored = true
-        val result = if (monitored) monitoredIsSubType else firstTry
-        recCount = recCount - 1
-        if (!result) state.resetConstraintTo(saved)
-        else if (recCount == 0 && needsGc) {
-          state.gc()
-          needsGc = false
+      ctx.typerState.retractable { implicit ctx =>
+        try {
+          recCount = recCount + 1
+          if (recCount >= Config.LogPendingSubTypesThreshold) monitored = true
+          val result = if (monitored) monitoredIsSubType else firstTry
+          recCount = recCount - 1
+          if (!result) state.resetConstraintTo(saved)
+          // else if (recCount == 0 && needsGc) {
+          //   state.gc()
+          //   needsGc = false
+          // }
+          if (Stats.monitored) recordStatistics(result, savedSuccessCount)
+          result
         }
-        if (Stats.monitored) recordStatistics(result, savedSuccessCount)
-        result
-      } catch {
-        case NonFatal(ex) =>
-          if (ex.isInstanceOf[AssertionError]) showGoal(tp1, tp2)
-          recCount -= 1
-          state.resetConstraintTo(saved)
-          successCount = savedSuccessCount
-          throw ex
+        catch {
+          case NonFatal(ex) =>
+            if (ex.isInstanceOf[AssertionError]) showGoal(tp1, tp2)
+            recCount -= 1
+            println("ctx: " + ctx.typerState + " " + ctx.typerState.isRetractable)
+            state.resetConstraintTo(saved)
+            successCount = savedSuccessCount
+            throw ex
+        }
       }
     }
   }
