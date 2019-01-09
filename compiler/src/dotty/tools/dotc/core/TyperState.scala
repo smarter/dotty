@@ -86,8 +86,8 @@ class TyperState(previous: TyperState /* | Null */) {
   private[this] var isCommitted = false
 
   /** A fresh typer state with the same constraint as this one. */
-  def fresh(): TyperState =
-    new TyperState(this).setReporter(new StoreReporter(reporter)).setCommittable(isCommittable)
+  def fresh(committable: Boolean): TyperState =
+    new TyperState(this).setReporter(new StoreReporter(reporter)).setCommittable(committable)
 
   /** The uninstantiated variables */
   def uninstVars: Seq[TypeVar] = constraint.uninstVars
