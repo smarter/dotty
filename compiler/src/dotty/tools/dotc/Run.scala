@@ -183,7 +183,7 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
             for (unit <- units)
               Stats.record(s"retained typed trees at end of $phase", unit.tpdTree.treeSize)
           }
-      println("#GC: " + TyperState.gcCount)
+      // println("#GC: " + TyperState.gcCount)
 
       profiler.finished()
     }
