@@ -232,7 +232,7 @@ class TyperState(previous: TyperState /* | Null */) {
    *  type variable instantiation cannot be retracted anymore. Then, remove
    *  no-longer needed constraint entries.
    */
-  def gc()(implicit ctx: Context): Unit = {
+  private def gc()(implicit ctx: Context): Unit = {
     TyperState.gcCount += 1
     assert(!isRetractable)
     assert(isCommittable)
