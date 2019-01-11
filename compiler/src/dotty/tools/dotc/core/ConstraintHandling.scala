@@ -187,12 +187,14 @@ trait ConstraintHandling[AbstractContext] {
   }
 
   @forceInline final def inFrozenConstraint[T](op: => T): T = {
+    val savedConstraint = constraint
     val savedFrozen = frozenConstraint
     val savedLambda = caseLambda
     frozenConstraint = true
     caseLambda = NoType
     try op
     finally {
+      assert(savedConstraint eq constraint, s"saved: $constraint, new: $constraint")
       frozenConstraint = savedFrozen
       caseLambda = savedLambda
     }
