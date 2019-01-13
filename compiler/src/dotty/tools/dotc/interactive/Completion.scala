@@ -210,7 +210,7 @@ object Completion {
       addAccessibleMembers(qual.tpe)
       if (!mode.is(Mode.Import)) {
         // Implicit conversions do not kick in when importing
-        implicitConversionTargets(qual)(ctx.fresh.setExploreTyperState())
+        implicitConversionTargets(qual)(ctx.fresh.setDisposableTyperState())
           .foreach(addAccessibleMembers)
       }
     }

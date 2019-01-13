@@ -93,7 +93,7 @@ class TyperState(previous: TyperState /* | Null */) {
    */
   def test[T](op: Context => T)(implicit ctx: Context): T =
     if (isShared)
-      op(ctx.fresh.setExploreTyperState())
+      op(ctx.fresh.setDisposableTyperState())
     else {
       val savedConstraint = myConstraint
       val savedReporter = myReporter

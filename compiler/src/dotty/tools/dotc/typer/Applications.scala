@@ -1222,7 +1222,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
         isApplicable(alt2, formals1, WildcardType) ||
         tp1.paramInfos.isEmpty && tp2.isInstanceOf[LambdaType]
       case tp1: PolyType => // (2)
-        val nestedCtx = ctx.fresh.setExploreTyperState()
+        val nestedCtx = ctx.fresh.setDisposableTyperState()
 
         {
           implicit val ctx = nestedCtx

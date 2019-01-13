@@ -581,7 +581,7 @@ trait Implicits { self: Typer =>
     && from.isValueType
     && (  from.isValueSubType(to)
        || inferView(dummyTreeOfType(from), to)
-            (ctx.fresh.addMode(Mode.ImplicitExploration).setExploreTyperState()).isSuccess
+            (ctx.fresh.addMode(Mode.ImplicitExploration).setDisposableTyperState()).isSuccess
           // TODO: investigate why we can't TyperState#test here
        )
     )
@@ -976,7 +976,7 @@ trait Implicits { self: Typer =>
             val SelectionProto(name: TermName, mbrType, _, _) = pt
             val result = extMethodApply(untpd.Select(untpdGenerated, name), argument, mbrType)
             if (!ctx.reporter.hasErrors && cand.isConversion) {
-              val testCtx = ctx.fresh.setExploreTyperState()
+              val testCtx = ctx.fresh.setDisposableTyperState()
               tryConversion(testCtx)
               if (testCtx.reporter.hasErrors)
                 ctx.error(em"ambiguous implicit: $generated is eligible both as an implicit conversion and as an extension method container")
@@ -987,7 +987,7 @@ trait Implicits { self: Typer =>
         }
       lazy val shadowing =
         typedUnadapted(untpd.Ident(cand.implicitRef.implicitName) withPos pos.toSynthetic)(
-          nestedContext().addMode(Mode.ImplicitShadowing).setExploreTyperState())
+          nestedContext().addMode(Mode.ImplicitShadowing).setDisposableTyperState())
 
       /** Is candidate reference the same as the `shadowing` reference? (i.e.
        *  no actual shadowing occured). This is the case if the
