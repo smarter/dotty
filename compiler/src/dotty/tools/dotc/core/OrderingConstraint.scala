@@ -434,8 +434,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       }
 
       typeVarOfParam(param) match {
-        case tvar: TypeVar if !tvar.isInstantiated && tvar.owningState != null =>
-          ctx.typerState.tryInstantiate(tvar, tp)
+        case tvar: TypeVar if !tvar.isInstantiated =>
+          ctx.typerState.recordInstantiation(tvar, tp)
         case _ =>
       }
 

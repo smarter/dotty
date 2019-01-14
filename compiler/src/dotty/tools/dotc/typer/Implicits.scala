@@ -1144,7 +1144,7 @@ trait Implicits { self: Typer =>
           result match {
             case _: SearchFailure =>
               SearchSuccess(ref(defn.Not_value), defn.Not_value.termRef, 0)(
-                ctx.typerState.fresh(committable = true),
+                ctx.typerState.fresh(TyperState.Mode.Committable),
                 ctx.gadt
               )
             case _: SearchSuccess =>

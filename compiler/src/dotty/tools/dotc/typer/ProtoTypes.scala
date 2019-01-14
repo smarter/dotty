@@ -464,8 +464,8 @@ object ProtoTypes {
     val state = ctx.typerState
     val addTypeVars = alwaysAddTypeVars || !owningTree.isEmpty
     if (tl.isInstanceOf[PolyType])
-      assert(!(ctx.typerState.isCommittable && !addTypeVars),
-        s"inconsistent: no typevars were added to committable constraint ${state.constraint}")
+      assert(!(ctx.typerState.isRetainable && !addTypeVars),
+        s"inconsistent: no typevars were added to retainable constraint ${state.constraint}")
       // hk type lambdas can be added to constraints without typevars during match reduction
 
     def newTypeVars(tl: TypeLambda): List[TypeTree] =

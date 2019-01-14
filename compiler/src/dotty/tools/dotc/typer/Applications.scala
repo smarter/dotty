@@ -277,7 +277,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
 
     def ok: Boolean = _ok
     def ok_=(x: Boolean): Unit = {
-      assert(x || ctx.reporter.errorsReported || !ctx.typerState.isCommittable) // !!! DEBUG
+      assert(x || ctx.reporter.errorsReported || !ctx.typerState.isRetainable) // !!! DEBUG
       _ok = x
     }
 
@@ -311,7 +311,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
         // apply the result type constraint, unless method type is dependent
         val resultApprox = resultTypeApprox(methType)
         if (!constrainResult(methRef.symbol, resultApprox, resultType))
-          if (ctx.typerState.isCommittable)
+          if (ctx.typerState.isRetainable)
             // defer the problem until after the application;
             // it might be healed by an implicit conversion
             ()

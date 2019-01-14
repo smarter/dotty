@@ -118,7 +118,7 @@ trait ConstraintHandling[AbstractContext] {
 
   protected def addUpperBound(param: TypeParamRef, bound: Type)(implicit actx: AbstractContext): Boolean = {
     def description = i"constraint $param <: $bound to\n$constraint"
-    if (bound.isRef(defn.NothingClass) && ctx.typerState.isGlobalCommittable) {
+    if (bound.isRef(defn.NothingClass) && ctx.typerState.isGlobalRetainable) {
       def msg = s"!!! instantiated to Nothing: $param, constraint = ${constraint.show}"
       if (Config.failOnInstantiationToNothing) assert(false, msg)
       else ctx.log(msg)

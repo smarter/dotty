@@ -310,7 +310,7 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] {
         thirdTry
       case tp1: TypeParamRef =>
         def flagNothingBound = {
-          if (!frozenConstraint && tp2.isRef(NothingClass) && state.isGlobalCommittable) {
+          if (!frozenConstraint && tp2.isRef(NothingClass) && state.isGlobalRetainable) {
             def msg = s"!!! instantiated to Nothing: $tp1, constraint = ${constraint.show}"
             if (Config.failOnInstantiationToNothing) assert(false, msg)
             else ctx.log(msg)
