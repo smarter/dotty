@@ -37,10 +37,6 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
   def mode: Mode = myMode
 
   private def transitionModeTo(newMode: Mode)(implicit ctx: Context): Unit = {
-    if (this.id == 29) {
-      System.err.println(s"#T: $mode --> $newMode")
-      Thread.dumpStack
-    }
     (mode, newMode) match {
       case (Committable, n) if n != Dirty =>
       case (Explore, Committable) =>
@@ -49,10 +45,12 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
       case (Dirty, Committable) =>
         // gc() // done upstream
       case (Dirty, Explore) =>
+      case (Dirty, Test) =>
       case (Test, Committable) =>
       case (Test, Explore) =>
+      case (Test, Dirty) =>
       case _ =>
-        assert(mode == newMode && mode != Committed, s"Invalid transition from $mode to $newMode")
+        assert(mode == newMode && mode != Committed, s"$this: Invalid transition from $mode to $newMode")
     }
     myMode = newMode
   }
@@ -79,7 +77,7 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
 
   /** Reset constraint to `c` and mark current constraint as retracted if it differs from `c` */
   def resetConstraintTo(c: Constraint): Unit = {
-    assert(mode == Explore)
+    assert(mode == Explore || mode == Dirty || mode == Test, s"Invalid mode: $this $mode")
     if (c `ne` myConstraint) myConstraint.markRetracted()
     myConstraint = c
   }
@@ -92,7 +90,7 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
    *  @pre `tvar` has not been instantiated yet.
    */
   private[core] def recordInstantiation(tvar: TypeVar, tp: Type)(implicit ctx: Context): Unit = {
-    assert(!tvar.isInstantiated)
+    assert(!tvar.inst.exists, s"$this: tryInstantiate($tvar, $tp) but tvar.inst = ${tvar.inst}")
     if (ownedVarsContains(tvar))
       mode match {
         case Committable =>
@@ -148,32 +146,33 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
     if (mode != Dirty)
       transitionModeTo(Explore)
 
-    try op(() => rollbackConstraint())
-    catch {
-      case NonFatal(ex) =>
-        rollbackConstraint()
-        myMode = savedMode
-        throw ex
-    }
-    finally {
-      assert(mode == Explore || mode == Dirty, s"$this: $mode")
-      val needsGc = mode == Dirty && (savedConstraint ne constraint)
-      savedMode match {
-        case Committable =>
-          if (needsGc)
-            gc()
-          transitionModeTo(savedMode)
-        case Explore =>
-          if (!needsGc)
-            transitionModeTo(savedMode)
-        case Dirty =>
-          assert(mode == Dirty)
-        case Test =>
-          transitionModeTo(savedMode)
-        case Committed =>
-          assert(false, "unreachable")
+    val ret =
+      try op(() => rollbackConstraint())
+      catch {
+        case NonFatal(ex) =>
+          rollbackConstraint()
+          myMode = savedMode
+          throw ex
       }
+
+    assert(mode == Explore || mode == Dirty, s"$this: $mode")
+    val needsGc = mode == Dirty && (savedConstraint ne constraint)
+    savedMode match {
+      case Committable =>
+        if (needsGc)
+          gc()
+        transitionModeTo(savedMode)
+      case Explore =>
+        if (!needsGc)
+          transitionModeTo(savedMode)
+      case Dirty =>
+        assert(mode == Dirty)
+      case Test =>
+        transitionModeTo(savedMode)
+      case Committed =>
+        assert(false, "unreachable")
     }
+    ret
   }
 
   /** Test using `op`. If current typerstate is shared, run `op` in a fresh disposable
@@ -227,24 +226,25 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
   def commit()(implicit ctx: Context): Unit = {
     val targetState = ctx.typerState
     if (this ne targetState) {
+      reporter.flush()
       transitionModeTo(Committed)
+
       targetState.constraint =
         if (targetState.constraint eq previousConstraint) constraint
         else targetState.constraint & (constraint, otherHasErrors = reporter.errorsReported)
 
       targetState.ownedVars ++= ownedVars
 
+      var needsGc = false
       constraint foreachTypeVar { tvar =>
         if (tvar.owningState.get eq this)
           tvar.owningState = new WeakReference(targetState)
 
-        if ((tvar.owningState.get eq targetState)) {
-          val inst = ctx.typeComparer.instType(tvar)
-          if (inst.exists)
-            targetState.recordInstantiation(tvar, inst)
-        }
+        if ((tvar.owningState.get eq targetState) && ctx.typeComparer.instType(tvar).exists)
+          needsGc = true
       }
-      reporter.flush()
+      if (needsGc)
+        targetState.gc()
     }
   }
 
