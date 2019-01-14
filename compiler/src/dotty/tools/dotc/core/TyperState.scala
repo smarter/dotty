@@ -49,6 +49,8 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
       case (Test, Committable) =>
       case (Test, Explore) =>
       case (Test, Dirty) =>
+      case (Committed, Explore) => // for error messages
+      case (Explore, Committed) => // for error messages
       case _ =>
         assert(mode == newMode && mode != Committed, s"$this: Invalid transition from $mode to $newMode")
     }
@@ -170,7 +172,8 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
       case Test =>
         transitionModeTo(savedMode)
       case Committed =>
-        assert(false, "unreachable")
+        assert(!needsGc)
+        transitionModeTo(savedMode)
     }
     ret
   }
