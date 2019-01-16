@@ -217,9 +217,6 @@ object ProtoTypes {
     /** A map recording the typer states and constraints in which arguments stored in myTypedArg were typed */
     var evalState: SimpleIdentityMap[untpd.Tree, (TyperState, Constraint)] = SimpleIdentityMap.Empty
 
-    /** The tupled version of this prototype, if it has been computed */
-    var tupled: Type = NoType
-
     /** If true, the application of this prototype was canceled. */
     var toDrop: Boolean = false
   }
@@ -316,17 +313,19 @@ object ProtoTypes {
       if (t == null) NoType else t.tpe
     }
 
+    private var myTupled: Type = NoType
     /** The same proto-type but with all arguments combined in a single tuple */
-    def tupled: FunProto = state.tupled match {
+    def tupled: FunProto = myTupled match {
       case pt: FunProto =>
         pt
       case _ =>
-        state.tupled = new FunProto(untpd.Tuple(args) :: Nil, resultType)(typer)
-        tupled
+        val pt = new FunProto(untpd.Tuple(args) :: Nil, resultType)(typer)
+        myTupled = pt
+        pt
     }
 
     /** Somebody called the `tupled` method of this prototype */
-    def isTupled: Boolean = state.tupled.isInstanceOf[FunProto]
+    def isTupled: Boolean = myTupled.isInstanceOf[FunProto]
 
     /** Cancel the application of this prototype. This can happen for a nullary
      *  application `f()` if `f` refers to a symbol that exists both in parameterless
@@ -356,7 +355,12 @@ object ProtoTypes {
 
     override def withContext(newCtx: Context): ProtoType =
       if (newCtx `eq` ctx) this
-      else new FunProto(args, resType)(typer, state)(newCtx)
+      else {
+        val pt2 = new FunProto(args, resType)(typer, state)(newCtx)
+        if (myTupled.exists)
+          pt2.myTupled = myTupled.asInstanceOf[FunProto].withContext(newCtx)
+        pt2
+      }
   }
 
   /** A prototype for expressions that appear in function position
