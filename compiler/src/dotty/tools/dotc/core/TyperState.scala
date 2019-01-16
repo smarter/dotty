@@ -65,7 +65,7 @@ class TyperState(previous: TyperState /* | Null */) {
    */
   def markShared(): Unit = isShared = true
 
-  private[this] var isCommitted = false
+  var isCommitted = false
 
   /** A fresh typer state with the same constraint as this one. */
   def fresh(): TyperState =
