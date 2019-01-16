@@ -105,7 +105,8 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
 
   /** Reset constraint to `c` and mark current constraint as retracted if it differs from `c` */
   def resetConstraintTo(c: Constraint): Unit = {
-    assert(mode == Explore || mode == Dirty || mode == Test, s"Invalid mode: $this $mode")
+    assert(mode == Explore || mode == Dirty || mode == Test || (mode == Committed && c == myConstraint),
+      s"Invalid mode: $this $mode")
     if (c `ne` myConstraint) myConstraint.markRetracted()
     myConstraint = c
   }
@@ -175,7 +176,7 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
     def rollbackConstraint() = resetConstraintTo(savedConstraint)
 
     // XX: In a Test, we should not transition, otherwise isRetainable changes value
-    if (mode != Dirty && mode != Test) {
+    if (mode != Dirty && mode != Test && mode != Committed) {
       checkInvariants()
       transitionModeTo(Explore)
     }
@@ -192,7 +193,7 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
 
     // XX: add no need gc sanity check
 
-    assert(mode == Explore || mode == Dirty || mode == Test, s"$this: $mode")
+    assert(mode == Explore || mode == Dirty || mode == Test || mode == Committed, s"$this: $mode")
     val needsGc = mode == Dirty && (savedConstraint ne constraint)
     savedMode match {
       case Committable =>
@@ -213,9 +214,8 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
       case Test =>
         assert(mode == Test)
       case Committed =>
-        assert(!needsGc)
+        assert(mode == Committed)
         checkNoGc()
-        transitionModeTo(savedMode)
     }
     checkInvariants()
     ret
@@ -272,6 +272,7 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
   def commit()(implicit ctx: Context): Unit = {
     val targetState = ctx.typerState
     if (this ne targetState) {
+      // println(i"$this COMMIT START: $constraint")
       // reporter.flush()
       transitionModeTo(Committed)
 
@@ -299,6 +300,7 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
       } else if (targetState.mode == Committable)
         targetState.checkNoGc()
 
+      // println(i"$this COMMIT PREFLUSH: $constraint")
       reporter.flush()
     }
   }
@@ -338,7 +340,9 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
   }
 
   private def checkInvariants()(implicit ctx: Context): Unit = {
-    if (inconsistent)
+    // if Committed, we might still end up doing explorations etc and have tvars which are instantiated
+    // proper fix: make frozen really frozen, ensure Commmitted only happen when frozen.
+    if (inconsistent || mode == Committed)
       return
     constraint foreachTypeVarComplete { tvar =>
       if (tvar.inst.exists) {
