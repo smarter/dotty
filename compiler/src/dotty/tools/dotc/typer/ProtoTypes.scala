@@ -219,6 +219,8 @@ object ProtoTypes {
 
     /** If true, the application of this prototype was canceled. */
     var toDrop: Boolean = false
+
+    var wasTupled: Boolean = false
   }
 
   /** A prototype for expressions that appear in function position
@@ -227,6 +229,8 @@ object ProtoTypes {
    */
   case class FunProto(args: List[untpd.Tree], resType: Type)(typer: Typer, state: FunProtoState = new FunProtoState)(implicit ctx: Context)
   extends UncachedGroundType with ApplyingProto with FunOrPolyProto {
+    assert(!ctx.typerState.isCommitted)
+
     override def resultType(implicit ctx: Context): Type = resType
 
     def isMatchedBy(tp: Type)(implicit ctx: Context): Boolean =
@@ -321,11 +325,12 @@ object ProtoTypes {
       case _ =>
         val pt = new FunProto(untpd.Tuple(args) :: Nil, resultType)(typer)
         myTupled = pt
+        state.wasTupled = true
         pt
     }
 
     /** Somebody called the `tupled` method of this prototype */
-    def isTupled: Boolean = myTupled.isInstanceOf[FunProto]
+    def isTupled: Boolean = state.wasTupled
 
     /** Cancel the application of this prototype. This can happen for a nullary
      *  application `f()` if `f` refers to a symbol that exists both in parameterless
@@ -357,8 +362,8 @@ object ProtoTypes {
       if (newCtx `eq` ctx) this
       else {
         val pt2 = new FunProto(args, resType)(typer, state)(newCtx)
-        if (myTupled.exists)
-          pt2.myTupled = myTupled.asInstanceOf[FunProto].withContext(newCtx)
+        // if (myTupled.exists)
+        //   pt2.myTupled = myTupled.asInstanceOf[FunProto].withContext(newCtx)
         pt2
       }
   }
