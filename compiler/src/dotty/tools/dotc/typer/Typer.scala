@@ -2024,6 +2024,7 @@ class Typer extends Namer
       record(s"typed $getClass")
       record("typed total")
       assertPositioned(tree)
+      assert(!ctx.typerState.isCommitted)
       try adapt(typedUnadapted(tree, pt, locked), pt, locked)
       catch {
         case ex: TypeError =>
