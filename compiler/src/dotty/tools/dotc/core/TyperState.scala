@@ -2,6 +2,7 @@ package dotty.tools
 package dotc
 package core
 
+import Decorators._
 import Types._
 import Contexts._
 import util.{SimpleIdentityMap, SimpleIdentitySet}
@@ -34,9 +35,23 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
   val id: Int = nextId
   nextId += 1
 
+  // if (id == 615) {
+  //   println("#CREATED")
+  //   Thread.dumpStack
+  // }
+
   def mode: Mode = myMode
 
   private def transitionModeTo(newMode: Mode)(implicit ctx: Context): Unit = {
+    // if (id == 2 || id == 1) {
+    //   if (mode == Dirty) {
+    //     println(s"$this: $mode -> $newMode")
+    //     if (!constraint.isEmpty) println(constraint.show)
+    //   }
+    //   if (newMode != Dirty) {
+    //     checkNoGc()
+    //   }
+    // }
     (mode, newMode) match {
       case (Committable, n) if n != Dirty =>
       case (Explore, Committable) =>
@@ -69,12 +84,23 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
 
   def constraint: Constraint = myConstraint
   protected def constraint_=(c: Constraint)(implicit ctx: Context): Unit = {
+    // if (id == 615) {
+    //   if (myConstraint ne c)
+    //     println(s"$this ($mode) prev: ${myConstraint.show}\nnew: ${c.show}")
+    // }
+    // TODO: make this pass
     if (Config.debugCheckConstraintsClosed && isGlobalRetainable) c.checkClosed()
     myConstraint = c
   }
 
-  def unsafeSetConstraintTo(c: Constraint)(implicit ctx: Context): Unit = {
-    constraint = c
+  private[this] var inconsistent = false
+  def unsafeSetConstraintTo(c: => Constraint)(implicit ctx: Context): Unit = {
+    val savedInconsistent = inconsistent
+    inconsistent = true
+    try constraint = c
+    finally {
+      inconsistent = savedInconsistent
+    }
   }
 
   /** Reset constraint to `c` and mark current constraint as retracted if it differs from `c` */
@@ -97,6 +123,9 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
       mode match {
         case Committable =>
           tvar.inst = tp
+          // if (id == 615) {
+          //   println(s"$this: Instantiating $tvar to $tp, c = ${constraint.show}")
+          // }
         case Explore =>
           transitionModeTo(Dirty)
         case _ =>
@@ -145,8 +174,12 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
 
     def rollbackConstraint() = resetConstraintTo(savedConstraint)
 
-    if (mode != Dirty)
+    // XX: In a Test, we should not transition, otherwise isRetainable changes value
+    if (mode != Dirty && mode != Test) {
+      checkInvariants()
       transitionModeTo(Explore)
+    }
+
 
     val ret =
       try op(() => rollbackConstraint())
@@ -157,24 +190,34 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
           throw ex
       }
 
-    assert(mode == Explore || mode == Dirty, s"$this: $mode")
+    // XX: add no need gc sanity check
+
+    assert(mode == Explore || mode == Dirty || mode == Test, s"$this: $mode")
     val needsGc = mode == Dirty && (savedConstraint ne constraint)
     savedMode match {
       case Committable =>
         if (needsGc)
           gc()
+        else
+          checkNoGc()
         transitionModeTo(savedMode)
       case Explore =>
-        if (!needsGc)
+        if (!needsGc) {
+          checkNoGc()
           transitionModeTo(savedMode)
+        }
+        // gc()
+        // transitionModeTo(savedMode)
       case Dirty =>
         assert(mode == Dirty)
       case Test =>
-        transitionModeTo(savedMode)
+        assert(mode == Test)
       case Committed =>
         assert(!needsGc)
+        checkNoGc()
         transitionModeTo(savedMode)
     }
+    checkInvariants()
     ret
   }
 
@@ -229,7 +272,7 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
   def commit()(implicit ctx: Context): Unit = {
     val targetState = ctx.typerState
     if (this ne targetState) {
-      reporter.flush()
+      // reporter.flush()
       transitionModeTo(Committed)
 
       targetState.constraint =
@@ -243,11 +286,20 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
         if (tvar.owningState.get eq this)
           tvar.owningState = new WeakReference(targetState)
 
+        // XX: instType might use wrong constraint ?
         if ((tvar.owningState.get eq targetState) && ctx.typeComparer.instType(tvar).exists)
           needsGc = true
       }
-      if (needsGc)
-        targetState.gc()
+      if (needsGc) {
+        if (targetState.mode == Committable)
+          targetState.gc()
+        else if (targetState.mode == Explore) {
+          targetState.transitionModeTo(Dirty)
+        }
+      } else if (targetState.mode == Committable)
+        targetState.checkNoGc()
+
+      reporter.flush()
     }
   }
 
@@ -269,6 +321,31 @@ class TyperState(previous: TyperState /* | Null */, private[this] var myMode: Ty
     }
     for (poly <- toCollect)
       constraint = constraint.remove(poly)
+    checkInvariants()
+  }
+
+  private def checkNoGc()(implicit ctx: Context): Unit = {
+    constraint foreachTypeVar { tvar =>
+      if (!tvar.inst.exists) {
+        val inst = ctx.typeComparer.instType(tvar)
+        assert(!(inst.exists && (tvar.owningState.get eq this)), i"$this ($mode): No gc set to be run in $constraint")
+        // if (inst.exists) {
+        //   println(s"$this: not instantiating $tvar owned by ${tvar.owningState.get}")
+        // }
+      }
+    }
+    checkInvariants()
+  }
+
+  private def checkInvariants()(implicit ctx: Context): Unit = {
+    if (inconsistent)
+      return
+    constraint foreachTypeVarComplete { tvar =>
+      if (tvar.inst.exists) {
+        val lam = tvar.origin.binder
+        assert(!constraint.isRemovable(lam), s"$this ($mode): ${tvar}#${tvar.hashCode} removable but still in ${constraint.show}")
+      }
+    }
   }
 
   override def toString: String = s"TS[$id]"

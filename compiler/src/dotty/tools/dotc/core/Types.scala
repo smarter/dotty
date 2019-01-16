@@ -3620,6 +3620,10 @@ object Types {
     private[core] def inst: Type = myInst
     private[core] def inst_=(tp: Type): Unit = {
       myInst = tp
+      // if (hashCode == 1700078557) {
+      //   println(s"Instantiating to $tp")
+      //   Thread.dumpStack
+      // }
       if (tp.exists && (owningState ne null)) {
         owningState.get.ownedVars -= this
         owningState = null // no longer needed; null out to avoid a memory leak

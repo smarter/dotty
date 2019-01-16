@@ -434,18 +434,23 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       }
 
       typeVarOfParam(param) match {
-        case tvar: TypeVar if !tvar.isInstantiated =>
+        case tvar: TypeVar =>
           ctx.typerState.recordInstantiation(tvar, tp)
         case _ =>
       }
 
+      val r = isRemovable(poly)
+      // println(s"${typeVarOfParam(param)} (of $poly) r: $r")
+
       var current =
-        if (isRemovable(poly)) remove(poly) else updateEntry(param, replacement)
+        if (r) remove(poly) else updateEntry(param, replacement)
+      // println(s"#AFTER1[${ctx.typerState.id}]: " + current.show)
       current.foreachParam {(p, i) =>
         current = boundsLens.map(this, current, p, i, replaceParam(_, p, i))
         current = lowerLens.map(this, current, p, i, removeParam)
         current = upperLens.map(this, current, p, i, removeParam)
       }
+      // if (ctx.typerState.id == 615)
       current
     }
   }
@@ -503,6 +508,16 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       for (i <- 0 until paramCount(entries)) {
         typeVar(entries, i) match {
           case tv: TypeVar if !tv.inst.exists => op(tv)
+          case _ =>
+        }
+      }
+    }
+
+  def foreachTypeVarComplete(op: TypeVar => Unit): Unit =
+    boundsMap.foreachBinding { (poly, entries) =>
+      for (i <- 0 until paramCount(entries)) {
+        typeVar(entries, i) match {
+          case tv: TypeVar => op(tv)
           case _ =>
         }
       }
@@ -614,7 +629,13 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       " bounds = " ~ {
         val assocs =
           for (param <- domainParams)
-          yield (" " * indent) ~ param.toText(printer) ~ entryText(entry(param))
+          yield (" " * indent) ~ param.toText(printer) ~ entryText(entry(param)) ~ (
+              typeVarOfParam(param) match {
+                case tvar: TypeVar if tvar.inst.exists =>
+                  s" XXX inst = ${tvar.inst}"
+                case _ =>
+                  " NO INST"
+              })
         Text(assocs, "\n")
       }
     val orderingText =
@@ -645,7 +666,13 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         val assocs =
           for (param <- domainParams)
           yield
-            param.binder.paramNames(param.paramNum) + ": " + entryText(entry(param))
+            param.binder.paramNames(param.paramNum) + ": " + entryText(entry(param)) + (
+              typeVarOfParam(param) match {
+                case tvar: TypeVar if tvar.inst.exists =>
+                  s" XXX inst = ${tvar.inst}"
+                case _ =>
+                  " NO INST"
+              })
         assocs.mkString("\n")
     }
     constrainedText + "\n" + boundsText

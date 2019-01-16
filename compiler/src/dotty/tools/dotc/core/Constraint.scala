@@ -129,6 +129,7 @@ abstract class Constraint extends Showable {
 
   /** Perform operation `op` on all typevars that do not have their `inst` field set. */
   def foreachTypeVar(op: TypeVar => Unit): Unit
+  def foreachTypeVarComplete(op: TypeVar => Unit): Unit
 
   /** The uninstantiated typevars of this constraint, which still have a bounds constraint
    */
