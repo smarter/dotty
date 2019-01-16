@@ -230,9 +230,7 @@ object ProtoTypes {
    */
   case class FunProto(args: List[untpd.Tree], resType: Type)(typer: Typer, state: FunProtoState = new FunProtoState)(implicit ctx: Context)
   extends UncachedGroundType with ApplyingProto with FunOrPolyProto {
-    assert(!ctx.typerState.isCommitted)
-
-    override def resultType(implicit ctx: Context): Type = resType
+     override def resultType(implicit ctx: Context): Type = resType
 
     def isMatchedBy(tp: Type)(implicit ctx: Context): Boolean =
       typer.isApplicable(tp, Nil, unforcedTypedArgs, resultType)
