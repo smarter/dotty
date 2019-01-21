@@ -577,7 +577,6 @@ class Definitions {
     }).symbol.asTerm
 
   lazy val JavaSerializableClass: ClassSymbol     = ctx.requiredClass("java.io.Serializable")
-  def readResolve(cls: ClassSymbol, flags: FlagSet) = enterMethod(cls, nme.readResolve, MethodType(Nil, AnyRefType), flags)
 
   lazy val ComparableClass: ClassSymbol           = ctx.requiredClass("java.lang.Comparable")
 
@@ -652,6 +651,8 @@ class Definitions {
     def Product_productElement(implicit ctx: Context): Symbol = Product_productElementR.symbol
     lazy val Product_productPrefixR: TermRef = ProductClass.requiredMethodRef(nme.productPrefix)
     def Product_productPrefix(implicit ctx: Context): Symbol = Product_productPrefixR.symbol
+
+  lazy val ModuleSerializationProxyType: TypeRef  = ctx.requiredClassRef("scala.runtime.ModuleSerializationProxy")
 
   lazy val GenericType: TypeRef                = ctx.requiredClassRef("scala.reflect.Generic")
   def GenericClass(implicit ctx: Context): ClassSymbol    = GenericType.symbol.asClass
