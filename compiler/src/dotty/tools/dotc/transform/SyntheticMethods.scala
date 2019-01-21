@@ -51,7 +51,7 @@ class SyntheticMethods(thisPhase: DenotTransformer) {
   def caseModuleSymbols(implicit ctx: Context): List[Symbol] = { initSymbols; myCaseModuleSymbols }
 
   /** The synthetic methods of the case or value class `clazz`. */
-  def syntheticMethods(clazz: ClassSymbol, isSerializableModuleClass: Boolean)(implicit ctx: Context): List[Tree] = {
+  def syntheticMethods(clazz: ClassSymbol)(implicit ctx: Context): List[Tree] = {
     val clazzType = clazz.appliedRef
     lazy val accessors =
       if (isDerivedValueClass(clazz)) clazz.paramAccessors.take(1) // Tail parameters can only be `erased`
@@ -255,35 +255,28 @@ class SyntheticMethods(thisPhase: DenotTransformer) {
      */
     def canEqualBody(that: Tree): Tree = that.isInstance(AnnotatedType(clazzType, Annotation(defn.UncheckedAnnot)))
 
-    val methods = symbolsToSynthesize flatMap syntheticDefIfMissing
+    symbolsToSynthesize.flatMap(syntheticDefIfMissing)
+  }
 
-    def createWriteReplaceMethod: Tree = {
+  def serializableObjectMethods(clazz: ClassSymbol)(implicit ctx: Context): List[Tree] = {
+    if (clazz.is(Module) && clazz.isStatic && clazz.isSerializable &&
+        !clazz.membersNamed(nme.writeReplace)
+         .filterWithPredicate(s => s.signature == Signature(defn.AnyRefType, isJava = false))
+         .exists) {
       val writeReplace = ctx.newSymbol(clazz, nme.writeReplace, Method | Private | Synthetic,
-        MethodType(Nil, defn.AnyRefType), coord = clazz.coord).enteredAfter(thisPhase).asTerm
-        
-      DefDef(writeReplace, _ => New(defn.ModuleSerializationProxyType, List(ref(clazz.sourceModule))))
-        .withSpan(ctx.owner.span.focus)
+        MethodType(Nil, defn.AnyRefType), coord = clazz.coord).entered.asTerm
+      List(
+        DefDef(writeReplace,
+          _ => New(defn.ModuleSerializationProxyType, List(Literal(Constant(clazz.sourceModule.termRef)))))
+          .withSpan(ctx.owner.span.focus))
     }
-
-    if (isSerializableModuleClass)
-      createWriteReplaceMethod :: methods
-     else
-      methods
+    else
+      Nil
   }
 
   def addSyntheticMethods(impl: Template)(implicit ctx: Context): Template = {
-    val isSerializableModuleClass =
-      (ctx.owner.is(Module)
-        && ctx.owner.isStatic
-        && ctx.owner.isSerializable
-        && !ctx.owner.asClass.membersNamed(nme.writeReplace)
-             .filterWithPredicate(s => s.signature == Signature(defn.AnyRefType, isJava = false))
-             .exists)
-
-    if (ctx.owner.is(Case) || isDerivedValueClass(ctx.owner))
-      cpy.Template(impl)(body = impl.body ++ syntheticMethods(ctx.owner.asClass, isSerializableModuleClass))
-    else
-      impl
+    val cls = ctx.owner.asClass
+    cpy.Template(impl)(body = serializableObjectMethods(cls) ::: syntheticMethods(cls) ::: impl.body)
   }
 
 }

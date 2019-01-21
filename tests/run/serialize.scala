@@ -11,7 +11,7 @@ object Test {
   object Foo extends Serializable {}
 
   object Baz extends Serializable {
-    private def readResolve(): AnyRef = {
+    private def writeReplace(): AnyRef = {
       this
     }
   }
