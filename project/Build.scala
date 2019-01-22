@@ -30,6 +30,7 @@ import scala.util.Properties.isJavaAtLeast
 
 object Build {
   val scalacVersion = "2.12.8"
+  val referenceVersion = "0.14.0-bin-20190321-bb0a1ed-NIGHTLY"
 
   val baseVersion = "0.14.0"
   val baseSbtDottyVersion = "0.3.2"
@@ -182,21 +183,27 @@ object Build {
   // Settings used for projects compiled only with Java
   lazy val commonJavaSettings = commonSettings ++ Seq(
     version := dottyVersion,
-    scalaVersion := scalacVersion,
+    scalaVersion := referenceVersion,
     // Do not append Scala versions to the generated artifacts
     crossPaths := false,
     // Do not depend on the Scala library
     autoScalaLibrary := false
   )
 
-  // Settings used when compiling dotty using Scala 2
-  lazy val commonNonBootstrappedSettings = commonSettings ++ Seq(
+  // Settings used when compiling dotty (both non-boostrapped and bootstrapped)
+  lazy val commonDottySettings = commonSettings ++ Seq(
+    // Manually set the standard library to use
+    autoScalaLibrary := false
+  )
+
+  // Settings used when compiling dotty with the reference compiler
+  lazy val commonNonBootstrappedSettings = commonDottySettings ++ Seq(
     version := dottyNonBootstrappedVersion,
-    scalaVersion := scalacVersion
+    scalaVersion := referenceVersion
   )
 
   // Settings used when compiling dotty with a non-bootstrapped dotty
-  lazy val commonBootstrappedSettings = commonSettings ++ Seq(
+  lazy val commonBootstrappedSettings = commonDottySettings ++ Seq(
     version := dottyVersion,
     scalaVersion := dottyNonBootstrappedVersion,
 
@@ -218,11 +225,6 @@ object Build {
 
     // sbt gets very unhappy if two projects use the same target
     target := baseDirectory.value / ".." / "out" / "bootstrap" / name.value,
-
-    // The non-bootstrapped dotty-library is not necessary when bootstrapping dotty
-    autoScalaLibrary := false,
-    // ...but scala-library is
-    libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion,
 
     // Compile using the non-bootstrapped and non-published dotty
     managedScalaInstance := false,
@@ -466,7 +468,7 @@ object Build {
           "-Ddotty.tests.classes.dottyLibrary=" + jars("dotty-library"),
           "-Ddotty.tests.classes.dottyCompiler=" + jars("dotty-compiler"),
           "-Ddotty.tests.classes.compilerInterface=" + findLib(attList, "compiler-interface"),
-          "-Ddotty.tests.classes.scalaLibrary=" + findLib(attList, "scala-library"),
+          "-Ddotty.tests.classes.scalaLibrary=" + findLib(attList, "scala-library-"),
           "-Ddotty.tests.classes.scalaAsm=" + findLib(attList, "scala-asm"),
           "-Ddotty.tests.classes.scalaXml=" + findLib(attList, "scala-xml"),
           "-Ddotty.tests.classes.jlineTerminal=" + findLib(attList, "jline-terminal"),
@@ -506,9 +508,6 @@ object Build {
         } else if (scalaLib == "") {
           println("Couldn't find scala-library on classpath, please run using script in bin dir instead")
         } else if (args.contains("-with-compiler")) {
-          if (!isDotty.value) {
-            throw new MessageOnlyException("-with-compiler can only be used with a bootstrapped compiler")
-          }
           val args1 = args.filter(_ != "-with-compiler")
           val asm = findLib(attList, "scala-asm")
           val dottyCompiler = jars("dotty-compiler")
@@ -558,7 +557,7 @@ object Build {
   def runCompilerMain(repl: Boolean = false) = Def.inputTaskDyn {
     val attList = (dependencyClasspath in Runtime).value
     val jars = packageAll.value
-    val scalaLib = findLib(attList, "scala-library")
+    val scalaLib = findLib(attList, "scala-library-")
     val dottyLib = jars("dotty-library")
     val dottyCompiler = jars("dotty-compiler")
     val args0: List[String] = spaceDelimited("<arg>").parsed.toList
@@ -576,12 +575,8 @@ object Build {
 
     var extraClasspath = s"$scalaLib${File.pathSeparator}$dottyLib"
     if ((decompile || printTasty) && !args.contains("-classpath")) extraClasspath += s"${File.pathSeparator}."
-    if (args0.contains("-with-compiler")) {
-      if (!isDotty.value) {
-        throw new MessageOnlyException("-with-compiler can only be used with a bootstrapped compiler")
-      }
+    if (args0.contains("-with-compiler"))
       extraClasspath += s"${File.pathSeparator}$dottyCompiler"
-    }
 
     val fullArgs = main :: insertClasspathInArgs(args, extraClasspath)
 
@@ -642,8 +637,12 @@ object Build {
   // Settings shared between dotty-library and dotty-library-bootstrapped
   lazy val dottyLibrarySettings = Seq(
     libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion,
+
+    // Needed so that the library sources are visible when `dotty.tools.dotc.core.Definitions#init` is called
+    scalacOptions in Compile ++= Seq("-sourcepath", (scalaSource in Compile).value.getAbsolutePath),
+
     // Add version-specific source directories:
-    // - files in src-non-bootstrapped will only be compiled by the reference compiler (scalac)
+    // - files in src-non-bootstrapped will only be compiled by the reference compiler
     // - files in src-bootstrapped will only be compiled by the current dotty compiler (non-bootstrapped and bootstrapped)
     unmanagedSourceDirectories in Compile += {
       val baseDir = baseDirectory.value
@@ -1149,11 +1148,7 @@ object Build {
       settings(dottyCompilerSettings)
 
     def asDottyLibrary(implicit mode: Mode): Project = project.withCommonSettings.
-      settings(dottyLibrarySettings).
-      bootstrappedSettings(
-        // Needed so that the library sources are visible when `dotty.tools.dotc.core.Definitions#init` is called.
-        scalacOptions in Compile ++= Seq("-sourcepath", (scalaSource in Compile).value.getAbsolutePath)
-      )
+      settings(dottyLibrarySettings)
 
     def asDottyDoc(implicit mode: Mode): Project = project.withCommonSettings.
       dependsOn(dottyCompiler, dottyCompiler % "test->test").
