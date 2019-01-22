@@ -6,6 +6,7 @@ import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.core.Phases.Phase
 
 import scala.collection.mutable
+import scala.collection.JavaConverters._
 import scala.tools.asm.CustomAttr
 import scala.tools.nsc.backend.jvm._
 import dotty.tools.dotc.transform.SymUtils._
@@ -23,6 +24,7 @@ import java.io.DataOutputStream
 
 
 import scala.tools.asm
+import scala.tools.asm.Handle
 import scala.tools.asm.tree._
 import tpd._
 import StdNames._
@@ -308,6 +310,93 @@ class GenBCodePipeline(val entryPoints: List[Symbol], val int: DottyBackendInter
         // BackendStats.timed(BackendStats.methodOptTimer)(localOpt.methodOptimizations(classNode))
       }
 
+      /*
+       * Add:
+       *
+       * private static Object $deserializeLambda$(SerializedLambda l) {
+       *   try return indy[scala.runtime.LambdaDeserialize.bootstrap, targetMethodGroup$0](l)
+       *   catch {
+       *     case i: IllegalArgumentException =>
+       *       try return indy[scala.runtime.LambdaDeserialize.bootstrap, targetMethodGroup$1](l)
+       *       catch {
+       *         case i: IllegalArgumentException =>
+       *           ...
+       *             return indy[scala.runtime.LambdaDeserialize.bootstrap, targetMethodGroup${NUM_GROUPS-1}](l)
+       *       }
+       *
+       * We use invokedynamic here to enable caching within the deserializer without needing to
+       * host a static field in the enclosing class. This allows us to add this method to interfaces
+       * that define lambdas in default methods.
+       *
+       * SI-10232 we can't pass arbitrary number of method handles to the final varargs parameter of the bootstrap
+       * method due to a limitation in the JVM. Instead, we emit a separate invokedynamic bytecode for each group of target
+       * methods.
+       */
+      def addLambdaDeserialize(classNode: ClassNode, implMethodsArray: Array[Handle]): Unit = {
+        import asm.Opcodes._
+        import BCodeBodyBuilder._
+        import bTypes._
+        import coreBTypes._
+
+        val cw = classNode
+
+        // Make sure to reference the ClassBTypes of all types that are used in the code generated
+        // here (e.g. java/util/Map) are initialized. Initializing a ClassBType adds it to
+        // `classBTypeFromInternalNameMap`. When writing the classfile, the asm ClassWriter computes
+        // stack map frames and invokes the `getCommonSuperClass` method. This method expects all
+        // ClassBTypes mentioned in the source code to exist in the map.
+
+        val serlamObjDesc = MethodBType(jliSerializedLambdaRef :: Nil, ObjectReference).descriptor
+
+        val mv = cw.visitMethod(ACC_PRIVATE + ACC_STATIC + ACC_SYNTHETIC, "$deserializeLambda$", serlamObjDesc, null, null)
+        def emitLambdaDeserializeIndy(targetMethods: Seq[Handle]): Unit = {
+          mv.visitVarInsn(ALOAD, 0)
+          mv.visitInvokeDynamicInsn("lambdaDeserialize", serlamObjDesc, lambdaDeserializeBootstrapHandle, targetMethods: _*)
+        }
+
+        val targetMethodGroupLimit = 255 - 1 - 3 // JVM limit. See See MAX_MH_ARITY in CallSite.java
+        val groups: Array[Array[Handle]] = implMethodsArray.grouped(targetMethodGroupLimit).toArray
+        val numGroups = groups.length
+
+        import scala.tools.asm.Label
+        val initialLabels = Array.fill(numGroups - 1)(new Label())
+        val terminalLabel = new Label
+        def nextLabel(i: Int) = if (i == numGroups - 2) terminalLabel else initialLabels(i + 1)
+
+        for ((label, i) <- initialLabels.iterator.zipWithIndex) {
+          mv.visitTryCatchBlock(label, nextLabel(i), nextLabel(i), jlIllegalArgExceptionRef.internalName)
+        }
+        for ((label, i) <- initialLabels.iterator.zipWithIndex) {
+          mv.visitLabel(label)
+          emitLambdaDeserializeIndy(groups(i))
+          mv.visitInsn(ARETURN)
+        }
+        mv.visitLabel(terminalLabel)
+        emitLambdaDeserializeIndy(groups(numGroups - 1))
+        mv.visitInsn(ARETURN)
+      }
+
+      /* Support deserialization of lambdas defined in this class */
+      def addLambdaDeserializeIfNeeded(classNode: ClassNode): Unit = {
+        val indyLambdaBodyMethods = new mutable.ArrayBuffer[Handle]
+        for (m <- classNode.methods.asScala) {
+          val iter = m.instructions.iterator
+          while (iter.hasNext) {
+            val insn = iter.next()
+            insn match {
+              case indy: InvokeDynamicInsnNode
+                  if indy.bsm == BCodeBodyBuilder.lambdaMetaFactoryMetafactoryHandle ||
+                     indy.bsm == BCodeBodyBuilder.lambdaMetaFactoryAltMetafactoryHandle =>
+                val implMethod = indy.bsmArgs(1).asInstanceOf[Handle]
+                indyLambdaBodyMethods += implMethod
+              case _ =>
+            }
+          }
+        }
+        if (indyLambdaBodyMethods.nonEmpty)
+          addLambdaDeserialize(classNode, indyLambdaBodyMethods.toArray)
+      }
+
       def run(): Unit = {
         while (true) {
           val item = q2.poll
@@ -317,7 +406,9 @@ class GenBCodePipeline(val entryPoints: List[Symbol], val int: DottyBackendInter
           }
           else {
             try {
-              localOptimizations(item.plain.classNode)
+              val plainNode = item.plain.classNode
+              addLambdaDeserializeIfNeeded(plainNode)
+              localOptimizations(plainNode)
               addToQ3(item)
             } catch {
               case ex: Throwable =>
