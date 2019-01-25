@@ -340,8 +340,9 @@ object desugar {
       case _ => false
     }
 
-    val isCaseClass  = mods.is(Case) && !mods.is(Module)
-    val isCaseObject = mods.is(Case) && mods.is(Module)
+    val isObject = mods.is(Module)
+    val isCaseClass  = mods.is(Case) && !isObject
+    val isCaseObject = mods.is(Case) && isObject
     val isImplicit = mods.is(Implicit)
     val isInstance = isImplicit && mods.mods.exists(_.isInstanceOf[Mod.Instance])
     val isEnum = mods.isEnumClass && !mods.is(Module)
@@ -533,6 +534,8 @@ object desugar {
       parents1 = enumClassTypeRef :: Nil
     if (isCaseClass | isCaseObject)
       parents1 = parents1 :+ scalaDot(str.Product.toTypeName) :+ scalaDot(nme.Serializable.toTypeName)
+    else if (isObject)
+      parents1 = parents1 :+ scalaDot(nme.Serializable.toTypeName)
     if (isEnum)
       parents1 = parents1 :+ ref(defn.EnumType)
 
