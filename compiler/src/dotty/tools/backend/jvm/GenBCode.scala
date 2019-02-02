@@ -385,8 +385,9 @@ class GenBCodePipeline(val entryPoints: List[Symbol], val int: DottyBackendInter
             val insn = iter.next()
             insn match {
               case indy: InvokeDynamicInsnNode
-                  if indy.bsm == BCodeBodyBuilder.lambdaMetaFactoryMetafactoryHandle ||
-                     indy.bsm == BCodeBodyBuilder.lambdaMetaFactoryAltMetafactoryHandle =>
+                  // No need to check the exact bsmArgs because we only generate
+                  // altMetafactory indy calls for serializable lambdas.
+                  if indy.bsm == BCodeBodyBuilder.lambdaMetaFactoryAltMetafactoryHandle =>
                 val implMethod = indy.bsmArgs(1).asInstanceOf[Handle]
                 indyLambdaBodyMethods += implMethod
               case _ =>
