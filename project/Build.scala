@@ -27,15 +27,6 @@ import sbtbuildinfo.BuildInfoPlugin.autoImport._
 
 import scala.util.Properties.isJavaAtLeast
 
-/* In sbt 0.13 the Build trait would expose all vals to the shell, where you
- * can use them in "set a := b" like expressions. This re-exposes them.
- */
-object ExposedValues extends AutoPlugin {
-  object autoImport {
-    val bootstrapFromPublishedJars = Build.bootstrapFromPublishedJars
-  }
-}
-
 object Build {
   val scalacVersion = "2.12.8"
 
@@ -107,8 +98,6 @@ object Build {
   // Shorthand for compiling a docs site
   lazy val dottydoc = inputKey[Unit]("run dottydoc")
 
-  lazy val bootstrapFromPublishedJars = settingKey[Boolean]("If true, bootstrap dotty from published non-bootstrapped dotty")
-
   // Only available in vscode-dotty
   lazy val unpublish = taskKey[Unit]("Unpublish a package")
 
@@ -135,9 +124,6 @@ object Build {
     ),
 
     javacOptions in (Compile, compile) ++= Seq("-Xlint:unchecked", "-Xlint:deprecation"),
-
-    // Change this to true if you want to bootstrap using a published non-bootstrapped compiler
-    bootstrapFromPublishedJars := false,
 
     // Override `runCode` from sbt-dotty to use the language-server and
     // vscode extension from the source repository of dotty instead of a
@@ -268,22 +254,6 @@ object Build {
     // ...but scala-library is
     libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion,
 
-    ivyConfigurations ++= {
-      if (bootstrapFromPublishedJars.value)
-        Seq(Configurations.ScalaTool)
-      else
-        Seq()
-    },
-    libraryDependencies ++= {
-      if (bootstrapFromPublishedJars.value)
-        Seq(
-          dottyOrganization %% "dotty-library" % dottyNonBootstrappedVersion % Configurations.ScalaTool.name,
-          dottyOrganization %% "dotty-compiler" % dottyNonBootstrappedVersion % Configurations.ScalaTool.name
-        ).map(_.withDottyCompat(scalaVersion.value))
-      else
-        Seq()
-    },
-
     // Compile using the non-bootstrapped and non-published dotty
     managedScalaInstance := false,
     scalaInstance := {
@@ -291,18 +261,8 @@ object Build {
       import sbt.internal.inc.classpath.ClasspathUtilities
 
       val updateReport = update.value
-      var libraryJar = packageBin.in(`dotty-library`, Compile).value
-      var compilerJar = packageBin.in(`dotty-compiler`, Compile).value
-
-      if (bootstrapFromPublishedJars.value) {
-        val jars = updateReport.select(
-            configuration = configurationFilter(Configurations.ScalaTool.name),
-            module = moduleFilter(),
-            artifact = artifactFilter(extension = "jar")
-          )
-        libraryJar = jars.find(_.getName.startsWith("dotty-library_2.12")).get
-        compilerJar = jars.find(_.getName.startsWith("dotty-compiler_2.12")).get
-      }
+      val libraryJar = packageBin.in(`dotty-library`, Compile).value
+      val compilerJar = packageBin.in(`dotty-compiler`, Compile).value
 
       // All dotty-doc's and compiler's dependencies except the library.
       // (we get the compiler's dependencies because dottydoc depends on the compiler)
