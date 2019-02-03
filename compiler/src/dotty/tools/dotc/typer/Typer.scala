@@ -356,6 +356,8 @@ class Typer extends Namer
       if (untpd.isVarPattern(tree) && name.isTermName)
         return typed(desugar.patternVar(tree), pt)
     }
+    if (name == nme.ROOTPKG)
+      return tree.withType(TermRef(NoPrefix, defn.RootPackage))
 
     val rawType = {
       val saved1 = unimported
