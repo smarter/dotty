@@ -32,7 +32,7 @@ class SymUtils(val self: Symbol) extends AnyVal {
     val superCls = self.asClass.superClass
     val baseClasses = self.asClass.baseClasses
     if (baseClasses.isEmpty) Nil
-    else baseClasses.tail.takeWhile(_ ne superCls).reverse
+    else baseClasses.tail.takeWhile(_ ne superCls).filter(_.is(Trait)).reverse
   }
 
   /** All traits implemented by a class, except for those inherited through the superclass.
