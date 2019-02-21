@@ -2717,13 +2717,13 @@ class Typer extends Namer
                 TypeRef(skolem, defn.TypeBox_CAP)
               case arg => arg
             }
-            val boundss = tparams.map(_.paramInfo.subst(tparams.asInstanceOf[List[TypeSymbol]], args1))
-            for ((newArg, oldArg, bounds) <- (args1, args, boundss).zipped)
-              if (newArg `ne` oldArg) {
-                val TypeRef(skolem @ SkolemType(app @ AppliedType(typeBox, lo :: hi :: Nil)), _) = newArg
-                skolem.info = app.derivedAppliedType(
-                  typeBox, (lo | bounds.loBound) :: (hi & bounds.hiBound) :: Nil)
-              }
+            // val boundss = tparams.map(_.paramInfo.subst(tparams.asInstanceOf[List[TypeSymbol]], args1))
+            // for ((newArg, oldArg, bounds) <- (args1, args, boundss).zipped)
+            //   if (newArg `ne` oldArg) {
+            //     val TypeRef(skolem @ SkolemType(app @ AppliedType(typeBox, lo :: hi :: Nil)), _) = newArg
+            //     skolem.info = app.derivedAppliedType(
+            //       typeBox, (lo | bounds.loBound) :: (hi & bounds.hiBound) :: Nil)
+            //   }
             tp.derivedAppliedType(tycon, args1)
           case _ =>
             tp
