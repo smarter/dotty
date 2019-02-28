@@ -8,8 +8,5 @@ trait Two[Y <: Foo] {
 
 class Foo
 
-class Bar extends One[String] with Two[Foo] {
-  val x: String = concat(0)
-  val y = concat[Int](0)
-  val z: Foo = concat(0)
-}
+class Bar extends One[Foo] with Two[Foo] // error: double definition of concat after erasure
+
