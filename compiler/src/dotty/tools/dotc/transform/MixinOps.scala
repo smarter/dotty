@@ -19,6 +19,9 @@ class MixinOps(cls: ClassSymbol, thisPhase: DenotTransformer)(implicit ctx: Cont
     filter(_.exists)
 
   def implementation(member: TermSymbol): TermSymbol = {
+    // println("member: " + member)
+    // println("member.id: " + member.id)
+    // println("member.info: " + member.info)
     val res = member.copy(
       owner = cls,
       name = member.name.stripScala2LocalSuffix,

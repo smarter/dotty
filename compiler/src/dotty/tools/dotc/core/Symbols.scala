@@ -421,6 +421,8 @@ object Symbols {
     type ThisName <: Name
 
     //assert(id != 723)
+    // assert(id != 13981)
+    // assert(id != 4031)
 
     def coord: Coord = myCoord
     /** Set the coordinate of this class, this is only useful when the coordinate is

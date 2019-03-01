@@ -96,7 +96,17 @@ class ElimErasedValueType extends MiniPhase with InfoTransformer {
       // println("isDefined(sym1): " + isDefined(sym1))
       // println("isDefined(sym2): " + isDefined(sym2))
       // println("!info1.matchesLoosely(info2): " + !info1.matchesLoosely(info2))
-      if (/*isDefined(sym1) && isDefined(sym2) &&*/ !info1.matchesLoosely(info2))
+      if (/*isDefined(sym1) && isDefined(sym2) &&*/ !info1.matchesLoosely(info2)) {
+        // val i1 = ctx.atPhase(sym1.originDenotation.validFor.firstPhaseId) { implicit ctx =>
+        //   println("sym1.id: " + sym1.id)
+        //   println("sym1 period: " + ctx.period)
+        //   println("sym1.info: " + sym1.originDenotation.info)
+        // }
+        // val i2 = ctx.atPhase(sym2.originDenotation.validFor.firstPhaseId) { implicit ctx =>
+        //   println("sym2.id: " + sym2.id)
+        //   println("sym2 period: " + ctx.period)
+        //   println("sym2.info: " + sym2.originDenotation.info)
+        // }
         // The reason for the `isDefined` condition is that we need to exclude mixin forwarders
         // from the tests. For instance, in compileStdLib, compiling scala.immutable.SetProxy, line 29:
         //    new AbstractSet[B] with SetProxy[B] { val self = newSelf }
@@ -116,12 +126,19 @@ class ElimErasedValueType extends MiniPhase with InfoTransformer {
                 |$sym2: $info2 in ${sym2.owner}
                 |have same type after erasure: $info""",
             root.sourcePos)
+      }
     }
-    val earlyCtx = ctx.withPhase(ctx.elimRepeatedPhase.next)
+    // val earlyCtx = ctx.withPhase(ctx.elimRepeatedPhase.next)
     while (opc.hasNext) {
       val sym1 = opc.overriding
       val sym2 = opc.overridden
-      checkNoConflict(sym1, sym2, sym1.info)(earlyCtx)
+      // Do the test at the earliest phase after `ElimRepeated` where both symbols existed.
+      val phaseId = math.max(math.max(
+        sym1.originDenotation.validFor.firstPhaseId,
+        sym2.originDenotation.validFor.firstPhaseId),
+        ctx.elimRepeatedPhase.next.id)
+
+      checkNoConflict(sym1, sym2, sym1.info)(ctx.withPhase(phaseId))
       opc.next()
     }
   }
