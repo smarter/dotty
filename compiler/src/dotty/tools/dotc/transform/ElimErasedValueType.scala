@@ -90,7 +90,7 @@ class ElimErasedValueType extends MiniPhase with InfoTransformer {
       val info1 = site.memberInfo(sym1)
       val info2 = site.memberInfo(sym2)
       def isDefined(sym: Symbol) = sym.originDenotation.validFor.firstPhaseId <= ctx.phaseId
-      if (isDefined(sym1) && isDefined(sym2) && !info1.matchesLoosely(info2))
+      if (/*isDefined(sym1) && isDefined(sym2) &&*/ !info1.matchesLoosely(info2))
         // The reason for the `isDefined` condition is that we need to exclude mixin forwarders
         // from the tests. For instance, in compileStdLib, compiling scala.immutable.SetProxy, line 29:
         //    new AbstractSet[B] with SetProxy[B] { val self = newSelf }
@@ -106,11 +106,17 @@ class ElimErasedValueType extends MiniPhase with InfoTransformer {
         // Maybe we should move mixin forwarding after erasure to avoid redundant forwarders like these.
         ctx.error(DoubleDefinition(sym1, sym2), root.sourcePos)
     }
-    val earlyCtx = ctx.withPhase(ctx.elimRepeatedPhase.next)
+    // val earlyCtx = ctx.withPhase(ctx.elimRepeatedPhase.next)
     while (opc.hasNext) {
       val sym1 = opc.overriding
       val sym2 = opc.overridden
-      checkNoConflict(sym1, sym2, sym1.info)(earlyCtx)
+      // Do the test at the earliest phase after `ElimRepeated` where both symbols existed.
+      val phaseId = math.max(math.max(
+        sym1.originDenotation.validFor.firstPhaseId,
+        sym2.originDenotation.validFor.firstPhaseId),
+        ctx.elimRepeatedPhase.next.id)
+
+      checkNoConflict(sym1, sym2, sym1.info)(ctx.withPhase(phaseId))
       opc.next()
     }
   }
