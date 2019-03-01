@@ -1050,6 +1050,9 @@ object Denotations {
      */
     def showDcl(implicit ctx: Context): String = ctx.printer.dclText(this).show
 
+    /** Like `showDcl`, but use the initial denotation. */
+    def showInitialDcl(implicit ctx: Context): String = ctx.printer.dclText(initial).show
+
     override def toString: String =
       if (symbol == NoSymbol) symbol.toString
       else s"<SingleDenotation of type $infoOrCompleter>"
