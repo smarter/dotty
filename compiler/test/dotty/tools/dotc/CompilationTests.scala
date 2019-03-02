@@ -39,65 +39,65 @@ class CompilationTests extends ParallelTesting {
 
   @Test def pos: Unit = {
     implicit val testGroup: TestGroup = TestGroup("compilePos")
-    compileList("compileStdLib", TestSources.stdLibWhitelisted, scala2Mode.and("-migration", "-Yno-inline")) +
-    compileFile("tests/pos/nullarify.scala", defaultOptions.and("-Ycheck:nullarify")) +
-    compileFile("tests/pos-scala2/rewrites.scala", scala2Mode.and("-rewrite")).copyToTarget() +
-    compileFile("tests/pos-special/utf8encoded.scala", explicitUTF8) +
-    compileFile("tests/pos-special/utf16encoded.scala", explicitUTF16) +
-    compileFile("tests/pos-special/completeFromSource/Test.scala", defaultOptions.and("-sourcepath", "tests/pos-special")) +
-    compileFile("tests/pos-special/completeFromSource/Test2.scala", defaultOptions.and("-sourcepath", "tests/pos-special")) +
-    compileFile("tests/pos-special/completeFromSource/Test3.scala", defaultOptions.and("-sourcepath", "tests/pos-special", "-scansource")) +
-    compileFile("tests/pos-special/completeFromSource/nested/Test4.scala", defaultOptions.and("-sourcepath", "tests/pos-special", "-scansource")) +
-    compileFile("tests/pos-special/repeatedArgs213.scala", defaultOptions.and("-Ynew-collections")) +
-    compileFilesInDir("tests/pos-special/fatal-warnings", defaultOptions.and("-Xfatal-warnings", "-feature")) +
-    compileList(
-      "compileMixed",
-      List(
-        "tests/pos/B.scala",
-        "tests/scala2-library/src/library/scala/collection/immutable/Seq.scala",
-        "tests/scala2-library/src/library/scala/collection/parallel/ParSeq.scala",
-        "tests/scala2-library/src/library/scala/package.scala",
-        "tests/scala2-library/src/library/scala/collection/GenSeqLike.scala",
-        "tests/scala2-library/src/library/scala/collection/SeqLike.scala",
-        "tests/scala2-library/src/library/scala/collection/generic/GenSeqFactory.scala"
-      ),
-      scala2Mode
-    ) +
-    compileFilesInDir("tests/pos-special/spec-t5545", defaultOptions) +
-    compileFilesInDir("tests/pos-special/strawman-collections", defaultOptions) +
-    compileFilesInDir("tests/pos-special/isInstanceOf", allowDeepSubtypes.and("-Xfatal-warnings")) +
-    compileFile("tests/scala2-library/src/library/scala/collection/immutable/IndexedSeq.scala", defaultOptions) +
-    compileFile("tests/scala2-library/src/library/scala/collection/parallel/mutable/ParSetLike.scala", defaultOptions) +
-    compileList(
-      "parSetSubset",
-      List(
-       "tests/scala2-library/src/library/scala/collection/parallel/mutable/ParSetLike.scala",
-       "tests/scala2-library/src/library/scala/collection/parallel/mutable/ParSet.scala",
-       "tests/scala2-library/src/library/scala/collection/mutable/SetLike.scala"
-      ),
-      scala2Mode
-    ) +
-    // FIXME: This fails with .times(2), see #2799
-    compileList(
-      "testPredefDeprecatedNonCyclic",
-      List(
-        "tests/scala2-library/src/library/scala/io/Position.scala",
-        "tests/scala2-library/src/library/scala/Predef.scala",
-        "tests/scala2-library/src/library/scala/deprecated.scala"
-      ),
-      scala2Mode
-    ) +
-    compileFilesInDir("tests/new", defaultOptions) +
-    compileFilesInDir("tests/pos-scala2", scala2Mode) +
-    compileFilesInDir("tests/pos", defaultOptions) +
-    compileFilesInDir("tests/pos-deep-subtype", allowDeepSubtypes) +
-    compileFilesInDir("tests/pos-kind-polymorphism", defaultOptions and "-Ykind-polymorphism") +
-    compileFile(
-      // succeeds despite -Xfatal-warnings because of -nowarn
-      "tests/neg-custom-args/fatal-warnings/xfatalWarnings.scala",
-      defaultOptions.and("-nowarn", "-Xfatal-warnings")
-    ) +
-    compileFile("tests/pos-special/typeclass-scaling.scala", defaultOptions.and("-Xmax-inlines", "40"))
+    compileList("compileStdLib", TestSources.stdLibWhitelisted, scala2Mode.and("-migration", "-Yno-inline"))// +
+    // compileFile("tests/pos/nullarify.scala", defaultOptions.and("-Ycheck:nullarify")) +
+    // compileFile("tests/pos-scala2/rewrites.scala", scala2Mode.and("-rewrite")).copyToTarget() +
+    // compileFile("tests/pos-special/utf8encoded.scala", explicitUTF8) +
+    // compileFile("tests/pos-special/utf16encoded.scala", explicitUTF16) +
+    // compileFile("tests/pos-special/completeFromSource/Test.scala", defaultOptions.and("-sourcepath", "tests/pos-special")) +
+    // compileFile("tests/pos-special/completeFromSource/Test2.scala", defaultOptions.and("-sourcepath", "tests/pos-special")) +
+    // compileFile("tests/pos-special/completeFromSource/Test3.scala", defaultOptions.and("-sourcepath", "tests/pos-special", "-scansource")) +
+    // compileFile("tests/pos-special/completeFromSource/nested/Test4.scala", defaultOptions.and("-sourcepath", "tests/pos-special", "-scansource")) +
+    // compileFile("tests/pos-special/repeatedArgs213.scala", defaultOptions.and("-Ynew-collections")) +
+    // compileFilesInDir("tests/pos-special/fatal-warnings", defaultOptions.and("-Xfatal-warnings", "-feature")) +
+    // compileList(
+    //   "compileMixed",
+    //   List(
+    //     "tests/pos/B.scala",
+    //     "tests/scala2-library/src/library/scala/collection/immutable/Seq.scala",
+    //     "tests/scala2-library/src/library/scala/collection/parallel/ParSeq.scala",
+    //     "tests/scala2-library/src/library/scala/package.scala",
+    //     "tests/scala2-library/src/library/scala/collection/GenSeqLike.scala",
+    //     "tests/scala2-library/src/library/scala/collection/SeqLike.scala",
+    //     "tests/scala2-library/src/library/scala/collection/generic/GenSeqFactory.scala"
+    //   ),
+    //   scala2Mode
+    // ) +
+    // compileFilesInDir("tests/pos-special/spec-t5545", defaultOptions) +
+    // compileFilesInDir("tests/pos-special/strawman-collections", defaultOptions) +
+    // compileFilesInDir("tests/pos-special/isInstanceOf", allowDeepSubtypes.and("-Xfatal-warnings")) +
+    // compileFile("tests/scala2-library/src/library/scala/collection/immutable/IndexedSeq.scala", defaultOptions) +
+    // compileFile("tests/scala2-library/src/library/scala/collection/parallel/mutable/ParSetLike.scala", defaultOptions) +
+    // compileList(
+    //   "parSetSubset",
+    //   List(
+    //    "tests/scala2-library/src/library/scala/collection/parallel/mutable/ParSetLike.scala",
+    //    "tests/scala2-library/src/library/scala/collection/parallel/mutable/ParSet.scala",
+    //    "tests/scala2-library/src/library/scala/collection/mutable/SetLike.scala"
+    //   ),
+    //   scala2Mode
+    // ) +
+    // // FIXME: This fails with .times(2), see #2799
+    // compileList(
+    //   "testPredefDeprecatedNonCyclic",
+    //   List(
+    //     "tests/scala2-library/src/library/scala/io/Position.scala",
+    //     "tests/scala2-library/src/library/scala/Predef.scala",
+    //     "tests/scala2-library/src/library/scala/deprecated.scala"
+    //   ),
+    //   scala2Mode
+    // ) +
+    // compileFilesInDir("tests/new", defaultOptions) +
+    // compileFilesInDir("tests/pos-scala2", scala2Mode) +
+    // compileFilesInDir("tests/pos", defaultOptions) +
+    // compileFilesInDir("tests/pos-deep-subtype", allowDeepSubtypes) +
+    // compileFilesInDir("tests/pos-kind-polymorphism", defaultOptions and "-Ykind-polymorphism") +
+    // compileFile(
+    //   // succeeds despite -Xfatal-warnings because of -nowarn
+    //   "tests/neg-custom-args/fatal-warnings/xfatalWarnings.scala",
+    //   defaultOptions.and("-nowarn", "-Xfatal-warnings")
+    // ) +
+    // compileFile("tests/pos-special/typeclass-scaling.scala", defaultOptions.and("-Xmax-inlines", "40"))
   }.checkCompile()
 
   @Test def posTwice: Unit = {
