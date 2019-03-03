@@ -121,7 +121,7 @@ object ResolveMixins {
           // The super-call that we would have called if `super` in traits behaved like it
           // does in classes, i.e. followed the linearization of the trait itself.
           val staticSuperCall = {
-            val staticSuper = mixin.asClass.info.parents.reverse.find(_.nonPrivateMember(memberName).exists)
+            val staticSuper = mixin.asClass.info.parents.reverse.find(_.nonPrivateMember(memberName).exists) // XX: matchingDenot like above ?
             val staticSuperName = staticSuper match {
               case Some(parent) =>
                 parent.classSymbol.name.show
