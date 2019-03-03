@@ -105,7 +105,7 @@ object ResolveMixins {
       if (ctx.settings.Ydebug.value)
         ctx.log(i"rebindsuper ${bcs.head} $other deferred = ${other.symbol.is(Deferred)}")
       val otherMember = other.matchingDenotation(base.thisType, base.thisType.memberInfo(acc))
-      if (otherMember.exists) {
+      if (otherMember.exists && !otherMember.symbol.is(MixinForwarder)) {
         sym = otherMember.symbol
         // Having a matching denotation is not enough: it should also be a subtype
         // of the superaccessor's type, see i5433.scala for an example where this matters
