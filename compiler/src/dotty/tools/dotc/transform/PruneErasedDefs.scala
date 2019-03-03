@@ -13,7 +13,7 @@ import ast.tpd
 
 /** This phase makes all erased term members of classes private so that they cannot
  *  conflict with non-erased members. This is needed so that subsequent phases like
- *  ResolveSuper that inspect class members work correctly.
+ *  ResolveMixins that inspect class members work correctly.
  *  The phase also replaces all expressions that appear in an erased context by
  *  default values. This is necessary so that subsequent checking phases such
  *  as IsInstanceOfChecker don't give false negatives.

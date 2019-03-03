@@ -84,7 +84,7 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
           info = MethodType(getter.info.resultType :: Nil, defn.UnitType))
 
       for (sym <- mixin.info.decls) {
-        if (needsForwarder(sym) || sym.isConstructor || sym.isGetter && sym.is(Lazy) || sym.is(Method, butNot = Deferred))
+        if (needsMixinForwarder(sym) || sym.isConstructor || sym.isGetter && sym.is(Lazy) || sym.is(Method, butNot = Deferred))
           implClass.enter(implMethod(sym.asTerm))
         if (sym.isGetter)
           if (sym.is(Lazy)) {

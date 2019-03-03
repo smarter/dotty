@@ -48,17 +48,17 @@ class MixinOps(cls: ClassSymbol, thisPhase: DenotTransformer)(implicit ctx: Cont
       // this is a hot spot, where we spend several seconds while compiling stdlib
       // unfortunately it will discard and recompute all the member chaches,
       // both making itself slow and slowing down anything that runs after it
-      // because resolveSuper uses hacks with explicit adding to scopes through .enter
+      // because resolveMixins uses hacks with explicit adding to scopes through .enter
       // this cannot be fixed by a smarter caching strategy. With current implementation
       // we HAVE to discard caches here for correctness
     }
 
-  /** Does `method` need a forwarder to in  class `cls`
+  /** Does mixin `method` need a forwarder in class `cls`
    *  Method needs a forwarder in those cases:
    *   - there's a class defining a method with same signature
    *   - there are multiple traits defining method with same signature
    */
-  def needsForwarder(meth: Symbol): Boolean = {
+  def needsMixinForwarder(meth: Symbol): Boolean = {
     lazy val competingMethods = competingMethodsIterator(meth).toList
 
     def needsDisambiguation = competingMethods.exists(x=> !(x is Deferred)) // multiple implementations are available

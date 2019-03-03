@@ -634,7 +634,7 @@ object Types {
           // fails (in fact it thinks the underlying type of the LHS is `Tree[Untyped]`.)
           //
           // Without the `openedTwice` trick, Typer.scala fails to Ycheck
-          // at phase resolveSuper.
+          // at phase resolveMixins.
           val rt =
             if (tp.opened) { // defensive copy
               tp.openedTwice = true

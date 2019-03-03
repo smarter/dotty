@@ -11,10 +11,10 @@ import Decorators._
 import DenotTransformers._
 import NameOps._
 import NameKinds._
-import ResolveSuper._
+import ResolveMixins._
 import reporting.diagnostic.messages.IllegalSuperAccessor
 
-/** This phase adds super accessors and method overrides where
+/** This phase adds super accessors and mixin forwarders where
  *  linearization differs from Java's rule for default methods in interfaces.
  *  In particular:
  *
@@ -28,7 +28,7 @@ import reporting.diagnostic.messages.IllegalSuperAccessor
  *
  *              where `S` is the superclass of `M` in the linearization of `C`.
  *
- *          3.2 (done in `methodOverrides`) For every method
+ *          3.2 (done in `mixinForwarders`) For every method
  *              `<mods> def f[Ts](ps1)...(psN): U` in M` that needs to be disambiguated:
  *
  *                <mods> def f[Ts](ps1)...(psN): U = super[M].f[Ts](ps1)...(psN)
@@ -39,10 +39,10 @@ import reporting.diagnostic.messages.IllegalSuperAccessor
  *  This is the first part of what was the mixin phase. It is complemented by
  *  Mixin, which runs after erasure.
  */
-class ResolveSuper extends MiniPhase with IdentityDenotTransformer { thisPhase =>
+class ResolveMixins extends MiniPhase with IdentityDenotTransformer { thisPhase =>
   import ast.tpd._
 
-  override def phaseName: String = ResolveSuper.name
+  override def phaseName: String = ResolveMixins.name
 
   override def runsAfter: Set[String] = Set(ElimByName.name, // verified empirically, need to figure out what the reason is.
                                AugmentScala2Traits.name,
@@ -62,14 +62,14 @@ class ResolveSuper extends MiniPhase with IdentityDenotTransformer { thisPhase =
           polyDefDef(implementation(superAcc.asTerm), forwarder(rebindSuper(cls, superAcc)))
         }
 
-    def methodOverrides(mixin: ClassSymbol): List[Tree] =
-      for (meth <- mixin.info.decls.toList if needsForwarder(meth))
+    def mixinForwarders(mixin: ClassSymbol): List[Tree] =
+      for (meth <- mixin.info.decls.toList if needsMixinForwarder(meth))
         yield {
-          util.Stats.record("method forwarders")
+          util.Stats.record("mixin forwarders")
           polyDefDef(implementation(meth.asTerm), forwarder(meth))
         }
 
-    val overrides = mixins.flatMap(mixin => superAccessors(mixin) ::: methodOverrides(mixin))
+    val overrides = mixins.flatMap(mixin => superAccessors(mixin) ::: mixinForwarders(mixin))
 
     cpy.Template(impl)(body = overrides ::: impl.body)
   }
@@ -87,8 +87,8 @@ class ResolveSuper extends MiniPhase with IdentityDenotTransformer { thisPhase =
   }
 }
 
-object ResolveSuper {
-  val name: String = "resolveSuper"
+object ResolveMixins {
+  val name: String = "resolveMixins"
 
   /** Returns the symbol that is accessed by a super-accessor in a mixin composition.
    *

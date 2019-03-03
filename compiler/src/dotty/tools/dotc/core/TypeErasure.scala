@@ -488,8 +488,8 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     case ExprType(rt) =>
       if (sym is Param) apply(tp)
         // Note that params with ExprTypes are eliminated by ElimByName,
-        // but potentially re-introduced by ResolveSuper, when we add
-        // forwarders to mixin methods.
+        // but potentially re-introduced by ResolveMixins, when we add
+        // mixin forwarders.
         // See doc comment for ElimByName for speculation how we could improve this.
       else MethodType(Nil, Nil, eraseResult(sym.info.finalResultType))
     case tp: PolyType =>
