@@ -92,9 +92,8 @@ class ElimErasedValueType extends MiniPhase with InfoTransformer {
       def isDefined(sym: Symbol) = sym.originDenotation.validFor.firstPhaseId <= ctx.phaseId
 
       val legalOverride = info1.matchesLoosely(info2) ||
-      sym1.is(MixinForwarder) && sym2.is(MixinForwarder) && {
-        // Two mixin forwarders might not override each other from Scala's point of view,
-        // but we should not report an error if they forward to ...
+      (sym1.is(MixinForwarder) || sym2.is(MixinForwarder)) && {
+        // If at least one mixin forwarder, ...
         val overridden1 = sym1.extendedOverriddenSymbols.toSet
         val overridden2 = sym2.extendedOverriddenSymbols.toSet
         if (sym1.owner.derivesFrom(sym2.owner))
