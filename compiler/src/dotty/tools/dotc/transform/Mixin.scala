@@ -241,7 +241,7 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
               else Underscore(getter.info.resultType)
             else initial
           // transformFollowing call is needed to make memoize & lazy vals run
-          transformFollowing(DefDef(implementation(getter.asTerm), rhs))
+          transformFollowing(DefDef(mkForwarder(getter.asTerm), rhs))
         }
         else if (isScala2x || was(getter, ParamAccessor | Lazy)) EmptyTree
         else initial
@@ -250,7 +250,7 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
 
     def setters(mixin: ClassSymbol): List[Tree] =
       for (setter <- mixin.info.decls.filter(setr => setr.isSetter && !was(setr, Deferred)))
-        yield transformFollowing(DefDef(implementation(setter.asTerm), unitLiteral.withSpan(cls.span)))
+        yield transformFollowing(DefDef(mkForwarder(setter.asTerm), unitLiteral.withSpan(cls.span)))
 
     cpy.Template(impl)(
       constr =
