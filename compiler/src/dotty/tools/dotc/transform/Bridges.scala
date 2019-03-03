@@ -81,12 +81,18 @@ class Bridges(root: ClassSymbol, thisPhase: DenotTransformer)(implicit ctx: Cont
 
   /** Generate bridge between `member` and `other`
    */
-  private def addBridge(member: Symbol, other: Symbol) = {
-    val bridge = other.copy(
-      owner = root,
-      flags = (member.flags | Method | Bridge | Artifact) &~
-        (Accessor | ParamAccessor | CaseAccessor | Deferred | Lazy | Module),
-      coord = bridgePosFor(member).span).enteredAfter(thisPhase).asTerm
+  private def addBridge(member: Symbol, other: Symbol): Unit = {
+    val bridge = {
+      val owner = root
+      val flags = (member.flags | Method | Bridge | Artifact) &~
+        (Accessor | ParamAccessor | CaseAccessor | Deferred | Lazy | Module)
+
+      if (member.is(MixinForwarder)) {
+        member.copySymDenotation(initFlags = flags, info = other.info).installAfter(thisPhase)
+        member
+      } else
+        other.copy(owner, flags = flags, coord = bridgePosFor(member).span).enteredAfter(thisPhase)
+    }.asTerm
 
     ctx.debuglog(
       i"""generating bridge from ${other.showLocated}: ${other.info}
@@ -95,6 +101,9 @@ class Bridges(root: ClassSymbol, thisPhase: DenotTransformer)(implicit ctx: Cont
 
     bridgeTarget(bridge) = member
     bridgesScope.enter(bridge)
+
+    if (member.is(MixinForwarder))
+      return
 
     if (other.owner == root) {
       root.delete(other)
