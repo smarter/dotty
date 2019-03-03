@@ -90,20 +90,22 @@ class ElimErasedValueType extends MiniPhase with InfoTransformer {
       val info1 = site.memberInfo(sym1)
       val info2 = site.memberInfo(sym2)
       def isDefined(sym: Symbol) = sym.originDenotation.validFor.firstPhaseId <= ctx.phaseId
-      if (/*isDefined(sym1) && isDefined(sym2) &&*/ !info1.matchesLoosely(info2))
-        // The reason for the `isDefined` condition is that we need to exclude mixin forwarders
-        // from the tests. For instance, in compileStdLib, compiling scala.immutable.SetProxy, line 29:
-        //    new AbstractSet[B] with SetProxy[B] { val self = newSelf }
-        // This generates two forwarders, one in AbstractSet, the other in the anonymous class itself.
-        // Their signatures are:
-        // method map: [B, That]
-        //   (f: B => B)(implicit bf: scala.collection.generic.CanBuildFrom[scala.collection.immutable.Set[B], B, That]): That override <method> <touched> in anonymous class scala.collection.AbstractSet[B] with scala.collection.immutable.SetProxy[B]{...} and
-        // method map: [B, That](f: B => B)(implicit bf: scala.collection.generic.CanBuildFrom[scala.collection.Set[B], B, That]): That override <method> <touched> in class AbstractSet
-        // These have same type after erasure:
-        //   (f: Function1, bf: scala.collection.generic.CanBuildFrom): Object
-        //
-        // The problem is that `map` was forwarded twice, with different instantiated types.
-        // Maybe we should move mixin forwarding after erasure to avoid redundant forwarders like these.
+
+      val legalOverride = info1.matchesLoosely(info2) ||
+      sym1.is(MixinForwarder) && sym2.is(MixinForwarder) && {
+        // Two mixin forwarders might not override each other from Scala's point of view,
+        // but we should not report an error if they forward to ...
+        val overridden1 = sym1.extendedOverriddenSymbols.toSet
+        val overridden2 = sym2.extendedOverriddenSymbols.toSet
+        if (sym1.owner.derivesFrom(sym2.owner))
+          overridden2.subsetOf(overridden1)
+        else if (sym2.owner.derivesFrom(sym1.owner))
+          overridden1.subsetOf(overridden2)
+        else
+          false
+      }
+
+      if (!legalOverride)
         ctx.error(DoubleDefinition(sym1, sym2), root.sourcePos)
     }
     // val earlyCtx = ctx.withPhase(ctx.elimRepeatedPhase.next)
