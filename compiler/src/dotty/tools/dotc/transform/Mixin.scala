@@ -252,6 +252,14 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
       for (setter <- mixin.info.decls.filter(setr => setr.isSetter && !was(setr, Deferred)))
         yield transformFollowing(DefDef(mkForwarder(setter.asTerm), unitLiteral.withSpan(cls.span)))
 
+    def mixinForwarders(mixin: ClassSymbol): List[Tree] =
+      for (meth <- mixin.info.decls.toList if needsMixinForwarder(meth))
+      yield {
+        util.Stats.record("mixin forwarders")
+        transformFollowing(polyDefDef(mkForwarder(meth.asTerm, MixinForwarder), forwarder(meth)))
+      }
+
+
     cpy.Template(impl)(
       constr =
         if (cls.is(Trait)) cpy.DefDef(impl.constr)(vparamss = Nil :: Nil)
@@ -261,7 +269,7 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
         if (cls is Trait) traitDefs(impl.body)
         else {
           val mixInits = mixins.flatMap { mixin =>
-            flatten(traitInits(mixin)) ::: superCallOpt(mixin) ::: setters(mixin)
+            flatten(traitInits(mixin)) ::: superCallOpt(mixin) ::: setters(mixin) ::: mixinForwarders(mixin)
           }
           superCallOpt(superCls) ::: mixInits ::: impl.body
         })

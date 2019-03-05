@@ -69,7 +69,7 @@ class ResolveMixins extends MiniPhase with IdentityDenotTransformer { thisPhase 
           polyDefDef(mkForwarder(meth.asTerm, MixinForwarder), forwarder(meth))
         }
 
-    val overrides = mixins.flatMap(mixin => superAccessors(mixin) ::: mixinForwarders(mixin))
+    val overrides = mixins.flatMap(mixin => superAccessors(mixin)/* ::: mixinForwarders(mixin)*/)
 
     cpy.Template(impl)(body = overrides ::: impl.body)
   }
