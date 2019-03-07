@@ -392,6 +392,9 @@ object Flags {
   /** Symbol is an enum class or enum case (if used with case) */
   final val Enum: FlagSet = commonFlag(40, "<enum>")
 
+  /** A mixin forwarder. Set by ResolveMixins */
+  final val MixinForwarder: FlagSet = termFlag(41, "<mixin-forwarder>")
+
   /** Labeled with `erased` modifier (erased value)  */
   final val Erased: FlagSet = termFlag(42, "erased")
 

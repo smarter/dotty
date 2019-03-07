@@ -110,6 +110,14 @@ class ElimErasedValueType extends MiniPhase with InfoTransformer {
     while (opc.hasNext) {
       val sym1 = opc.overriding
       val sym2 = opc.overridden
+      // Do the test at the earliest phase after `ElimRepeated` where both symbols existed.
+      val phaseId = math.max(math.max(
+        sym1.originDenotation.validFor.firstPhaseId,
+        sym2.originDenotation.validFor.firstPhaseId),
+        ctx.elimRepeatedPhase.next.id)
+
+      // XX: wrong if one sym is mixin forwarder
+
       checkNoConflict(sym1, sym2, sym1.info)(earlyCtx)
       opc.next()
     }

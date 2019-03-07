@@ -59,17 +59,17 @@ class ResolveSuper extends MiniPhase with IdentityDenotTransformer { thisPhase =
       for (superAcc <- mixin.info.decls.filter(_.isSuperAccessor))
         yield {
           util.Stats.record("super accessors")
-          polyDefDef(implementation(superAcc.asTerm), forwarder(rebindSuper(cls, superAcc)))
+          polyDefDef(mkForwarder(superAcc.asTerm), forwarder(rebindSuper(cls, superAcc)))
         }
 
     def methodOverrides(mixin: ClassSymbol): List[Tree] =
       for (meth <- mixin.info.decls.toList if needsForwarder(meth))
         yield {
-          util.Stats.record("method forwarders")
-          polyDefDef(implementation(meth.asTerm), forwarder(meth))
+          util.Stats.record("mixin forwarders")
+          polyDefDef(mkForwarder(meth.asTerm, MixinForwarder), forwarder(meth))
         }
 
-    val overrides = mixins.flatMap(mixin => superAccessors(mixin) ::: methodOverrides(mixin))
+    val overrides = mixins.flatMap(mixin => superAccessors(mixin)/* ::: methodOverrides(mixin)*/)
 
     cpy.Template(impl)(body = overrides ::: impl.body)
   }
