@@ -64,7 +64,7 @@ class MixinOps(cls: ClassSymbol, thisPhase: DenotTransformer)(implicit ctx: Cont
 
     def needsDisambiguation = competingMethods.exists(x=> !(x is Deferred)) // multiple implementations are available
     def hasNonInterfaceDefinition = competingMethods.exists(!_.owner.is(Trait)) // there is a definition originating from class
-    meth.name != nme.TRAIT_CONSTRUCTOR && !meth.name.is(ImplMethName) &&
+    meth.name != nme.TRAIT_CONSTRUCTOR &&
     meth.is(Method, butNot = PrivateOrAccessorOrDeferred) &&
     (meth.owner.is(Scala2x) || needsDisambiguation || hasNonInterfaceDefinition || needsJUnit4Fix(meth) ) &&
     isCurrent(meth)

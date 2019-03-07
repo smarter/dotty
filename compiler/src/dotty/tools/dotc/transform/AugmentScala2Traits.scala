@@ -13,7 +13,7 @@ import DenotTransformers._
 import Annotations._
 import StdNames._
 import NameOps._
-import NameKinds.{ExpandedName, ImplMethName, TraitSetterName}
+import NameKinds.{ExpandedName, TraitSetterName}
 import ast.Trees._
 
 object AugmentScala2Traits {
@@ -25,8 +25,9 @@ object AugmentScala2Traits {
  *  These symbols would have been added between Unpickling and Mixin in the Scala2 pipeline.
  *
  *  Specifically, we:
- *   - add trait setters for vals defined in traits
- *   - expands the names of all private getters and setters as well as super accessors in the trait and make
+ *   - Mark all lazy val fields as @volatile to get the proper Scala 2 semantics.
+ *   - Add trait setters for vals defined in traits.
+ *   - Expand the names of all private getters and setters as well as super accessors in the trait and make
  *     not-private.
  */
 class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with FullParameterization { thisPhase =>

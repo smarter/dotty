@@ -105,7 +105,7 @@ class Mixin extends MiniPhase with SymTransformer { thisPhase =>
   override def changesMembers: Boolean = true  // the phase adds implementions of mixin accessors
 
   override def transformSym(sym: SymDenotation)(implicit ctx: Context): SymDenotation =
-    if (sym.is(Accessor, butNot = Deferred) && sym.owner.is(Trait) && !sym.name.is(ImplMethName)) {
+    if (sym.is(Accessor, butNot = Deferred) && sym.owner.is(Trait)) {
       val sym1 =
         if (sym is Lazy) sym
         else sym.copySymDenotation(initFlags = sym.flags &~ ParamAccessor | Deferred)
