@@ -42,11 +42,11 @@ class AugmentScala2Traits extends MiniPhase with IdentityDenotTransformer with F
   override def transformTemplate(impl: Template)(implicit ctx: Context): Template = {
     val cls = impl.symbol.owner.asClass
     for (mixin <- cls.mixins if mixin.is(Scala2x) && !mixin.is(Scala2xPartiallyAugmented))
-      augmentScala2Trait(mixin, cls)
+      augmentScala2Trait(mixin)
     impl
   }
 
-  private def augmentScala2Trait(mixin: ClassSymbol, cls: ClassSymbol)(implicit ctx: Context): Unit = {
+  private def augmentScala2Trait(mixin: ClassSymbol)(implicit ctx: Context): Unit = {
     def traitSetter(getter: TermSymbol) =
       getter.copy(
         name = getter.ensureNotPrivate.name
