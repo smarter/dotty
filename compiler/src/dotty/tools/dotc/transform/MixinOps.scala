@@ -18,7 +18,7 @@ class MixinOps(cls: ClassSymbol, thisPhase: DenotTransformer)(implicit ctx: Cont
     map(n => ctx.getClassIfDefined("org.junit." + n)).
     filter(_.exists)
 
-  def implementation(member: TermSymbol): TermSymbol = {
+  def mkForwarder(member: TermSymbol): TermSymbol = {
     val res = member.copy(
       owner = cls,
       name = member.name.stripScala2LocalSuffix,
