@@ -388,9 +388,10 @@ trait BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
       }
       debuglog(s"Potentially conflicting names for forwarders: $conflictingNames")
 
-      for (m <- moduleClass.info.membersBasedOnFlags(ExcludedForwarderFlags, Flag_METHOD)) {
-        if (m.isType || m.isDeferred || (m.owner eq ObjectClass) || m.isConstructor || m.isExpanded)
-          debuglog(s"No forwarder for '$m' from $jclassName to '$moduleClass'")
+      for (m0 <- moduleClass.info.membersBasedOnFlags(ExcludedForwarderFlags, Flag_METHOD)) {
+        val m = if (m0.isBridge) m0.nextOverriddenSymbol else m0
+        if (m == NoSymbol || m.isType || m.isDeferred || (m.owner eq ObjectClass) || m.isConstructor || m.isExpanded)
+          debuglog(s"No forwarder for '$m0' from $jclassName to '$moduleClass'")
         else if (conflictingNames(m.name))
           log(s"No forwarder for $m due to conflict with ${linkedClass.info.member(m.name)}")
         else if (m.hasAccessBoundary)
