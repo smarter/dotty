@@ -1115,7 +1115,14 @@ object Denotations {
         case _ => if (symbol.exists) symbol.owner else NoSymbol
       }
       if (!owner.membersNeedAsSeenFrom(pre) || symbol.is(NonMember)) this
-      else derivedSingleDenotation(symbol, symbol.info.asSeenFrom(pre, owner))
+      else {
+        // println("symbol.info: " + symbol.info.show)
+        // println("YYpre: " + pre.show)
+        // println("owner: " + owner.show)
+        val z = symbol.info.asSeenFrom(pre, owner)
+        // println("z: " + z.show)
+        derivedSingleDenotation(symbol, z)
+      }
     }
 
     /** Does this denotation have all the `required` flags but none of the `excluded` flags?

@@ -3,6 +3,7 @@ package dotc
 package core
 
 import Contexts._, Types._, Symbols._, Names._, Flags._
+import Annotations._
 import SymDenotations._
 import util.Spans._
 import util.SourcePosition
@@ -44,7 +45,15 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
           case _ =>
             if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists)
-              if (variance <= 0 && !isLegalPrefix(pre)) range(defn.NothingType, pre)
+              if (variance <= 0 && !isLegalPrefix(pre))
+                pre match {
+                  case AnnotatedType(_, ann) if ann.symbol == defn.UnsafeNonvariantAnnot => pre
+                  case _ =>
+                    // println("XXpre: " + pre)
+                    // range(
+                      AnnotatedType(pre, Annotation(defn.UnsafeNonvariantAnnot, Nil))
+                    // , pre)
+                }
               else pre
             else if ((pre.termSymbol is Package) && !(thiscls is Package))
               toPrefix(pre.select(nme.PACKAGE), cls, thiscls)
@@ -60,7 +69,14 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           case tp: NamedType =>
             val sym = tp.symbol
             if (sym.isStatic && !sym.maybeOwner.isOpaqueCompanion || (tp.prefix `eq` NoPrefix)) tp
-            else derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
+            else {
+              val pre1 = atVariance(variance max 0)(this(tp.prefix))
+              // println("##pre1: " + pre1)
+              // println("##tp: " + tp)
+              val z = derivedSelect(tp, pre1)
+              // println("##z: " + z)
+              z
+            }
           case tp: ThisType =>
             toPrefix(pre, cls, tp.cls)
           case _: BoundType =>
@@ -87,8 +103,11 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
         if (tp.symbol.isStatic || (tp.prefix `eq` NoPrefix)) tp
         else tp.derivedSelect(simplify(tp.prefix, theMap)) match {
           case tp1: NamedType if tp1.denotationIsCurrent =>
+            // println("##tp.prefix: " + tp.prefix)
+            // println("##tp: " + tp)
+            // println("##tp1: " + tp1)
             val tp2 = tp1.reduceProjection
-            //if (tp2 ne tp1) println(i"simplified $tp1 -> $tp2")
+            if (tp2 ne tp1) println(i"##simplified $tp1 -> $tp2")
             tp2
           case tp1 => tp1
         }

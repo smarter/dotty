@@ -441,6 +441,29 @@ class Typer extends Namer
     tree
   }
 
+  /** Let `tree = p.n` where `p: T`. If tree's type is an unsafe instantiation
+   *  (see TypeOps#asSeenFrom for how this can happen), rewrite the prefix `p`
+   *  to `(p: <unknown skolem of type T>)` and try again with the new (stable)
+   *  prefix. If the result has another unsafe instantiation, raise an error.
+   */
+  private def healNonvariant[T <: Tree](tree: T, pt: Type)(implicit ctx: Context): T  =
+    if (/*ctx.unsafeNonvariant == ctx.runId &&*/ tree.tpe.widen.hasUnsafeNonvariant) {
+      // println("TT: " + tree.tpe.show)
+      tree match {
+        case tree @ Select(qual, _) if !qual.tpe.isStable =>
+          val alt = typedSelect(tree, pt, Typed(qual, TypeTree(SkolemType(qual.tpe.widen))))
+          /*typr.*/println(i"healed type: ${tree.tpe} --> $alt")
+          alt.asInstanceOf[T]
+        case _ =>
+          ctx.error(ex"unsafe instantiation of type ${tree.tpe}", tree.sourcePos)
+          tree
+      }
+    }
+    else {
+      // println("XX: " + tree.tpe.show)
+      tree
+    }
+
   def typedSelect(tree: untpd.Select, pt: Type, qual: Tree)(implicit ctx: Context): Tree = qual match {
     case qual @ IntegratedTypeArgs(app) =>
       pt.revealIgnored match {
@@ -449,8 +472,10 @@ class Typer extends Namer
       }
     case qual =>
       if (tree.name.isTypeName) checkStable(qual.tpe, qual.sourcePos)
-      val select = Applications.handleMeta(
-        checkValue(assignType(cpy.Select(tree)(qual, tree.name), qual), pt))
+      val select =
+        Applications.handleMeta(
+          healNonvariant(
+            checkValue(assignType(cpy.Select(tree)(qual, tree.name), qual), pt), pt))
       if (select.tpe ne TryDynamicCallType) ConstFold(checkStableIdentPattern(select, pt))
       else if (pt.isInstanceOf[FunOrPolyProto] || pt == AssignProto) select
       else typedDynamicSelect(tree, Nil, pt)
@@ -680,7 +705,8 @@ class Typer extends Namer
                 case lhsCore: RefTree if setter.exists =>
                   val setterTypeRaw = pre.select(setterName, setter)
                   val setterType = ensureAccessible(setterTypeRaw, isSuperSelection(lhsCore), tree.sourcePos)
-                  val lhs2 = untpd.rename(lhsCore, setterName).withType(setterType)
+                  val lhs2 = healNonvariant(
+                    untpd.rename(lhsCore, setterName).withType(setterType), WildcardType)
                   typedUnadapted(untpd.Apply(untpd.TypedSplice(lhs2), tree.rhs :: Nil), WildcardType, locked)
                 case _ =>
                   reassignmentToVal
