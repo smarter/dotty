@@ -1715,8 +1715,8 @@ object Types {
     assert(prefix.isValueType || (prefix eq NoPrefix), s"invalid prefix $prefix")
 
     prefix match {
-      case prefix: SkolemType =>
-        println(s"Skolem captured: $this")
+      case prefix: QualSkolemType =>
+        assert(false, s"Skolem captured: $this")
       case _ =>
     }
 
@@ -3654,6 +3654,14 @@ object Types {
     }
 
     override def toString: String = s"Skolem($hashCode)"
+  }
+
+  class QualSkolemType(info: Type) extends SkolemType(info) {
+    override def derivedSkolemType(info: Type)(implicit ctx: Context): SkolemType =
+      if (info eq this.info) this else QualSkolemType(info)
+  }
+  object QualSkolemType {
+    def apply(info: Type): QualSkolemType = new QualSkolemType(info)
   }
 
   // ------------ Type variables ----------------------------------------

@@ -43,7 +43,7 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           tp
         else pre match {
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
-          case pre: SkolemType if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists) =>
+          case pre: QualSkolemType if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists) =>
             val needSkolem = variance <= 0 && !isLegalPrefix(pre.info)
             if (needSkolem) {
               // pre.info
