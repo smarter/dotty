@@ -89,12 +89,14 @@ object Types {
 // ----- Tests -----------------------------------------------------
 
 //    // debug only: a unique identifier for a type
-//    val uniqId = {
-//      nextId = nextId + 1
-//      if (nextId == 19555)
-//        println("foo")
-//      nextId
-//    }
+   // val uniqId = {
+   //   nextId = nextId + 1
+   //   if (nextId == 4187)
+   //     Thread.dumpStack
+   //   // if (nextId == 19555)
+   //   //   println("foo")
+   //   nextId
+   // }
 
     /** A cache indicating whether the type was still provisional, last time we checked */
     @sharable private var mightBeProvisional = true

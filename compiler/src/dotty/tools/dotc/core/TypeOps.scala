@@ -33,7 +33,7 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
   class AsSeenFromMap(pre: Type, cls: Symbol) extends ApproximatingTypeMap {
 
     def apply(tp: Type): Type = {
-
+      // println("pre: " + pre)// + " " + pre.uniqId)
       /** Map a `C.this` type to the right prefix. If the prefix is unstable, and
        *  the current variance is <= 0, return a range.
        */
@@ -42,6 +42,15 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           tp
         else pre match {
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
+          case pre: SkolemType if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists) =>
+            val needSkolem = variance <= 0 && !isLegalPrefix(pre.info)
+            if (needSkolem) {
+              // pre.info
+              //range(pre, pre.info)
+              pre
+            }
+            else
+              pre.info
           case _ =>
             if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists)
               if (variance <= 0 && !isLegalPrefix(pre)) range(defn.NothingType, pre)
@@ -60,7 +69,9 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           case tp: NamedType =>
             val sym = tp.symbol
             if (sym.isStatic && !sym.maybeOwner.isOpaqueCompanion || (tp.prefix `eq` NoPrefix)) tp
-            else derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
+            else {
+              derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
+            }
           case tp: ThisType =>
             toPrefix(pre, cls, tp.cls)
           case _: BoundType =>
