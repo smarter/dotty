@@ -232,6 +232,7 @@ trait TypeAssigner {
     val nonSkolemQualType = qualType
     if (qualType != qual1.tpe) {
       // println("tree: " + tree.show)
+      // println("tp: " + qual1.tpe)
       qualType = QualSkolemType(qualType)
     }
     if (!qualType.hasSimpleKind && tree.name != nme.CONSTRUCTOR)

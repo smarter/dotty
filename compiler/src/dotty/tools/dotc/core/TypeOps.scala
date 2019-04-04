@@ -48,8 +48,11 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
             if (needSkolem) {
               // pre.info
               //range(pre, pre.info)
+
               // println(s"needSkolem[${ctx.compilationUnit.source}]: ($pre, $cls, $thiscls), tp = $tp")
+
               // Thread.dumpStack
+              // range(pre, pre.info)
               pre
             }
             else
@@ -73,7 +76,17 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
             val sym = tp.symbol
             if (sym.isStatic && !sym.maybeOwner.isOpaqueCompanion || (tp.prefix `eq` NoPrefix)) tp
             else {
-              derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
+              val pre1 = atVariance(variance max 0)(this(tp.prefix))
+              if (pre1.isInstanceOf[QualSkolemType]) {
+                // val safeCtx = ctx.withProperty(TypeOps.findMemberLimit, Some(()))
+                pre1.member(tp.name)/*(safeCtx)*/.info match {
+                  case TypeAlias(alias) =>
+                    // try to follow aliases of this will avoid skolemization.
+                    return alias
+                  case _ =>
+                }
+              }
+              derivedSelect(tp, pre1)
             }
           case tp: ThisType =>
             toPrefix(pre, cls, tp.cls)

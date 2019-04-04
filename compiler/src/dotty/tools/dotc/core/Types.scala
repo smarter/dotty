@@ -2109,9 +2109,17 @@ object Types {
       else if (prefix.isBottomType) prefix
       else {
         if (isType) {
+          // println("prefix: " + prefix)
+          // println("currentSymbol: " + currentSymbol)
           val res =
-            if (currentSymbol.is(ClassTypeParam)) argForParam(prefix)
-            else prefix.lookupRefined(name)
+            if (currentSymbol.is(ClassTypeParam)) {
+              // println("1")
+              argForParam(prefix)
+            }
+            else {
+              // println("2")
+              prefix.lookupRefined(name)
+            }
           if (res.exists) return res
           if (Config.splitProjections)
             prefix match {
