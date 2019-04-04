@@ -33,6 +33,7 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
   class AsSeenFromMap(pre: Type, cls: Symbol) extends ApproximatingTypeMap {
 
     def apply(tp: Type): Type = {
+      // println(i"#ASF($pre, $cls), tp = $tp")
       // println("pre: " + pre)// + " " + pre.uniqId)
       /** Map a `C.this` type to the right prefix. If the prefix is unstable, and
        *  the current variance is <= 0, return a range.
@@ -47,7 +48,8 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
             if (needSkolem) {
               // pre.info
               //range(pre, pre.info)
-              println(s"needSkolem[${ctx.compilationUnit.source}]: ($pre, $cls, $thiscls), tp = $tp")
+              // println(s"needSkolem[${ctx.compilationUnit.source}]: ($pre, $cls, $thiscls), tp = $tp")
+              // Thread.dumpStack
               pre
             }
             else

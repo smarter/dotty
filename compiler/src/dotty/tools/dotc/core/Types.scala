@@ -1714,6 +1714,12 @@ object Types {
 
     assert(prefix.isValueType || (prefix eq NoPrefix), s"invalid prefix $prefix")
 
+    prefix match {
+      case prefix: SkolemType =>
+        println(s"Skolem captured: $this")
+      case _ =>
+    }
+
     private[this] var myName: Name = null
     private[this] var lastDenotation: Denotation = null
     private[this] var lastSymbol: Symbol = null

@@ -230,8 +230,10 @@ trait TypeAssigner {
   def selectionType(tree: untpd.RefTree, qual1: Tree)(implicit ctx: Context): Type = {
     var qualType = qual1.tpe.widenIfUnstable
     val nonSkolemQualType = qualType
-    if (qualType != qual1.tpe)
+    if (qualType != qual1.tpe) {
+      // println("tree: " + tree.show)
       qualType = SkolemType(qualType)
+    }
     if (!qualType.hasSimpleKind && tree.name != nme.CONSTRUCTOR)
       // constructors are selected on typeconstructor, type arguments are passed afterwards
       qualType = errorType(em"$qualType takes type parameters", qual1.sourcePos)
@@ -239,6 +241,9 @@ trait TypeAssigner {
       qualType = errorType(em"$qualType is illegal as a selection prefix", qual1.sourcePos)
     val name = tree.name
     val mbr = qualType.member(name)
+    // if (qualType != qual1.tpe) {
+    //   println("mbr: " + mbr.info.show)
+    // }
     if (reallyExists(mbr))
       nonSkolemQualType.select(name, mbr)
     else if (qualType.derivesFrom(defn.DynamicClass) && name.isTermName && !Dynamic.isDynamicMethod(name))
