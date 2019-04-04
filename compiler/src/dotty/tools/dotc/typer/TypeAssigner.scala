@@ -229,6 +229,8 @@ trait TypeAssigner {
   /** The type of the selection `tree`, where `qual1` is the typed qualifier part. */
   def selectionType(tree: untpd.RefTree, qual1: Tree)(implicit ctx: Context): Type = {
     var qualType = qual1.tpe.widenIfUnstable
+    if (qualType != qual1.tpe)
+      qualType = SkolemType(qualType)
     if (!qualType.hasSimpleKind && tree.name != nme.CONSTRUCTOR)
       // constructors are selected on typeconstructor, type arguments are passed afterwards
       qualType = errorType(em"$qualType takes type parameters", qual1.sourcePos)
