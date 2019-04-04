@@ -47,6 +47,7 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
             if (needSkolem) {
               // pre.info
               //range(pre, pre.info)
+              println(s"needSkolem[${ctx.compilationUnit.source}]: ($pre, $cls, $thiscls), tp = $tp")
               pre
             }
             else
