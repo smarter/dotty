@@ -82,11 +82,25 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
                 pre1.member(tp.name)/*(safeCtx)*/.info match {
                   case TypeAlias(alias) =>
                     // try to follow aliases of this will avoid skolemization.
-                    return alias
-                  case _ =>
+                    alias
+                  case tp: TermRef =>
+                    tp
+                  case b: TypeBounds =>
+                    derivedSelect(tp, pre1)
+                  case info =>
+                    // println("pre1: " + pre1)
+                    // println("XX: " + info)
+                    if (variance > 0)
+                      info
+                    else {
+                      // println("variance: " + variance)
+                      // println("tp: " + tp)
+                      derivedSelect(tp, pre1)
+                    }
                 }
               }
-              derivedSelect(tp, pre1)
+              else
+                derivedSelect(tp, pre1)
             }
           case tp: ThisType =>
             toPrefix(pre, cls, tp.cls)
