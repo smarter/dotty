@@ -248,8 +248,12 @@ trait TypeAssigner {
     // if (qualType != qual1.tpe) {
     //   println("mbr: " + mbr.info.show)
     // }
-    if (reallyExists(mbr))
+    if (reallyExists(mbr)) {
+      if (mbr.info.existsPart(_.isInstanceOf[QualSkolemType])) {
+        assert(false, i"[${ctx.compilationUnit.source}] skolem retained for $tree: ${mbr.info}")
+      }
       nonSkolemQualType.select(name, mbr)
+    }
     else if (qualType.derivesFrom(defn.DynamicClass) && name.isTermName && !Dynamic.isDynamicMethod(name))
       TryDynamicCallType
     else if (qualType.isErroneous || name.toTermName == nme.ERROR)

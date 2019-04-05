@@ -1714,11 +1714,11 @@ object Types {
 
     assert(prefix.isValueType || (prefix eq NoPrefix), s"invalid prefix $prefix")
 
-    prefix match {
-      case prefix: QualSkolemType =>
-        assert(false, s"Skolem captured: $this")
-      case _ =>
-    }
+    // prefix match {
+    //   case prefix: QualSkolemType =>
+    //     assert(false, s"Skolem captured: $this")
+    //   case _ =>
+    // }
 
     private[this] var myName: Name = null
     private[this] var lastDenotation: Denotation = null
