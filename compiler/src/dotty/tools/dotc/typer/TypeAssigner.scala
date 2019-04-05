@@ -233,7 +233,7 @@ trait TypeAssigner {
 
     var qualType = qual1.tpe.widenIfUnstable
     val nonSkolemQualType = qualType
-    if (!isLegalPrefix(qualType)) {
+    if (tree.name.isTermName && !isLegalPrefix(qualType)) {
       // println("tree: " + tree.show)
       // println("tp: " + qual1.tpe)
       qualType = QualSkolemType(qualType)
