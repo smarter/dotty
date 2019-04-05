@@ -228,9 +228,12 @@ trait TypeAssigner {
 
   /** The type of the selection `tree`, where `qual1` is the typed qualifier part. */
   def selectionType(tree: untpd.RefTree, qual1: Tree)(implicit ctx: Context): Type = {
+    def isLegalPrefix(pre: Type)(implicit ctx: Context) =
+      pre.isStable || !ctx.phase.isTyper
+
     var qualType = qual1.tpe.widenIfUnstable
     val nonSkolemQualType = qualType
-    if (qualType != qual1.tpe) {
+    if (!isLegalPrefix(qualType)) {
       // println("tree: " + tree.show)
       // println("tp: " + qual1.tpe)
       qualType = QualSkolemType(qualType)
