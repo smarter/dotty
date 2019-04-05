@@ -26,13 +26,31 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
   /** The type `tp` as seen from prefix `pre` and owner `cls`. See the spec
    *  for what this means.
    */
-  final def asSeenFrom(tp: Type, pre: Type, cls: Symbol): Type =
+  final def asSeenFrom(tp: Type, pre: Type, cls: Symbol): Type = {
+    pre match {
+      case pre: QualSkolemType =>
+        val map = new AsSeenFromMap(pre, cls, skolemizable = true)
+        val ret = map.apply(tp)
+        if (!map.needsSkolem)
+          return ret
+        else {
+          // println(i"~~needsSkolem[${ctx.compilationUnit.source}]: ($pre, $cls), tp = $tp")
+        }
+      case _ =>
+    }
     new AsSeenFromMap(pre, cls).apply(tp)
+  }
 
   /** The TypeMap handling the asSeenFrom */
-  class AsSeenFromMap(pre: Type, cls: Symbol) extends ApproximatingTypeMap {
+  class AsSeenFromMap(pre: Type, cls: Symbol, skolemizable: Boolean = false) extends ApproximatingTypeMap {
+    var needsSkolem: Boolean = false
+    private[this] var pathVariance: Int = variance
 
     def apply(tp: Type): Type = {
+      apply(tp, isPrefix = false)
+    }
+
+    def apply(tp: Type, isPrefix: Boolean): Type = {
       // println(i"#ASF($pre, $cls), tp = $tp")
       // println("pre: " + pre)// + " " + pre.uniqId)
       /** Map a `C.this` type to the right prefix. If the prefix is unstable, and
@@ -43,23 +61,18 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           tp
         else pre match {
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
-          case pre: QualSkolemType if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists) =>
-            val needSkolem = variance <= 0 && !isLegalPrefix(pre.info)
-            if (needSkolem) {
-              // pre.info
-              //range(pre, pre.info)
-
-              // println(s"needSkolem[${ctx.compilationUnit.source}]: ($pre, $cls, $thiscls), tp = $tp")
-
-              // Thread.dumpStack
-              // range(pre, pre.info)
-              pre
+          case pre: QualSkolemType if skolemizable && (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists) =>
+            if (!needsSkolem) {
+              needsSkolem = pathVariance <= 0 && !isLegalPrefix(pre.info) // Second cond probably always true
             }
-            else
-              pre.info
+            pre.info
           case _ =>
             if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists)
-              if (variance <= 0 && !isLegalPrefix(pre)) range(defn.NothingType, pre)
+              if (variance <= 0 && !isLegalPrefix(pre)) {
+                // TODO: when is this branch taken ?
+                // assert(false, i"##BROKEN: [${if (ctx.compilationUnit != null) ctx.compilationUnit.source else ""}]: ($pre, $cls, $thiscls), tp = $tp")
+                range(defn.NothingType, pre)
+              }
               else pre
             else if ((pre.termSymbol is Package) && !(thiscls is Package))
               toPrefix(pre.select(nme.PACKAGE), cls, thiscls)
@@ -72,35 +85,21 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
         // All cases except for ThisType are the same as in Map. Inlined for performance
         // TODO: generalize the inlining trick?
         tp match {
+          // TODO:
+          // case tp: MethodType => // ExprType too ?
+          //   don't skolemizable in resType if it's not methodic
+
           case tp: NamedType =>
             val sym = tp.symbol
             if (sym.isStatic && !sym.maybeOwner.isOpaqueCompanion || (tp.prefix `eq` NoPrefix)) tp
             else {
-              val pre1 = atVariance(variance max 0)(this(tp.prefix))
-              if (pre1.isInstanceOf[QualSkolemType]) {
-                // val safeCtx = ctx.withProperty(TypeOps.findMemberLimit, Some(()))
-                pre1.member(tp.name)/*(safeCtx)*/.info match {
-                  case TypeAlias(alias) =>
-                    // try to follow aliases of this will avoid skolemization.
-                    alias
-                  case tp: TermRef =>
-                    tp
-                  case b: TypeBounds =>
-                    derivedSelect(tp, pre1)
-                  case info =>
-                    // println("pre1: " + pre1)
-                    // println("XX: " + info)
-                    if (variance > 0)
-                      info
-                    else {
-                      // println("variance: " + variance)
-                      // println("tp: " + tp)
-                      derivedSelect(tp, pre1)
-                    }
-                }
-              }
-              else
-                derivedSelect(tp, pre1)
+              val savedPathVariance = pathVariance
+              if (!isPrefix)
+                pathVariance = variance
+              val pre1 = atVariance(variance max 0)(apply(tp.prefix, isPrefix = true))
+              pathVariance = savedPathVariance
+
+              derivedSelect(tp, pre1)
             }
           case tp: ThisType =>
             toPrefix(pre, cls, tp.cls)
