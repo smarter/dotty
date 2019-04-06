@@ -112,8 +112,10 @@ object TypeApplications {
     def atNestedLevel(op: => Type): Type = {
       val saved = available
       available = Set()
+      // println(">> NEST")
       try op
       finally available = saved
+      // println("<< NEST")
     }
 
     // If this is a reference to a reducable type parameter corresponding to a
@@ -126,9 +128,19 @@ object TypeApplications {
         atNestedLevel(apply(arg))
     }
 
-    def apply(t: Type): Type = t match {
+    def apply(t: Type): Type = {
+      // println("##tycon: " + tycon.show)
+      // println("##args: " + args)
+      // println("Reduce: " + t.show)
+      val z = t match {
       case t @ AppliedType(tycon, args1) if tycon.typeSymbol.isClass =>
         t.derivedAppliedType(apply(tycon), args1.mapConserve(applyArg))
+      case t @ RefinedType(parent, name, TypeAlias(info)) =>
+        // println("t: " + t.show)
+        // println("info: " + info + " " + info.getClass)
+        // println("info: " + info)
+        // println("a: " + applyArg(info))
+        t.derivedRefinedType(apply(parent), name, applyArg(info).bounds)
       case p: TypeParamRef if p.binder == tycon =>
         args(p.paramNum) match {
           case TypeBounds(lo, hi) =>
@@ -142,6 +154,9 @@ object TypeApplications {
         atNestedLevel(mapOver(t))
       case _ =>
         mapOver(t)
+      }
+      // println("Reduced: " + t.show + " -> " + z.show)
+      z
     }
   }
 }
