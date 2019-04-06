@@ -590,11 +590,9 @@ object ProtoTypes {
         case WildcardType(tp: TypeBounds) => tp
         case tp => tp
       }
-      wildApprox(tycon, theMap, seen) match {
-        case _: WildcardType => WildcardType // this ensures we get a * type
-        case tycon1 => tp.derivedAppliedType(tycon1,
-          args.mapConserve(arg => wildToBounds(wildApprox(arg, theMap, seen))))
-      }
+      val tycon1 = wildApprox(tycon, theMap, seen)
+      tp.derivedAppliedType(tycon1,
+        args.mapConserve(arg => wildToBounds(wildApprox(arg, theMap, seen))))
     case tp: RefinedType => // default case, inlined for speed
       tp.derivedRefinedType(
           wildApprox(tp.parent, theMap, seen),
