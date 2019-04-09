@@ -228,7 +228,16 @@ trait TypeAssigner {
 
   /** The type of the selection `tree`, where `qual1` is the typed qualifier part. */
   def selectionType(tree: untpd.RefTree, qual1: Tree)(implicit ctx: Context): Type = {
+    def isLegalPrefix(pre: Type)(implicit ctx: Context) =
+      pre.isStable || !ctx.phase.isTyper
+
     var qualType = qual1.tpe.widenIfUnstable
+    val nonSkolemQualType = qualType
+    if (tree.name.isTermName && !isLegalPrefix(qualType)) {
+      // println("tree: " + tree.show)
+      // println("tp: " + qual1.tpe)
+      qualType = QualSkolemType(qualType)
+    }
     if (!qualType.hasSimpleKind && tree.name != nme.CONSTRUCTOR)
       // constructors are selected on typeconstructor, type arguments are passed afterwards
       qualType = errorType(em"$qualType takes type parameters", qual1.sourcePos)
@@ -236,8 +245,12 @@ trait TypeAssigner {
       qualType = errorType(em"$qualType is illegal as a selection prefix", qual1.sourcePos)
     val name = tree.name
     val mbr = qualType.member(name)
-    if (reallyExists(mbr))
-      qualType.select(name, mbr)
+    if (reallyExists(mbr)) {
+      if (mbr.info.existsPart(_.isInstanceOf[QualSkolemType])) {
+        assert(false, i"[${ctx.compilationUnit.source}] skolem retained for $tree: ${mbr.info}")
+      }
+      nonSkolemQualType.select(name, mbr)
+    }
     else if (qualType.derivesFrom(defn.DynamicClass) && name.isTermName && !Dynamic.isDynamicMethod(name))
       TryDynamicCallType
     else if (qualType.isErroneous || name.toTermName == nme.ERROR)

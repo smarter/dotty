@@ -3655,6 +3655,14 @@ object Types {
     override def toString: String = s"Skolem($hashCode)"
   }
 
+  class QualSkolemType(info: Type) extends SkolemType(info) {
+    override def derivedSkolemType(info: Type)(implicit ctx: Context): SkolemType =
+      if (info eq this.info) this else QualSkolemType(info)
+  }
+  object QualSkolemType {
+    def apply(info: Type): QualSkolemType = new QualSkolemType(info)
+  }
+
   // ------------ Type variables ----------------------------------------
 
   /** In a TypeApply tree, a TypeVar is created for each argument type to be inferred.
@@ -4578,6 +4586,9 @@ object Types {
       case _ => tp
     }
 
+    protected def expandBounds(tp: TypeBounds): Type =
+      range(atVariance(-variance)(reapply(tp.lo)), reapply(tp.hi))
+
     /** Try to widen a named type to its info relative to given prefix `pre`, where possible.
      *  The possible cases are listed inline in the code.
      */
@@ -4589,10 +4600,10 @@ object Types {
             // if H#T = U, then for any x in L..H, x.T =:= U,
             // hence we can replace with U under all variances
             reapply(alias.rewrapAnnots(tp1))
-          case TypeBounds(lo, hi) =>
+          case tp: TypeBounds =>
             // If H#T = _ >: S <: U, then for any x in L..H, S <: x.T <: U,
             // hence we can replace with S..U under all variances
-            range(atVariance(-variance)(reapply(lo)), reapply(hi))
+            expandBounds(tp)
           case info: SingletonType =>
             // if H#x: y.type, then for any x in L..H, x.type =:= y.type,
             // hence we can replace with y.type under all variances
@@ -4608,8 +4619,6 @@ object Types {
      *  underlying bounds to a range, otherwise return the expansion.
      */
     def expandParam(tp: NamedType, pre: Type): Type = {
-      def expandBounds(tp: TypeBounds) =
-        range(atVariance(-variance)(reapply(tp.lo)), reapply(tp.hi))
       tp.argForParam(pre) match {
         case arg @ TypeRef(pre, _) if pre.isArgPrefixOf(arg.symbol) =>
           arg.info match {
