@@ -43,9 +43,13 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
         else pre match {
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
           case _ =>
-            if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists)
+            if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists) {
+              if (thiscls != cls) {
+                assert(false, "pre: " + pre + " thiscls: " + thiscls + " cls: " + cls)
+              }
               if (variance <= 0 && !isLegalPrefix(pre)) range(defn.NothingType, pre)
               else pre
+            }
             else if ((pre.termSymbol is Package) && !(thiscls is Package))
               toPrefix(pre.select(nme.PACKAGE), cls, thiscls)
             else
