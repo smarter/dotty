@@ -132,7 +132,8 @@ object Settings {
         case (BooleanTag, _) =>
           update(true, args)
         case (OptionTag, _) =>
-          update(Some(propertyClass.get.getConstructor().newInstance()), args)
+          val p = propertyClass.get
+          update(Some(p.getConstructor().newInstance()), args)
         case (ListTag, _) =>
           if (argRest.isEmpty) missingArg
           else update((argRest split ",").toList, args)
