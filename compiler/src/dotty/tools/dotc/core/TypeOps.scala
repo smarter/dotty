@@ -26,11 +26,21 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
   /** The type `tp` as seen from prefix `pre` and owner `cls`. See the spec
    *  for what this means.
    */
-  final def asSeenFrom(tp: Type, pre: Type, cls: Symbol): Type =
+  final def asSeenFrom(tp: Type, pre: Type, cls: Symbol): Type = {
+    pre match {
+      case pre: QualSkolemType =>
+        val widenedMap = new AsSeenFromMap(pre.info, cls)
+        val ret = widenedMap.apply(tp)
+        if (!widenedMap.needsSkolem)
+          return ret
+      case _ =>
+    }
     new AsSeenFromMap(pre, cls).apply(tp)
+  }
 
   /** The TypeMap handling the asSeenFrom */
   class AsSeenFromMap(pre: Type, cls: Symbol) extends ApproximatingTypeMap {
+    var needsSkolem: Boolean = false
 
     def apply(tp: Type): Type = {
 
@@ -44,7 +54,14 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
           case _ =>
             if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists)
-              if (variance <= 0 && !isLegalPrefix(pre)) range(defn.NothingType, pre)
+              if (variance <= 0 && !isLegalPrefix(pre)) {
+                if (variance < 0) {
+                  needsSkolem = true
+                  defn.NothingType
+                }
+                else
+                  range(defn.NothingType, pre)
+              }
               else pre
             else if ((pre.termSymbol is Package) && !(thiscls is Package))
               toPrefix(pre.select(nme.PACKAGE), cls, thiscls)
@@ -74,6 +91,11 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
     override def reapply(tp: Type): Type =
       // derived infos have already been subjected to asSeenFrom, hence to need to apply the map again.
       tp
+
+    override protected def expandBounds(tp: TypeBounds): Type = {
+      needsSkolem = true
+      super.expandBounds(tp)
+    }
   }
 
   private def isLegalPrefix(pre: Type)(implicit ctx: Context) =
