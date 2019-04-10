@@ -1223,6 +1223,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
     case methRef: TermRef if methRef.widenSingleton.isInstanceOf[MethodicType] =>
       p(methRef)
     case mt: MethodicType =>
+      assert(false, s"[${ctx.compilationUnit.source}] onMethod($mt)")
       p(mt.narrow)
     case _ =>
       tp.member(nme.apply).hasAltWith(d => p(TermRef(tp, nme.apply, d)))
