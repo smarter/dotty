@@ -448,8 +448,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     case ExprType(rt) =>
       defn.FunctionType(0)
     case RefinedType(parent, nme.apply, refinedInfo) if parent.typeSymbol eq defn.PolyFunctionClass =>
-      assert(refinedInfo.isInstanceOf[PolyType])
-      val res = refinedInfo.resultType
+      val res = if (refinedInfo.isInstanceOf[PolyType]) refinedInfo.resultType else refinedInfo
       val paramss = res.paramNamess
       assert(paramss.length == 1)
       this(defn.FunctionType(paramss.head.length, isContextual = res.isImplicitMethod, isErased = res.isErasedMethod))
