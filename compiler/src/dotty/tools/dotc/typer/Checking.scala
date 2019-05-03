@@ -677,8 +677,8 @@ trait Checking {
   *   check that class prefix is stable.
    *  @return  `tp` itself if it is a class or trait ref, ObjectType if not.
    */
-  def checkClassType(tp: Type, pos: SourcePosition, traitReq: Boolean, stablePrefixReq: Boolean)(implicit ctx: Context): Type =
-    tp.underlyingClassRef(refinementOK = false) match {
+  def checkClassType(tp: Type, pos: SourcePosition, traitReq: Boolean, stablePrefixReq: Boolean)(implicit ctx: Context): Type = {
+    def check(base: Type) = base.underlyingClassRef(refinementOK = false) match {
       case tref: TypeRef =>
         if (traitReq && !tref.symbol.is(Trait)) ctx.error(TraitIsExpected(tref.symbol), pos)
         if (stablePrefixReq && ctx.phase <= ctx.refchecksPhase) checkStable(tref.prefix, pos)
@@ -687,6 +687,14 @@ trait Checking {
         ctx.error(ex"$tp is not a class type", pos)
         defn.ObjectType
     }
+
+    tp match {
+      case RefinedType(parent, nme.apply, _) if parent.classSymbol.derivesFrom(defn.PolyFunctionClass) =>
+        check(parent)
+      case _ =>
+        check(tp)
+    }
+  }
 
   /** If `sym` is an implicit conversion, check that implicit conversions are enabled.
    *  @pre  sym.is(GivenOrImplicit)
