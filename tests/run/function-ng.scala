@@ -5,7 +5,9 @@ object Test {
 
   def main(args: Array[String]): Unit = {
     val z = test1(new PolyFunction {
-      def apply(x: Int, y: Int): Int = x + y
+      def apply(x: Any, y: Any): Int = (x,y) match {
+        case (x: Int, y: Int) => x + y
+      }
     })
     println(z)
   }
