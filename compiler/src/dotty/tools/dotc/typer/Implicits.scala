@@ -142,7 +142,7 @@ object Implicits {
               //
               // We keep the old behavior under -language:Scala2.
               val isFunctionInS2 =
-                ctx.scala2Mode && tpw.derivesFrom(defn.FunctionClass(1)) && ref.symbol != defn.Predef_conforms
+                ctx.scala2Mode && (tpw <:< defn.FunctionType(1).appliedTo(WildcardType, WildcardType)) && ref.symbol != defn.Predef_conforms
               val isImplicitConversion = tpw.derivesFrom(defn.ConversionClass)
               val isConforms = // An implementation of <:< counts as a view, except that $conforms is always omitted
                   tpw.derivesFrom(defn.SubTypeClass) &&
