@@ -1105,10 +1105,7 @@ class Definitions {
 
   def FunctionClass(n: Int, isContextual: Boolean = false, isErased: Boolean = false)(implicit ctx: Context): Symbol =
     if (ctx.phase.erasedTypes) {
-      if (isErased) ctx.requiredClass("scala.Function0")
-      else if (n > 22) FunctionXXLClass
-      else if (n >= 0) ctx.requiredClass(s"scala.Function$n")
-      else NoSymbol
+      erasedFunctionClass(n, isErased)
     } else {
       if (isContextual && isErased)
         ctx.requiredClass("scala.ErasedImplicitFunction" + n.toString)
@@ -1127,7 +1124,7 @@ class Definitions {
 
   def FunctionType(n: Int, isContextual: Boolean = false, isErased: Boolean = false)(implicit ctx: Context): Type =
     if (ctx.phase.erasedTypes) {
-      FunctionClass(n, isContextual, isErased).typeRef
+      erasedFunctionType(n, isErased)
     } else {
       if (n <= MaxImplementedFunctionArity && (!isContextual || ctx.erasedTypes) && !isErased) ImplementedFunctionType(n)
       else {
@@ -1222,9 +1219,13 @@ class Definitions {
    */
   def erasedFunctionClass(cls: Symbol): Symbol = {
     val arity = scalaClassName(cls).functionArity
-    if (cls.name.isErasedFunction) FunctionClass(0)
+    erasedFunctionClass(arity, cls.name.isErasedFunction)
+  }
+
+  def erasedFunctionClass(arity: Int, isErased: Boolean): Symbol = {
+    if (isErased) ctx.requiredClass("scala.Function0")
     else if (arity > 22) FunctionXXLClass
-    else if (arity >= 0) FunctionClass(arity)
+    else if (arity >= 0) ctx.requiredClass(s"scala.Function$arity")
     else NoSymbol
   }
 
@@ -1238,11 +1239,13 @@ class Definitions {
    *    - anything else becomes a NoType
    */
   def erasedFunctionType(cls: Symbol): Type = {
-    val arity = scalaClassName(cls).functionArity
-    if (cls.name.isErasedFunction) FunctionType(0)
-    else if (arity > 22) FunctionXXLType
-    else if (arity >= 0) FunctionType(arity)
-    else NoType
+    val sym = erasedFunctionClass(cls)
+    if (sym.exists) sym.typeRef else NoType
+  }
+
+  def erasedFunctionType(arity: Int, isErased: Boolean): Type = {
+    val sym = erasedFunctionClass(arity, isErased)
+    if (sym.exists) sym.typeRef else NoType
   }
 
   val predefClassNames: Set[Name] =
