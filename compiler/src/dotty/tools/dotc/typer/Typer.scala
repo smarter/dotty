@@ -813,7 +813,7 @@ class Typer extends Namer
       funFlags = funFlags &~ Erased
     }
 
-    val funCls = defn.FunctionClass(args.length,
+    val funTpe = defn.FunctionType(args.length,
         isContextual = funFlags.is(Given), isErased = funFlags.is(Erased))
 
     /** Typechecks dependent function type with given parameters `params` */
@@ -830,7 +830,7 @@ class Typer extends Namer
         ctx.error(i"$mt is an illegal function type because it has inter-parameter dependencies", tree.sourcePos)
       val resTpt = TypeTree(mt.nonDependentResultApprox).withSpan(body.span)
       val typeArgs = params1.map(_.tpt) :+ resTpt
-      val tycon = TypeTree(funCls.typeRef)
+      val tycon = TypeTree(funTpe)
       val core = assignType(cpy.AppliedTypeTree(tree)(tycon, typeArgs), tycon, typeArgs)
       val appMeth = ctx.newSymbol(ctx.owner, nme.apply, Synthetic | Method | Deferred, mt, coord = body.span)
       val appDef = assignType(
@@ -844,7 +844,7 @@ class Typer extends Namer
         typedDependent(args.asInstanceOf[List[ValDef]])(
           ctx.fresh.setOwner(ctx.newRefinedClassSymbol(tree.span)).setNewScope)
       case _ =>
-        typed(cpy.AppliedTypeTree(tree)(untpd.TypeTree(funCls.typeRef), args :+ body), pt)
+        typed(cpy.AppliedTypeTree(tree)(untpd.TypeTree(funTpe), args :+ body), pt)
     }
   }
 
