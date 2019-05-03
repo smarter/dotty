@@ -618,7 +618,7 @@ object SymDenotations {
       */
     final def isStableMember(implicit ctx: Context): Boolean = {
       def isUnstableValue = is(UnstableValue) || info.isInstanceOf[ExprType]
-      isType || is(StableRealizable) || !isUnstableValue
+      exists && (isType || is(StableRealizable) || !isUnstableValue)
     }
 
     /** Is this a denotation of a class that does not have - either direct or inherited -
