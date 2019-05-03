@@ -1,7 +1,6 @@
 package dotty
 
 object DottyPredef {
-
   @forceInline final def assert(assertion: => Boolean, message: => Any): Unit = {
     if (!assertion)
       assertFail(message)
