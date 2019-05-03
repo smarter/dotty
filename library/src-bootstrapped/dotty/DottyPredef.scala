@@ -7,7 +7,8 @@ object DottyPredef {
   type Function1[-T1, +R] =
     scala.Function1[T1, R]
   type Function2[-T1, -T2, +R] =
-    scala.Function2[T1, T2, R]
+    PolyFunction { def apply(a: T1, b: T2): R }
+    // scala.Function2[T1, T2, R]
   type Function3[-T1, -T2, -T3, +R] =
     PolyFunction { def apply(a: T1, b: T2, c: T3): R }
     // scala.Function3[T1, T2, T3, R]

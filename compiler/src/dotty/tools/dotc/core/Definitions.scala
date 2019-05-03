@@ -1232,14 +1232,14 @@ class Definitions {
     val sym = tp.dealias.typeSymbol
 
     arity >= 0 &&
-      isFunctionClass(sym) &&
-      tp.isRef(FunctionClass(arity, sym.name.isImplicitFunction, sym.name.isErasedFunction)) /*&&
+      isFunctionClass(tp.dealias.classSymbol) /*&&
+      tp.isRef(FunctionClass(arity, sym.name.isImplicitFunction, sym.name.isErasedFunction)) &&
         !tp.isInstanceOf[RefinedType]*/
   }
 
   /** Is `tp` a representation of a (possibly depenent) function type or an alias of such? */
   def isFunctionType(tp: Type)(implicit ctx: Context): Boolean =
-    isNonRefinedFunction(tp.dropDependentRefinement)
+    isNonRefinedFunction(tp)
 
   // Specialized type parameters defined for scala.Function{0,1,2}.
   lazy val Function1SpecializedParamTypes: collection.Set[TypeRef] =
@@ -1279,7 +1279,20 @@ class Definitions {
         false
     })
 
-  def functionArity(tp: Type)(implicit ctx: Context): Int = tp.dropDependentRefinement.dealias.argInfos.length - 1
+  def functionArity(tp: Type)(implicit ctx: Context): Int = tp.dealias match {
+    case tp: AppliedType =>
+      tp.argInfos.length - 1
+    case RefinedType(parent, nme.apply, refinedInfo)
+        if parent.classSymbol.derivesFrom(defn.PolyFunctionClass) =>
+      val res = if (refinedInfo.isInstanceOf[PolyType]) refinedInfo.resultType else refinedInfo
+      val paramss = res.paramNamess
+      assert(paramss.length == 1)
+      paramss.head.length
+    case RefinedType(parent, nme.apply, _) => // old dep encoding
+      functionArity(parent)
+    case _ =>
+      -1
+  }
 
   /** Return underlying immplicit function type (i.e. instance of an ImplicitFunctionN class)
    *  or NoType if none exists. The following types are considered as underlying types:
