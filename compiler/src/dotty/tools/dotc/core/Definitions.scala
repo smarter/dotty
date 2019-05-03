@@ -1321,19 +1321,29 @@ class Definitions {
     (sym `eq` SomeClass) || isTupleClass(sym)
 
   /** If `cls` is Tuple1..Tuple22, add the corresponding *: type as last parent to `parents` */
-  def adjustForTuple(cls: ClassSymbol, tparams: List[TypeSymbol], parents: List[Type]): List[Type] = {
+  def adjustForTuple(cls: ClassSymbol, tparams: List[TypeSymbol], parents: List[Type])(implicit ctx: Context): List[Type] = {
     def syntheticParent(tparams: List[TypeSymbol]): Type =
       if (tparams.isEmpty) TupleTypeRef
       else TypeOps.nestedPairs(tparams.map(_.typeRef))
+
+    def stripRefinement(tp: Type): Type = tp.stripAnnots match {
+      case tp @ RefinedType(parent, name, info) =>
+        if (!cls.info.decls.lookupAll(name).exists(_.info.matchesLoosely(info)))
+          cls.enter(ctx.newSymbol(cls, name, Method | Synthetic | Deferred, info))
+        parent
+      case _ =>
+        tp
+    }
+
     def replaceFunctionParent(parent: Type): Type = parent.dealias match {
       case tp: AppliedType =>
         val sym = tp.tycon.classSymbol
         if (defn.scalaClassName(sym).isFunction)
-          defn.FunctionType(sym.name.functionArity).appliedTo(tp.args)
+          stripRefinement(defn.FunctionType(sym.name.functionArity).appliedTo(tp.args).dealias)
         else
           parent
       case _ =>
-        parent
+        stripRefinement(parent)
     }
     val parents1 =
       if (isTupleClass(cls) || cls == UnitClass) parents :+ syntheticParent(tparams)
