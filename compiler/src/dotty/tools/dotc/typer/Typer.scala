@@ -780,10 +780,23 @@ class Typer extends Namer
     }
     pt.stripTypeVar.dealias match {
       case pt1 if defn.isNonRefinedFunction(pt1) =>
-        // if expected parameter type(s) are wildcards, approximate from below.
-        // if expected result type is a wildcard, approximate from above.
-        // this can type the greatest set of admissible closures.
-        (pt1.argTypesLo.init, typeTree(pt1.argTypesHi.last))
+        def functionExpectedArgs(tp: Type): (List[Type], Type) = tp.dealias match {
+          case tp: AppliedType =>
+            // if expected parameter type(s) are wildcards, approximate from below.
+            // if expected result type is a wildcard, approximate from above.
+            // this can type the greatest set of admissible closures.
+            (tp.argTypesLo.init, tp.argTypesHi.last)
+          case RefinedType(parent, nme.apply, refinedInfo)
+              if parent.classSymbol.derivesFrom(defn.PolyFunctionClass) =>
+            val res = if (refinedInfo.isInstanceOf[PolyType]) refinedInfo.resultType else refinedInfo
+            val paramss = res.paramInfoss
+            assert(paramss.length == 1)
+            (paramss.head, res.resultType)
+          case RefinedType(parent, nme.apply, _) => // old dep encoding
+            functionExpectedArgs(parent)
+        }
+        val (param, ret) = functionExpectedArgs(pt1)
+        (param, typeTree(ret))
       case SAMType(sam @ MethodTpe(_, formals, restpe)) =>
         (formals,
          if (sam.isResultDependent)
