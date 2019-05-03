@@ -443,12 +443,12 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     case SuperType(thistpe, supertpe) =>
       SuperType(this(thistpe), this(supertpe))
     case ExprType(rt) =>
-      this(defn.FunctionType(0))
+      defn.erasedFunctionType(0, isErased = false)
     case RefinedType(parent, nme.apply, refinedInfo) if parent.typeSymbol eq defn.PolyFunctionClass =>
       val res = if (refinedInfo.isInstanceOf[PolyType]) refinedInfo.resultType else refinedInfo
       val paramss = res.paramNamess
       assert(paramss.length == 1)
-      this(defn.FunctionType(paramss.head.length, isContextual = res.isImplicitMethod, isErased = res.isErasedMethod))
+      defn.erasedFunctionType(paramss.head.length, isErased = res.isErasedMethod)
     case tp: TypeProxy =>
       this(tp.underlying)
     case AndType(tp1, tp2) =>
