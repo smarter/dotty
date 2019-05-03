@@ -29,11 +29,11 @@ class ElimPolyFunction extends MiniPhase with DenotTransformer {
   override def changesParents: Boolean = true // Replaces PolyFunction by FunctionN
 
   override def transform(ref: SingleDenotation)(implicit ctx: Context) = ref match {
-    case ref: ClassDenotation if ref.symbol != defn.PolyFunctionClass && ref.derivesFrom(defn.PolyFunctionClass) =>
+    case ref: ClassDenotation if ref.symbol != defn.PolyFunctionClass && ref.classParents.exists(_.classSymbol eq defn.PolyFunctionClass) =>
       val cinfo = ref.classInfo
       val newParent = functionTypeOfPoly(cinfo)
       val newParents = cinfo.classParents.map(parent =>
-        if (parent.typeSymbol == defn.PolyFunctionClass)
+        if (parent.classSymbol eq defn.PolyFunctionClass)
           newParent
         else
           parent
@@ -44,6 +44,10 @@ class ElimPolyFunction extends MiniPhase with DenotTransformer {
   }
 
   def functionTypeOfPoly(cinfo: ClassInfo)(implicit ctx: Context): Type = {
+    // FIXME: Handle overloads
+    // FIXME2: If user extended Function1, don't want to extend Function2 even
+    // if matching apply found. Need to remember the refinement in the parent
+    // type.
     val applyMeth = cinfo.decls.lookup(nme.apply).info
     val arity = applyMeth.paramNamess.head.length
     defn.FunctionType(arity)
@@ -51,7 +55,7 @@ class ElimPolyFunction extends MiniPhase with DenotTransformer {
 
   override def transformTemplate(tree: Template)(implicit ctx: Context): Tree = {
     val newParents = tree.parents.mapconserve(parent =>
-      if (parent.tpe.typeSymbol == defn.PolyFunctionClass) {
+      if (parent.tpe.classSymbol eq defn.PolyFunctionClass) {
         val cinfo = tree.symbol.owner.asClass.classInfo
         tpd.TypeTree(functionTypeOfPoly(cinfo))
       }
