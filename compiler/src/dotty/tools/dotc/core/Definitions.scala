@@ -1338,7 +1338,10 @@ class Definitions {
     val parents1 =
       if (isTupleClass(cls) || cls == UnitClass) parents :+ syntheticParent(tparams)
       else parents
-    parents1.mapconserve(replaceFunctionParent)
+    if (!cls.name.startsWith("JFunction"))
+      parents1.mapconserve(replaceFunctionParent)
+    else
+      parents1
   }
 
   // ----- primitive value class machinery ------------------------------------------
