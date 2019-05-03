@@ -1470,8 +1470,28 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
         case _ => false
       }
 
+      def isSubFunction(info1: Type, info2: Type): Boolean = (info1, info2) match {
+        case (info1: PolyType, info2: PolyType) =>
+          matchingPolyParams(info1, info2) &&
+          isSubFunction(info1.resultType, info2.resultType)
+        case (info1: MethodType, info2: MethodType) =>
+          val paramss1 = info1.paramInfoss
+          val paramss2 = info2.paramInfoss.nestedMap(_.subst(info2, info1))
+          assert(paramss1.length == 1)
+          assert(paramss2.length == 1)
+          info1.isImplicitMethod == info2.isImplicitMethod &&
+          (paramss2.head, paramss1.head).zipped.forall(isSubType) &&
+          isSubType(info1.resultType, info2.resultType.subst(info2, info1))
+        case _ =>
+          false
+      }
+
       def qualifies(m: SingleDenotation) =
-        isSubType(m.info.widenExpr, rinfo2.widenExpr) || matchAbstractTypeMember(m.info)
+        isSubType(m.info.widenExpr, rinfo2.widenExpr) || matchAbstractTypeMember(m.info) ||
+          (name eq nme.apply) &&
+          tp1.widen.classSymbol.derivesFrom(defn.PolyFunctionClass) &&
+          tp2.widen.classSymbol.derivesFrom(defn.PolyFunctionClass) &&
+          isSubFunction(m.info.widenExpr, rinfo2.widenExpr)
 
       tp1.member(name) match { // inlined hasAltWith for performance
         case mbr: SingleDenotation => qualifies(mbr)
