@@ -750,6 +750,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
         val tycon = pre.select(sym)
         val args = until(end, () => readTypeRef())
         if (sym == defn.ByNameParamClass2x) ExprType(args.head)
+        else if (defn.scalaClassName(sym).isFunction) defn.FunctionType(sym.name.functionArity).appliedTo(args)
         else if (args.nonEmpty) tycon.safeAppliedTo(EtaExpandIfHK(sym.typeParams, args.map(translateTempPoly)))
         else if (sym.typeParams.nonEmpty) tycon.EtaExpand(sym.typeParams)
         else tycon

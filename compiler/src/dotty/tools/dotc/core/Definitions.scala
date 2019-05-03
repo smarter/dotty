@@ -187,6 +187,12 @@ class Definitions {
     arr
   }
 
+  private def mkArityArray(prefix: Symbol, name: String, arity: Int, countFrom: Int): Array[TypeRef] = {
+    val arr = new Array[TypeRef](arity + 1)
+    for (i <- countFrom to arity) arr(i) = prefix.requiredType(name + i).typeRef
+    arr
+  }
+
   private def completeClass(cls: ClassSymbol, ensureCtor: Boolean = true): ClassSymbol = {
     if (ensureCtor) ensureConstructor(cls, EmptyScope)
     if (cls.linkedClass.exists) cls.linkedClass.info = NoType
@@ -1077,8 +1083,8 @@ class Definitions {
   @threadUnsafe lazy val AbstractFunctionType: Array[TypeRef] = mkArityArray("scala.runtime.AbstractFunction", MaxImplementedFunctionArity, 0)
   val AbstractFunctionClassPerRun: PerRun[Array[Symbol]] = new PerRun(implicit ctx => AbstractFunctionType.map(_.symbol.asClass))
   def AbstractFunctionClass(n: Int)(implicit ctx: Context): Symbol = AbstractFunctionClassPerRun()(ctx)(n)
-  @threadUnsafe private lazy val ImplementedFunctionType = mkArityArray("scala.Function", MaxImplementedFunctionArity, 0)
-  def FunctionClassPerRun: PerRun[Array[Symbol]] = new PerRun(implicit ctx => ImplementedFunctionType.map(_.symbol.asClass))
+  @threadUnsafe private lazy val ImplementedFunctionType = mkArityArray(DottyPredefModule, "Function", MaxImplementedFunctionArity, 0)
+  def FunctionClassPerRun: PerRun[Array[Symbol]] = new PerRun(implicit ctx => ImplementedFunctionType.map(_.classSymbol.asClass))
 
   val LazyHolder: PerRun[Map[Symbol, Symbol]] = new PerRun({ implicit ctx =>
     def holderImpl(holderType: String) = ctx.requiredClass("scala.runtime." + holderType)
@@ -1098,23 +1104,43 @@ class Definitions {
   @threadUnsafe lazy val TupleType: Array[TypeRef] = mkArityArray("scala.Tuple", MaxTupleArity, 1)
 
   def FunctionClass(n: Int, isContextual: Boolean = false, isErased: Boolean = false)(implicit ctx: Context): Symbol =
-    if (isContextual && isErased)
-      ctx.requiredClass("scala.ErasedImplicitFunction" + n.toString)
-    else if (isContextual)
-      ctx.requiredClass("scala.ImplicitFunction" + n.toString)
-    else if (isErased)
-      ctx.requiredClass("scala.ErasedFunction" + n.toString)
-    else if (n <= MaxImplementedFunctionArity)
-      FunctionClassPerRun()(ctx)(n)
-    else
-      ctx.requiredClass("scala.Function" + n.toString)
+    if (ctx.phase.erasedTypes) {
+      if (isErased) ctx.requiredClass("scala.Function0")
+      else if (n > 22) FunctionXXLClass
+      else if (n >= 0) ctx.requiredClass(s"scala.Function$n")
+      else NoSymbol
+    } else {
+      if (isContextual && isErased)
+        ctx.requiredClass("scala.ErasedImplicitFunction" + n.toString)
+      else if (isContextual)
+        ctx.requiredClass("scala.ImplicitFunction" + n.toString)
+      else if (isErased)
+        ctx.requiredClass("scala.ErasedFunction" + n.toString)
+      else if (n <= MaxImplementedFunctionArity)
+        FunctionClassPerRun()(ctx)(n)
+      else
+        DottyPredefModule.requiredType(s"Function$n").info.dealias.classSymbol
+    }
 
     @threadUnsafe lazy val Function0_applyR: TermRef = ImplementedFunctionType(0).symbol.requiredMethodRef(nme.apply)
     def Function0_apply(implicit ctx: Context): Symbol = Function0_applyR.symbol
 
-  def FunctionType(n: Int, isContextual: Boolean = false, isErased: Boolean = false)(implicit ctx: Context): TypeRef =
-    if (n <= MaxImplementedFunctionArity && (!isContextual || ctx.erasedTypes) && !isErased) ImplementedFunctionType(n)
-    else FunctionClass(n, isContextual, isErased).typeRef
+  def FunctionType(n: Int, isContextual: Boolean = false, isErased: Boolean = false)(implicit ctx: Context): Type =
+    if (ctx.phase.erasedTypes) {
+      FunctionClass(n, isContextual, isErased).typeRef
+    } else {
+      if (n <= MaxImplementedFunctionArity && (!isContextual || ctx.erasedTypes) && !isErased) ImplementedFunctionType(n)
+      else {
+        if (isContextual && isErased)
+          ctx.requiredClass("scala.ErasedImplicitFunction" + n.toString).typeRef
+        else if (isContextual)
+          ctx.requiredClass("scala.ImplicitFunction" + n.toString).typeRef
+        else if (isErased)
+          ctx.requiredClass("scala.ErasedFunction" + n.toString).typeRef
+        else
+          DottyPredefModule.requiredType(s"Function$n").typeRef
+      }
+    }
 
   lazy val PolyFunctionClass = ctx.requiredClass("scala.PolyFunction")
   def PolyFunctionType = PolyFunctionClass.typeRef
@@ -1145,7 +1171,8 @@ class Definitions {
    *   - ErasedFunctionN for N > 0
    *   - ErasedImplicitFunctionN for N > 0
    */
-  def isFunctionClass(cls: Symbol): Boolean = scalaClassName(cls).isFunction
+  def isFunctionClass(cls: Symbol): Boolean =
+    (cls eq PolyFunctionClass) || scalaClassName(cls).isFunction
 
   /** Is an implicit function class.
    *   - ImplicitFunctionN for N >= 0
@@ -1298,8 +1325,8 @@ class Definitions {
 
     arity >= 0 &&
       isFunctionClass(sym) &&
-      tp.isRef(FunctionType(arity, sym.name.isImplicitFunction, sym.name.isErasedFunction).typeSymbol) &&
-      !tp.isInstanceOf[RefinedType]
+      tp.isRef(FunctionClass(arity, sym.name.isImplicitFunction, sym.name.isErasedFunction)) /*&&
+        !tp.isInstanceOf[RefinedType]*/
   }
 
   /** Is `tp` a representation of a (possibly depenent) function type or an alias of such? */
@@ -1377,8 +1404,20 @@ class Definitions {
     def syntheticParent(tparams: List[TypeSymbol]): Type =
       if (tparams.isEmpty) TupleTypeRef
       else TypeOps.nestedPairs(tparams.map(_.typeRef))
-    if (isTupleClass(cls) || cls == UnitClass) parents :+ syntheticParent(tparams)
-    else parents
+    def replaceFunctionParent(parent: Type): Type = parent.dealias match {
+      case tp: AppliedType =>
+        val sym = tp.tycon.classSymbol
+        if (defn.scalaClassName(sym).isFunction)
+          defn.FunctionType(sym.name.functionArity).appliedTo(tp.args)
+        else
+          parent
+      case _ =>
+        parent
+    }
+    val parents1 =
+      if (isTupleClass(cls) || cls == UnitClass) parents :+ syntheticParent(tparams)
+      else parents
+    parents1.mapconserve(replaceFunctionParent)
   }
 
   /** Is synthesized symbol with alphanumeric name allowed to be used as an infix operator? */
