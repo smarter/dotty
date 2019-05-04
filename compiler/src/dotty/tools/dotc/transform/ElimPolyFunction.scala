@@ -45,9 +45,6 @@ class ElimPolyFunction extends MiniPhase with DenotTransformer {
 
   def functionTypeOfPoly(cinfo: ClassInfo)(implicit ctx: Context): Type = {
     // FIXME: Handle overloads
-    // FIXME2: If user extended Function1, don't want to extend Function2 even
-    // if matching apply found. Need to remember the refinement in the parent
-    // type.
     val applyMeth = cinfo.decls.lookup(nme.apply).info
     val arity = applyMeth.paramNamess.head.length
     defn.FunctionType(arity)

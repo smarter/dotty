@@ -494,6 +494,7 @@ object Checking {
           def transformedParent(tp: Type): Type = tp match {
             case ref: TypeRef => ref
             case ref: AppliedType => ref
+            case ref: RefinedType => ref
             case AnnotatedType(parent, annot) =>
               AnnotatedType(transformedParent(parent), annot)
             case _ => defn.ObjectType // can happen if class files are missing
