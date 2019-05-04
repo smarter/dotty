@@ -1421,30 +1421,30 @@ class Definitions {
       if (tparams.isEmpty) TupleTypeRef
       else TypeOps.nestedPairs(tparams.map(_.typeRef))
 
-    def stripRefinement(tp: Type): Type = tp.stripAnnots match {
+    def handleRefinement(tp: Type): Type = tp.stripAnnots match {
       case tp @ RefinedType(parent, name, info) =>
         if (!cls.info.decls.lookupAll(name).exists(_.info.matchesLoosely(info)))
           cls.enter(ctx.newSymbol(cls, name, Method | Synthetic | Deferred, info))
-        parent
+        tp
       case _ =>
         tp
     }
 
-    def replaceFunctionParent(parent: Type): Type = parent.dealias match {
+    def handleFunctionParent(parent: Type): Type = parent.dealias match {
       case tp: AppliedType =>
         val sym = tp.tycon.classSymbol
         if (defn.scalaClassName(sym).isFunction)
-          stripRefinement(defn.FunctionType(sym.name.functionArity).appliedTo(tp.args).dealias)
+          handleRefinement(defn.FunctionType(sym.name.functionArity).appliedTo(tp.args).dealias)
         else
           parent
       case _ =>
-        stripRefinement(parent)
+        handleRefinement(parent)
     }
     val parents1 =
       if (isTupleClass(cls) || cls == UnitClass) parents :+ syntheticParent(tparams)
       else parents
     if (!cls.name.startsWith("JFunction"))
-      parents1.mapconserve(replaceFunctionParent)
+      parents1.mapconserve(handleFunctionParent)
     else
       parents1
   }
