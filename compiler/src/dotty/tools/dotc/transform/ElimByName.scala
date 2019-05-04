@@ -42,7 +42,7 @@ class ElimByName extends TransformByNameApply with InfoTransformer {
   private def applyIfFunction(tree: Tree, ftree: Tree)(implicit ctx: Context) =
     if (isByNameRef(ftree)) {
       val tree0 = transformFollowing(tree)
-      ctx.atPhase(next) { implicit ctx => tree0.select(defn.Function0_apply).appliedToNone }
+      ctx.atPhase(next) { implicit ctx => tree0.select(nme.apply).appliedToNone }
     }
     else tree
 
