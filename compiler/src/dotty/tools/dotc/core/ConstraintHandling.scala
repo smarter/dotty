@@ -56,6 +56,11 @@ trait ConstraintHandling[AbstractContext] {
    */
   protected var comparedTypeLambdas: Set[TypeLambda] = Set.empty
 
+  /** We are currently comparing term lambdas. Used as a flag for
+   *  optimization: when `false`, no need to do an expensive `pruneLambdaParams`
+   */
+  protected var comparedTermLambdas: Set[TermLambda] = Set.empty
+
   /** Gives for each instantiated type var that does not yet have its `inst` field
     *  set, the instance value stored in the constraint. Storing instances in constraints
     *  is done only in a temporary way for contexts that may be retracted
@@ -429,13 +434,15 @@ trait ConstraintHandling[AbstractContext] {
        *  missing.
        */
       def pruneLambdaParams(tp: Type) =
-        if (comparedTypeLambdas.nonEmpty) {
+        if (comparedTypeLambdas.nonEmpty || comparedTermLambdas.nonEmpty) {
           val approx = new ApproximatingTypeMap {
             if (!fromBelow) variance = -1
             def apply(t: Type): Type = t match {
               case t @ TypeParamRef(tl: TypeLambda, n) if comparedTypeLambdas contains tl =>
                 val bounds = tl.paramInfos(n)
                 range(bounds.lo, bounds.hi)
+              case t @ TermParamRef(tl: TermLambda, n) if comparedTermLambdas contains tl =>
+                range(defn.NothingType, tl.paramInfos(n))
               case _ =>
                 mapOver(t)
             }
