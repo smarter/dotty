@@ -1631,7 +1631,7 @@ class Typer extends Namer
       }
       var result = if (isTreeType(tree)) typedType(tree)(superCtx) else typedExpr(tree)(superCtx)
       val psym = result.tpe.dealias.typeSymbol
-      if (seenParents.contains(psym) && !cls.isRefinementClass) {
+      if (psym != defn.PolyFunctionClass && seenParents.contains(psym) && !cls.isRefinementClass) {
         // Desugaring can adds parents to classes, but we don't want to emit an
         // error if the same parent was explicitly added in user code.
         if (!tree.span.isSourceDerived)
