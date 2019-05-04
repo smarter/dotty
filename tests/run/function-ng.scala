@@ -9,6 +9,9 @@ object Test {
     f(1, 2)
   }
 
+  def foo(x: => Int): Unit =
+    println(x)
+
   def main(args: Array[String]): Unit = {
     val h = new Hi/*PolyFunction*/ {
       def apply(x: Any): Int = x match {
@@ -20,5 +23,6 @@ object Test {
     }
     println(test1(h))
     println(test2(h))
+    foo(42)
   }
 }
