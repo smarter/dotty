@@ -422,7 +422,7 @@ object Build {
       libraryDependencies ++= Seq(
         "org.scala-lang.modules" % "scala-asm" % "6.0.0-scala-1", // used by the backend
         // FIXME: Not needed, but should be on the compiler CP
-        ("org.scala-lang.modules" %% "scala-xml" % "1.1.0").withDottyCompat(scalaVersion.value),
+        // ("org.scala-lang.modules" %% "scala-xml" % "1.1.0").withDottyCompat(scalaVersion.value),
         "org.scala-lang" % "scala-library" % scalacVersion % "test",
         Dependencies.`compiler-interface`,
         "org.jline" % "jline-reader" % "3.9.0",   // used by the REPL
