@@ -12,7 +12,7 @@
 	url = https://github.com/dotty-staging/ScalaPB
 [submodule "community-build/community-projects/scalatest"]
 	path = community-build/community-projects/scalatest
-	url = https://github.com/dotty-staging/scalatest
+	url = https://github.com/smarter/scalatest
 [submodule "community-build/community-projects/scopt"]
 	path = community-build/community-projects/scopt
 	url = https://github.com/dotty-staging/scopt
