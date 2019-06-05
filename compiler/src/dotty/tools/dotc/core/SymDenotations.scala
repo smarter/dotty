@@ -539,8 +539,10 @@ object SymDenotations {
     def isError: Boolean = false
 
     /** Make denotation not exist */
-    final def markAbsent(): Unit =
+    final def markAbsent(): Unit = {
+      assert(!isCompleting, this)
       myInfo = NoType
+    }
 
     /** Is symbol known to not exist, or potentially not completed yet? */
     final def unforcedIsAbsent(implicit ctx: Context): Boolean =
