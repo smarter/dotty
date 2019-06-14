@@ -528,7 +528,7 @@ object SymDenotations {
 
     /** Is symbol known to not exist? */
     final def isAbsent(implicit ctx: Context): Boolean = {
-      ensureCompleted()
+      // ensureCompleted()
       (myInfo `eq` NoType) ||
       (this.is(ModuleVal, butNot = Package)) && moduleClass.isAbsent
     }
@@ -804,7 +804,7 @@ object SymDenotations {
       }
 
       if (pre eq NoPrefix) true
-      else if (info eq NoType) false
+      else if (isAbsent) false
       else {
         val boundary = accessBoundary(owner)
 
@@ -1255,11 +1255,12 @@ object SymDenotations {
      *  @param base  The access boundary to assume if this symbol is protected
      */
     final def accessBoundary(base: Symbol)(implicit ctx: Context): Symbol = {
-      val fs = flags
-      if (fs.is(Private)) owner
-      else if (fs.isAllOf(StaticProtected)) defn.RootClass
-      else if (privateWithin.exists && !ctx.phase.erasedTypes) privateWithin
-      else if (fs.is(Protected)) base
+      // val fs = flags
+      if (this.is(Private)) owner
+      else if (this.isAllOf(StaticProtected)) defn.RootClass
+      // else if (privateWithin.exists && !ctx.phase.erasedTypes) privateWithin
+      else if (myPrivateWithin.exists && !ctx.phase.erasedTypes) myPrivateWithin
+      else if (this.is(Protected)) base
       else defn.RootClass
     }
 
