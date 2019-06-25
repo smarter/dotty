@@ -295,12 +295,14 @@ class Typer extends Namer
 
           if (isNewDefScope) {
             val defDenot = ctx.denotNamed(name, required)
+            // println("defDenot: " + defDenot + " curOwner: " + curOwner)
             if (qualifies(defDenot)) {
               val found =
                 if (isSelfDenot(defDenot)) curOwner.enclosingClass.thisType
                 else {
                   val effectiveOwner =
-                    if (curOwner.isTerm && defDenot.symbol.isType)
+                    if (curOwner.isConstructor/* && defDenot.symbol.isType*/) {
+                      // println("defDenot: " + defDenot + " curOwner: " + curOwner + " ac: " + defDenot.symbol.owner)
                       // Don't mix NoPrefix and thisType prefixes, since type comparer
                       // would not detect types to be compatible. Note: If we replace the
                       // 2nd condition by `defDenot.symbol.maybeOwner.isType` we get lots
@@ -308,9 +310,12 @@ class Typer extends Namer
                       // files in isolation works though.
                       // TODO: Investigate why that happens.
                       defDenot.symbol.owner
-                    else
+                    } else
                       curOwner
-                  effectiveOwner.thisType.select(name, defDenot)
+                  // println("ef: " + effectiveOwner + " other: " + defDenot.symbol.owner)
+                  val z = effectiveOwner.thisType.select(name, defDenot)
+                  // println("z: " + z)
+                  z
                 }
               if (!(curOwner is Package) || isDefinedInCurrentUnit(defDenot))
                 result = checkNewOrShadowed(found, definition) // no need to go further out, we found highest prec entry
@@ -428,6 +433,7 @@ class Typer extends Namer
       } else
         errorType(new MissingIdent(tree, kind, name.show), tree.sourcePos)
 
+    // println("ownType: " + ownType)
     val tree1 = ownType match {
       case ownType: NamedType if !prefixIsElidable(ownType) =>
         ref(ownType).withSpan(tree.span)
@@ -1591,6 +1597,7 @@ class Typer extends Namer
     val TypeDef(name, impl @ Template(constr, _, self, _)) = cdef
     val parents = impl.parents
     val superCtx = ctx.superCallContext
+    // println("pa: " + ctx.owner.asClass.paramAccessors.map(_.info))
 
     /** If `ref` is an implicitly parameterized trait, pass an implicit argument list.
      *  Otherwise, if `ref` is a parameterized trait, error.
