@@ -545,10 +545,10 @@ class TreeUnpickler(reader: TastyReader,
           case Some(rootd) =>
             pickling.println(i"overwriting ${rootd.symbol} # ${rootd.hashCode}")
             rootd.symbol.coord = coord
+            rootd.privateWithin = privateWithin
             rootd.info = adjustIfModule(
                 new Completer(subReader(start, end)) with SymbolLoaders.SecondCompleter)
             rootd.flags = flags &~ Touched // allow one more completion
-            rootd.privateWithin = privateWithin
             seenRoots += rootd.symbol
             rootd.symbol
           case _ =>
