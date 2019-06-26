@@ -541,8 +541,8 @@ object SymDenotations {
 
     /** Make denotation not exist */
     final def markAbsent(): Unit = {
-      assert(!isCompleting || myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | NoCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
-      assert(isCompleted || myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | NoCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
+      assert(!isCompleting || myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader | typer.Namer#ClassCompleter | NoCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
+      assert(isCompleted || myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader | typer.Namer#ClassCompleter | NoCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
       myInfo = NoType
     }
 
@@ -555,7 +555,7 @@ object SymDenotations {
     final def isAbsent(implicit ctx: Context): Boolean = {
       // ensureCompleted()
 
-      if (myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter]) {
+      if (myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader | typer.Namer#ClassCompleter]) {
         ensureCompleted()
       } else {
         val comp = myInfo
