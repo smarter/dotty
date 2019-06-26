@@ -540,7 +540,7 @@ object SymDenotations {
 
     /** Make denotation not exist */
     final def markAbsent(): Unit = {
-      assert(!isCompleting, this)
+      assert(!isCompleting, s"$this -- $myInfo -- ${myInfo.getClass}")
       myInfo = NoType
     }
 
@@ -552,6 +552,13 @@ object SymDenotations {
     /** Is symbol known to not exist? */
     final def isAbsent(implicit ctx: Context): Boolean = {
       // ensureCompleted()
+ 
+      val comp = myInfo
+      val saved = unforcedIsAbsent
+      ensureCompleted()
+      // completeOnce()
+      assert(saved == unforcedIsAbsent, s"saved: $saved\nnew: $unforcedIsAbsent\n$this -- $myInfo -- ${myInfo.getClass} -- $comp -- ${comp.getClass}")
+
       (myInfo `eq` NoType) ||
       (this.is(ModuleVal, butNot = Package)) && moduleClass.isAbsent
     }
