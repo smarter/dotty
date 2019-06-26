@@ -220,7 +220,7 @@ class ClassfileParser(
     skipAttributes()
   }
 
-  val memberCompleter: LazyType = new LazyType {
+  class MemberCompleter extends LazyType {
 
     def complete(denot: SymDenotation)(implicit ctx: Context): Unit = {
       val oldbp = in.bp
@@ -285,6 +285,8 @@ class ClassfileParser(
       }
     }
   }
+
+  val memberCompleter: MemberCompleter = new MemberCompleter
 
   /** Map direct references to Object to references to Any */
   final def objToAny(tp: Type)(implicit ctx: Context): Type =

@@ -287,13 +287,35 @@ object SymDenotations {
       if (this.is(ModuleClass)) name.stripModuleClassSuffix
       else name.exclude(AvoidClashName)
 
+    final def completeOnce()(implicit ctx: Context): Unit = myInfo match {
+      case cinfo: LazyType =>
+        completeFrom(cinfo)
+      case _ =>
+    }
+
     /** The privateWithin boundary, NoSymbol if no boundary is given.
      */
-    final def privateWithin(implicit ctx: Context): Symbol = { ensureCompleted(); myPrivateWithin }
+    final def privateWithin(implicit ctx: Context): Symbol = {
+      // ensureCompleted()
+      if(myInfo.isInstanceOf[unpickleScala2.Scala2Unpickler#LocalUnpickler | classfile.ClassfileParser#MemberCompleter | typer.Namer#Completer | LazyType#ProxyCompleter | ModuleCompleter]) {
+        ensureCompleted()
+        // completeOnce()
+      } else {
+        val comp = myInfo
+        val saved = myPrivateWithin
+        ensureCompleted()
+        // completeOnce()
+        assert(saved == myPrivateWithin, s"saved: $saved\nnew: $myPrivateWithin\n$this -- $myInfo -- ${myInfo.getClass} -- $comp -- ${comp.getClass}")
+      }
+      myPrivateWithin
+    }
 
     /** Set privateWithin. */
-    protected[dotc] final def privateWithin_=(sym: Symbol): Unit =
+    protected[dotc] final def privateWithin_=(sym: Symbol): Unit = {
+      assert(!isCompleting || myInfo.isInstanceOf[unpickleScala2.Scala2Unpickler#LocalUnpickler | NoCompleter /*from ClassfileParser*/ | classfile.ClassfileParser#MemberCompleter | typer.Namer#Completer | LazyType#ProxyCompleter | ModuleCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
+      assert(isCompleted || myInfo.isInstanceOf[unpickleScala2.Scala2Unpickler#LocalUnpickler | NoCompleter /*from ClassfileParser*/ | classfile.ClassfileParser#MemberCompleter | typer.Namer#Completer | LazyType#ProxyCompleter | ModuleCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
       myPrivateWithin = sym
+    }
 
     /** The annotations of this denotation */
     final def annotations(implicit ctx: Context): List[Annotation] = {
@@ -518,8 +540,11 @@ object SymDenotations {
     def isError: Boolean = false
 
     /** Make denotation not exist */
-    final def markAbsent(): Unit =
+    final def markAbsent(): Unit = {
+      assert(!isCompleting || myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader | typer.Namer#ClassCompleter | NoCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
+      assert(isCompleted || myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader | typer.Namer#ClassCompleter | NoCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
       myInfo = NoType
+    }
 
     /** Is symbol known to not exist, or potentially not completed yet? */
     final def unforcedIsAbsent(implicit ctx: Context): Boolean =
@@ -528,7 +553,18 @@ object SymDenotations {
 
     /** Is symbol known to not exist? */
     final def isAbsent(implicit ctx: Context): Boolean = {
-      ensureCompleted()
+      // ensureCompleted()
+
+      if (myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader | typer.Namer#ClassCompleter]) {
+        ensureCompleted()
+      } else {
+        val comp = myInfo
+        val saved = unforcedIsAbsent
+        ensureCompleted()
+        // completeOnce()
+        assert(saved == unforcedIsAbsent, s"saved: $saved\nnew: $unforcedIsAbsent\n$this -- $myInfo -- ${myInfo.getClass} -- $comp -- ${comp.getClass}")
+      }
+
       (myInfo `eq` NoType) ||
       (this.is(ModuleVal, butNot = Package)) && moduleClass.isAbsent
     }
@@ -2162,12 +2198,14 @@ object SymDenotations {
     private[this] var mySourceModuleFn: Context => Symbol = NoSymbolFn
     private[this] var myModuleClassFn: Context => Symbol = NoSymbolFn
 
+    class ProxyCompleter extends LazyType {
+      override def complete(denot: SymDenotation)(implicit ctx: Context) = self.complete(denot)
+    }
+
     /** A proxy to this lazy type that keeps the complete operation
      *  but provides fresh slots for scope/sourceModule/moduleClass
      */
-    def proxy: LazyType = new LazyType {
-      override def complete(denot: SymDenotation)(implicit ctx: Context) = self.complete(denot)
-    }
+    def proxy: LazyType = new ProxyCompleter
 
     /** The type parameters computed by the completer before completion has finished */
     def completerTypeParams(sym: Symbol)(implicit ctx: Context): List[TypeParamInfo] =
