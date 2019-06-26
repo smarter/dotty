@@ -287,13 +287,34 @@ object SymDenotations {
       if (this.is(ModuleClass)) name.stripModuleClassSuffix
       else name.exclude(AvoidClashName)
 
+    final def completeOnce()(implicit ctx: Context): Unit = myInfo match {
+      case cinfo: LazyType =>
+        completeFrom(cinfo)
+      case _ =>
+    }
+
     /** The privateWithin boundary, NoSymbol if no boundary is given.
      */
-    final def privateWithin(implicit ctx: Context): Symbol = { ensureCompleted(); myPrivateWithin }
+    final def privateWithin(implicit ctx: Context): Symbol = {
+      // ensureCompleted()
+      if(myInfo.isInstanceOf[unpickleScala2.Scala2Unpickler#LocalUnpickler | classfile.ClassfileParser#MemberCompleter]) {
+        ensureCompleted()
+        // completeOnce()
+      } else {
+        val comp = myInfo
+        val saved = myPrivateWithin
+        ensureCompleted()
+        // completeOnce()
+        assert(saved == myPrivateWithin, s"saved: $saved\nnew: $myPrivateWithin\n$this -- $myInfo -- ${myInfo.getClass} -- $comp -- ${comp.getClass}")
+      }
+      myPrivateWithin
+    }
 
     /** Set privateWithin. */
-    protected[dotc] final def privateWithin_=(sym: Symbol): Unit =
+    protected[dotc] final def privateWithin_=(sym: Symbol): Unit = {
+      assert(!isCompleting || myInfo.isInstanceOf[unpickleScala2.Scala2Unpickler#LocalUnpickler | NoCompleter /*from ClassfileParser*/ | classfile.ClassfileParser#MemberCompleter], s"$this -- $myInfo -- ${myInfo.getClass}")
       myPrivateWithin = sym
+    }
 
     /** The annotations of this denotation */
     final def annotations(implicit ctx: Context): List[Annotation] = {
@@ -1258,8 +1279,8 @@ object SymDenotations {
       // val fs = flags
       if (this.is(Private)) owner
       else if (this.isAllOf(StaticProtected)) defn.RootClass
-      // else if (privateWithin.exists && !ctx.phase.erasedTypes) privateWithin
-      else if (myPrivateWithin.exists && !ctx.phase.erasedTypes) myPrivateWithin
+      else if (privateWithin.exists && !ctx.phase.erasedTypes) privateWithin
+      // else if (myPrivateWithin.exists && !ctx.phase.erasedTypes) myPrivateWithin
       else if (this.is(Protected)) base
       else defn.RootClass
     }
