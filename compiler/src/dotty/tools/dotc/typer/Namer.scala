@@ -457,7 +457,14 @@ class Namer { typer: Typer =>
     def invalidate(name: TypeName) =
       if (!(definedNames contains name)) {
         val member = pkg.info.decl(name).asSymDenotation
-        if (member.isClass && !(member.is(Package))) member.markAbsent()
+        if (member.isClass && !(member.is(Package))) {
+          if (member.symbol.isDefinedInCurrentRun)
+            // `checkNoConflict` should have reported an error by now
+            assert(ctx.reporter.errorsReported)
+          else
+            // this companion either comes from an old run or the classpath and can be disregarded
+            member.markAbsent()
+        }
       }
     xstats foreach {
       case stat: TypeDef if stat.isClassDef =>
