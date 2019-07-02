@@ -317,6 +317,9 @@ object SymDenotations {
       myPrivateWithin = sym
     }
 
+    protected[dotc] final def unsafeSetPrivateWithin(sym: Symbol): Unit =
+      myPrivateWithin = sym
+
     /** The annotations of this denotation */
     final def annotations(implicit ctx: Context): List[Annotation] = {
       ensureCompleted(); myAnnotations
