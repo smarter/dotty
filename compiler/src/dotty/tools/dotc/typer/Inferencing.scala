@@ -45,10 +45,14 @@ object Inferencing {
 
 
   /** Instantiate selected type variables `tvars` in type `tp` */
-  def instantiateSelected(tp: Type, tvars: List[Type])(implicit ctx: Context): Unit = {
-    if (tvars.nonEmpty)
+  def instantiateSelected(tp: Type, tvars: List[TypeVar])(implicit ctx: Context): Unit = {
+    if (tvars.nonEmpty) {
       new IsFullyDefinedAccumulator(new ForceDegree.Value(tvars.contains, minimizeAll = false/*true*/)).process(tp) // 2460f9603b0f0ed1d73dfea99edcee9ba6261d63
-    // ... then minimize remaining vars.
+      tvars.foreach { case tvar =>
+        if (!tvar.isInstantiated)
+          tvar.instantiate(fromBelow = true)
+      }
+    }
                                                                                                                     // XX: logic also used for dep variables,
   }
 

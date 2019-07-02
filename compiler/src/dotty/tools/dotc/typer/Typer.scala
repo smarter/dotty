@@ -2625,11 +2625,8 @@ class Typer extends Namer
     def adaptNoArgsImplicitMethod(wtp: MethodType): Tree = {
       assert(wtp.isImplicitMethod)
       val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
-      def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToInstantiate)
-        replaceSingletons(tp)
-      }
-      instantiate(wtp)
+      instantiateSelected(wtp.finalResultType, tvarsToInstantiate)
+      replaceSingletons(wtp)
       // XXX: wrong, use variance in resultType to decide how to instantiate (e.g. def lt[T: Ordering](...)
 
       // wtp.paramInfos.foreach(instantiate)
