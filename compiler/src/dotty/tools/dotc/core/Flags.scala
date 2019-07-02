@@ -450,7 +450,7 @@ object Flags {
     Scala2ExistentialCommon, Mutable, Opaque, Touched, JavaStatic,
     OuterOrCovariant, LabelOrContravariant, CaseAccessor,
     Extension, NonMember, Implicit, Given, Delegate, Permanent, Synthetic,
-    SuperAccessorOrScala2x, Inline)
+    SuperAccessorOrScala2x, Inline, JavaDefined)
 
   /** Flags that are not (re)set when completing the denotation, or, if symbol is
    *  a top-level class or object, when completing the denotation once the class
