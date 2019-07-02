@@ -297,10 +297,11 @@ object SymDenotations {
      */
     final def privateWithin(implicit ctx: Context): Symbol = {
       // ensureCompleted()
-      if(myInfo.isInstanceOf[unpickleScala2.Scala2Unpickler#LocalUnpickler | classfile.ClassfileParser#MemberCompleter | typer.Namer#Completer | LazyType#ProxyCompleter | ModuleCompleter]) {
-        ensureCompleted()
-        // completeOnce()
-      } else {
+      if(myInfo.isInstanceOf[unpickleScala2.Scala2Unpickler#LocalUnpickler | classfile.ClassfileParser#MemberCompleter | /*typer.Namer#Completer |*/ LazyType#ProxyCompleter | ModuleCompleter] ||
+      (myInfo.isInstanceOf[typer.Namer#Completer] && !myInfo.isInstanceOf[typer.Namer#ClassCompleter])) {
+        // ensureCompleted()
+        completeOnce()
+      } else /*if (false)*/ {
         val comp = myInfo
         val saved = myPrivateWithin
         ensureCompleted()
@@ -555,9 +556,11 @@ object SymDenotations {
     final def isAbsent(implicit ctx: Context): Boolean = {
       // ensureCompleted()
 
-      if (myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader | typer.Namer#ClassCompleter]) {
-        ensureCompleted()
-      } else {
+      if (myInfo.isInstanceOf[LazyType#ProxyCompleter | SymDenotations.ModuleCompleter | ClassfileLoader/* | typer.Namer#ClassCompleter*/] ||
+        (myInfo.isInstanceOf[typer.Namer#Completer] && !myInfo.isInstanceOf[typer.Namer#ClassCompleter])) {
+        // ensureCompleted()
+        completeOnce()
+      } else /*if (false)*/ {
         val comp = myInfo
         val saved = unforcedIsAbsent
         ensureCompleted()
