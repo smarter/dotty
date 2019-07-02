@@ -47,7 +47,7 @@ object Inferencing {
   /** Instantiate selected type variables `tvars` in type `tp` */
   def instantiateSelected(tp: Type, tvars: List[Type])(implicit ctx: Context): Unit =
     if (tvars.nonEmpty)
-      new IsFullyDefinedAccumulator(new ForceDegree.Value(tvars.contains, minimizeAll = true)).process(tp)
+      new IsFullyDefinedAccumulator(new ForceDegree.Value(tvars.contains, minimizeAll = false/*true*/)).process(tp) // 2460f9603b0f0ed1d73dfea99edcee9ba6261d63
 
   /** Instantiate any type variables in `tp` whose bounds contain a reference to
    *  one of the parameters in `tparams` or `vparamss`.

@@ -2629,7 +2629,8 @@ class Typer extends Namer
         instantiateSelected(tp, tvarsToInstantiate)
         replaceSingletons(tp)
       }
-      wtp.paramInfos.foreach(instantiate)
+      instantiate(wtp)
+      // wtp.paramInfos.foreach(instantiate)
       val constr = ctx.typerState.constraint
 
       def dummyArg(tp: Type) = untpd.Ident(nme.???).withTypeUnchecked(tp)
