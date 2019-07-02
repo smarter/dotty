@@ -2630,6 +2630,8 @@ class Typer extends Namer
         replaceSingletons(tp)
       }
       instantiate(wtp)
+      // XXX: wrong, use variance in resultType to decide how to instantiate (e.g. def lt[T: Ordering](...)
+
       // wtp.paramInfos.foreach(instantiate)
       val constr = ctx.typerState.constraint
 
