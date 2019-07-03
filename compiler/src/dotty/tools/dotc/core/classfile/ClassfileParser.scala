@@ -210,9 +210,16 @@ class ClassfileParser(
       if (method) Flags.Method | methodTranslation.flags(jflags)
       else fieldTranslation.flags(jflags)
     val name = pool.getName(in.nextChar)
+    val owner = getOwner(jflags)
+    // TODO: refactor with setPrivateWithin
+    val privateWithin =
+      if ((jflags & (JAVA_ACC_PRIVATE | JAVA_ACC_PUBLIC)) == 0)
+        owner.enclosingPackageClass
+      else
+        NoSymbol
     if (!sflags.is(Flags.Private) || name == nme.CONSTRUCTOR) {
       val member = ctx.newSymbol(
-        getOwner(jflags), name, sflags, memberCompleter, coord = start)
+        getOwner(jflags), name, sflags, memberCompleter, privateWithin, coord = start)
       getScope(jflags).enter(member)
     }
     // skip rest of member for now
@@ -263,7 +270,6 @@ class ClassfileParser(
         denot.info = pool.getType(in.nextChar)
         if (isEnum) denot.info = ConstantType(Constant(sym))
         if (isConstructor) normalizeConstructorParams()
-        setPrivateWithin(denot, jflags)
         denot.info = translateTempPoly(parseAttributes(sym, denot.info))
         if (isConstructor) normalizeConstructorInfo()
 

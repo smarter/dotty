@@ -297,7 +297,7 @@ object SymDenotations {
      */
     final def privateWithin(implicit ctx: Context): Symbol = {
       // ensureCompleted()
-      if (myInfo.isInstanceOf[classfile.ClassfileParser#MemberCompleter | LazyType#ProxyCompleter | ModuleCompleter | SymbolLoader]) {
+      if (myInfo.isInstanceOf[LazyType#ProxyCompleter | ModuleCompleter | SymbolLoader]) {
         // ensureCompleted()
         completeOnce()
       } else /*if (false)*/ {
@@ -312,8 +312,8 @@ object SymDenotations {
 
     /** Set privateWithin. */
     protected[dotc] final def privateWithin_=(sym: Symbol): Unit = {
-      assert(!isCompleting || myInfo.isInstanceOf[NoCompleter /*from ClassfileParser*/ | classfile.ClassfileParser#MemberCompleter | LazyType#ProxyCompleter | ModuleCompleter | SymbolLoader], s"$this -- $myInfo -- ${myInfo.getClass}")
-      assert(isCompleted || myInfo.isInstanceOf[NoCompleter /*from ClassfileParser*/ | classfile.ClassfileParser#MemberCompleter | LazyType#ProxyCompleter | ModuleCompleter | SymbolLoader], s"$this -- $myInfo -- ${myInfo.getClass}")
+      assert(!isCompleting || myInfo.isInstanceOf[NoCompleter /*from ClassfileParser*/ | LazyType#ProxyCompleter | ModuleCompleter | SymbolLoader], s"$this -- $myInfo -- ${myInfo.getClass}")
+      assert(isCompleted || myInfo.isInstanceOf[NoCompleter /*from ClassfileParser*/ | LazyType#ProxyCompleter | ModuleCompleter | SymbolLoader], s"$this -- $myInfo -- ${myInfo.getClass}")
       myPrivateWithin = sym
     }
 
