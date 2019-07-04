@@ -289,11 +289,32 @@ object SymDenotations {
 
     /** The privateWithin boundary, NoSymbol if no boundary is given.
      */
-    final def privateWithin(implicit ctx: Context): Symbol = { ensureCompleted(); myPrivateWithin }
+    @tailrec
+    final def privateWithin(implicit ctx: Context): Symbol = myInfo match {
+      case myInfo: ModuleCompleter =>
+        // Instead of completing the ModuleCompleter, we can get `privateWithin`
+        // directly from the module class, which might require less completions.
+        myInfo.moduleClass.privateWithin
+      case _: SymbolLoader =>
+        // A SymbolLoader may need to be completed to have its privateWithin field set
+        completeOnce()
+        privateWithin
+      case _ =>
+        // Otherwise, no completion is necessary, the symbol should have been
+        // created with myPrivateWithin already set.
+        myPrivateWithin
+    }
 
     /** Set privateWithin. */
-    protected[dotc] final def privateWithin_=(sym: Symbol): Unit =
-      myPrivateWithin = sym
+    protected[dotc] final def privateWithin_=(pw: Symbol)(implicit ctx: Context): Unit = {
+      if (isCompleting) {
+        assert(owner.is(Package),
+          s"Only top-level classes can have privateWithin set during completion, but attempted to set $this with completer $myInfo to $pw")
+        assert(myInfo.isInstanceOf[ModuleCompleter | SymbolLoader],
+          s"Only symbol loaders may set privateWithin during completion, but attempted to set $this with completer $myInfo to $pw")
+      }
+      myPrivateWithin = pw
+    }
 
     /** The annotations of this denotation */
     final def annotations(implicit ctx: Context): List[Annotation] = {
@@ -365,7 +386,21 @@ object SymDenotations {
     /** The completer of this denotation. @pre: Denotation is not yet completed */
     final def completer: LazyType = myInfo.asInstanceOf[LazyType]
 
-    /** Make sure this denotation is completed */
+    /** If this denotation is not completed, run the completer.
+     *  The resulting info might be another completer.
+     *
+     *  @see ensureCompleted
+     */
+    final def completeOnce()(implicit ctx: Context): Unit = myInfo match {
+      case myInfo: LazyType =>
+        completeFrom(myInfo)
+      case _ =>
+    }
+
+    /** Make sure this denotation is fully completed.
+     *
+     *  @see completeOnce
+     */
     final def ensureCompleted()(implicit ctx: Context): Unit = info
 
     /** The symbols defined in this class or object.
@@ -382,7 +417,7 @@ object SymDenotations {
       case cinfo: LazyType =>
         val knownDecls = cinfo.decls
         if (knownDecls ne EmptyScope) knownDecls
-        else { completeFrom(cinfo); unforcedDecls } // complete-once
+        else { completeOnce(); unforcedDecls }
       case _ => info.decls
     }
 
