@@ -277,11 +277,30 @@ object SymDenotations {
 
     /** The privateWithin boundary, NoSymbol if no boundary is given.
      */
-    final def privateWithin(implicit ctx: Context): Symbol = { ensureCompleted(); myPrivateWithin }
+    @tailrec
+    final def privateWithin(implicit ctx: Context): Symbol = myInfo match {
+      case myInfo: ModuleCompleter =>
+        // Instead of completing the ModuleCompleter, we can get `privateWithin`
+        // directly from the module class, which might require less completions.
+        myInfo.moduleClass.privateWithin
+      case _: SymbolLoader =>
+        // A SymbolLoader may need to be completed to have its privateWithin field set
+        completeOnce()
+        privateWithin
+      case _ =>
+        // Otherwise, no completion is necessary, the symbol should have been
+        // created with myPrivateWithin already set.
+        myPrivateWithin
+    }
 
-    /** Set privateWithin. */
-    protected[dotc] final def privateWithin_=(sym: Symbol): Unit =
-      myPrivateWithin = sym
+    /** Set privateWithin. XX: document conditions */
+    protected[dotc] final def setPrivateWithin(pw: Symbol)(implicit ctx: Context): Unit = {
+      if (isCompleting) {
+        assert(myInfo.isInstanceOf[ModuleCompleter | SymbolLoader],
+          s"Only symbol loaders may set privateWithin during completion, but attempted to set $this with completer $myInfo to $pw")
+      }
+      myPrivateWithin = pw
+    }
 
     /** The annotations of this denotation */
     final def annotations(implicit ctx: Context): List[Annotation] = {
@@ -2220,7 +2239,7 @@ object SymDenotations {
         // is to have the module class completer set the annotations of both the
         // class and the module.
       denot.info = moduleClass.typeRef
-      denot.privateWithin = from.privateWithin
+      denot.setPrivateWithin(from.privateWithin)
     }
   }
 
@@ -2234,7 +2253,7 @@ object SymDenotations {
         case _ =>
           ErrorType(errMsg)
       }
-      denot.privateWithin = NoSymbol
+      denot.setPrivateWithin(NoSymbol)
     }
 
     def complete(denot: SymDenotation)(implicit ctx: Context): Unit = {
