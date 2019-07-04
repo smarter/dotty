@@ -156,12 +156,19 @@ class ClassfileParser(
 
       classRoot.setFlag(sflags)
       moduleRoot.setFlag(Flags.JavaDefined | Flags.ModuleClassCreationFlags)
-      setPrivateWithin(classRoot, jflags)
-      setPrivateWithin(moduleRoot, jflags)
-      setPrivateWithin(moduleRoot.sourceModule, jflags)
 
-      for (i <- 0 until in.nextChar) parseMember(method = false)
-      for (i <- 0 until in.nextChar) parseMember(method = true)
+      val privateWithin =
+        if ((jflags & (JAVA_ACC_PRIVATE | JAVA_ACC_PUBLIC)) == 0)
+          classRoot.enclosingPackageClass
+        else
+          NoSymbol
+
+      classRoot.privateWithin = privateWithin
+      moduleRoot.privateWithin = privateWithin
+      moduleRoot.sourceModule.privateWithin = privateWithin
+
+      for (i <- 0 until in.nextChar) parseMember(method = false, privateWithin)
+      for (i <- 0 until in.nextChar) parseMember(method = true, privateWithin)
       classInfo = parseAttributes(classRoot.symbol, classInfo)
       if (isAnnotation) addAnnotationConstructor(classInfo)
 
@@ -203,7 +210,7 @@ class ClassfileParser(
     }
   }
 
-  def parseMember(method: Boolean)(implicit ctx: Context): Unit = {
+  def parseMember(method: Boolean, privateWithin: Symbol)(implicit ctx: Context): Unit = {
     val start = indexCoord(in.bp)
     val jflags = in.nextChar
     val sflags =
@@ -211,8 +218,9 @@ class ClassfileParser(
       else fieldTranslation.flags(jflags)
     val name = pool.getName(in.nextChar)
     if (!sflags.is(Flags.Private) || name == nme.CONSTRUCTOR) {
+      val owner = getOwner(jflags)
       val member = ctx.newSymbol(
-        getOwner(jflags), name, sflags, memberCompleter, coord = start)
+        owner, name, sflags, memberCompleter, privateWithin, coord = start)
       getScope(jflags).enter(member)
     }
     // skip rest of member for now
@@ -263,7 +271,6 @@ class ClassfileParser(
         denot.info = pool.getType(in.nextChar)
         if (isEnum) denot.info = ConstantType(Constant(sym))
         if (isConstructor) normalizeConstructorParams()
-        setPrivateWithin(denot, jflags)
         denot.info = translateTempPoly(parseAttributes(sym, denot.info))
         if (isConstructor) normalizeConstructorInfo()
 
@@ -983,10 +990,11 @@ class ClassfileParser(
   protected def getScope(flags: Int): MutableScope =
     if (isStatic(flags)) staticScope else instanceScope
 
-  private def setPrivateWithin(denot: SymDenotation, jflags: Int)(implicit ctx: Context): Unit = {
+  private def getPrivateWithin(denot: SymDenotation, jflags: Int)(implicit ctx: Context): Symbol =
     if ((jflags & (JAVA_ACC_PRIVATE | JAVA_ACC_PUBLIC)) == 0)
-      denot.privateWithin = denot.enclosingPackageClass
-  }
+      denot.enclosingPackageClass
+    else
+      NoSymbol
 
   private def isPrivate(flags: Int)     = (flags & JAVA_ACC_PRIVATE) != 0
   private def isStatic(flags: Int)      = (flags & JAVA_ACC_STATIC) != 0
