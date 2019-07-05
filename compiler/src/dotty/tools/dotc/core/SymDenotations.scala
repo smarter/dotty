@@ -2189,7 +2189,7 @@ object SymDenotations {
   }
 
   /** A missing completer */
-  @sharable class NoCompleter extends LazyType {
+  @sharable trait NoCompleter extends LazyType {
     def complete(denot: SymDenotation)(implicit ctx: Context): Unit = unsupported("complete")
   }
 
