@@ -365,7 +365,21 @@ object SymDenotations {
     /** The completer of this denotation. @pre: Denotation is not yet completed */
     final def completer: LazyType = myInfo.asInstanceOf[LazyType]
 
-    /** Make sure this denotation is completed */
+    /** If this denotation is not completed, run the completer.
+     *  The resulting info might be another completer.
+     *
+     *  @see ensureCompleted
+     */
+    final def completeOnce()(implicit ctx: Context): Unit = myInfo match {
+      case myInfo: LazyType =>
+        completeFrom(myInfo)
+      case _ =>
+    }
+
+    /** Make sure this denotation is fully completed.
+     *
+     *  @see completeOnce
+     */
     final def ensureCompleted()(implicit ctx: Context): Unit = info
 
     /** The symbols defined in this class or object.
@@ -382,7 +396,7 @@ object SymDenotations {
       case cinfo: LazyType =>
         val knownDecls = cinfo.decls
         if (knownDecls ne EmptyScope) knownDecls
-        else { completeFrom(cinfo); unforcedDecls } // complete-once
+        else { completeOnce(); unforcedDecls }
       case _ => info.decls
     }
 
@@ -518,19 +532,27 @@ object SymDenotations {
     def isError: Boolean = false
 
     /** Make denotation not exist */
-    final def markAbsent(): Unit =
+    final def markAbsent()(implicit ctx: Context): Unit = {
+      if (isCompleting) {
+        assert(owner.is(Package),
+          s"Only top-level classes can be marked absent during completion, but attempted to mark absent $this with completer $myInfo")
+        assert(myInfo.isInstanceOf[ModuleCompleter | SymbolLoader],
+          s"Only symbol loaders can be mared absent during completion, but attempted to mark absent $this with completer $myInfo")
+      }
       myInfo = NoType
-
-    /** Is symbol known to not exist, or potentially not completed yet? */
-    final def unforcedIsAbsent(implicit ctx: Context): Boolean =
-      myInfo == NoType ||
-      (this.is(ModuleVal, butNot = Package)) && moduleClass.unforcedIsAbsent
+    }
 
     /** Is symbol known to not exist? */
-    final def isAbsent(implicit ctx: Context): Boolean = {
-      ensureCompleted()
-      (myInfo `eq` NoType) ||
-      (this.is(ModuleVal, butNot = Package)) && moduleClass.isAbsent
+    @tailrec
+    final def isAbsent(canForce: Boolean = true)(implicit ctx: Context): Boolean = myInfo match {
+      case myInfo: ModuleCompleter =>
+        myInfo.moduleClass.isAbsent(canForce)
+      case _: SymbolLoader if canForce =>
+        completeOnce()
+        isAbsent(canForce)
+      case _ =>
+        (myInfo `eq` NoType) ||
+        (this.is(ModuleVal, butNot = Package)) && moduleClass.isAbsent(canForce)
     }
 
     /** Is this symbol the root class or its companion object? */
@@ -651,7 +673,7 @@ object SymDenotations {
     final def isCoDefinedWith(other: Symbol)(implicit ctx: Context): Boolean =
       (this.effectiveOwner == other.effectiveOwner) &&
       (  !this.effectiveOwner.is(PackageClass)
-        || this.unforcedIsAbsent || other.unforcedIsAbsent
+        || this.isAbsent(canForce = false) || other.isAbsent(canForce = false)
         || { // check if they are defined in the same file(or a jar)
            val thisFile = this.symbol.associatedFile
            val thatFile = other.associatedFile
@@ -804,7 +826,7 @@ object SymDenotations {
       }
 
       if (pre eq NoPrefix) true
-      else if (isAbsent) false
+      else if (isAbsent()) false
       else {
         val boundary = accessBoundary(owner)
 
@@ -1620,7 +1642,7 @@ object SymDenotations {
     }
 
     final override def derivesFrom(base: Symbol)(implicit ctx: Context): Boolean =
-      !isAbsent &&
+      !isAbsent() &&
       base.isClass &&
       (  (symbol eq base)
       || (baseClassSet contains base)
@@ -1999,7 +2021,7 @@ object SymDenotations {
 
     /** Register companion class */
     override def registerCompanion(companion: Symbol)(implicit ctx: Context) =
-      if (companion.isClass && !unforcedIsAbsent && !companion.unforcedIsAbsent)
+      if (companion.isClass && !isAbsent(canForce = false) && !companion.isAbsent(canForce = false))
         myCompanion = companion
 
     override def registeredCompanion(implicit ctx: Context) = { ensureCompleted(); myCompanion }
@@ -2081,7 +2103,7 @@ object SymDenotations {
           }
         case nil =>
           val directMembers = super.computeNPMembersNamed(name)
-          if (acc.exists) acc.union(directMembers.filterWithPredicate(!_.symbol.isAbsent))
+          if (acc.exists) acc.union(directMembers.filterWithPredicate(!_.symbol.isAbsent()))
           else directMembers
       }
       if (symbol `eq` defn.ScalaPackageClass) {
