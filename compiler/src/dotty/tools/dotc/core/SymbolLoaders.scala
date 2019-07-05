@@ -18,6 +18,7 @@ import ast.Trees._
 import parsing.JavaParsers.OutlineJavaParser
 import parsing.Parsers.OutlineParser
 import reporting.trace
+import scala.annotation.internal.sharable
 
 object SymbolLoaders {
   import ast.untpd._
@@ -418,7 +419,7 @@ class SourcefileLoader(val srcfile: AbstractFile) extends SymbolLoader {
 }
 
 /** A NoCompleter which is also a SymbolLoader. */
-class NoLoader extends SymbolLoader with NoCompleter {
+@sharable class NoLoader extends SymbolLoader with NoCompleter {
   def description(implicit ctx: Context): String = "NoLoader"
   override def sourceFileOrNull: AbstractFile = null
   override def complete(root: SymDenotation)(implicit ctx: Context): Unit =
