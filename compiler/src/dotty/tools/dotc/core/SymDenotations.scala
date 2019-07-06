@@ -299,6 +299,10 @@ object SymDenotations {
         // A SymbolLoader may need to be completed to have its privateWithin field set
         completeOnce()
         privateWithin
+      // case _: typer.Namer#ClassCompleter =>
+      //   // XXX
+      //   completeOnce()
+      //   privateWithin
       case _ =>
         // Otherwise, no completion is necessary, the symbol should have been
         // created with myPrivateWithin already set.
