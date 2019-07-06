@@ -344,7 +344,7 @@ object desugar {
   @sharable private val synthetic = Modifiers(Synthetic)
 
   private def toDefParam(tparam: TypeDef): TypeDef =
-    tparam.withMods(tparam.rawMods & EmptyFlags | Param)
+    tparam.withMods(tparam.rawMods.withAnnotations(Nil) & EmptyFlags | Param)
   private def toDefParam(vparam: ValDef): ValDef =
     vparam.withMods(vparam.rawMods & (GivenOrImplicit | Erased) | Param)
 
@@ -453,7 +453,8 @@ object desugar {
 
     def anyRef = ref(defn.AnyRefAlias.typeRef)
 
-    val derivedTparams = constrTparams.map(derivedTypeParam(_))
+    val derivedTparams = (constrTparams, impliedTparams).zipped
+      .map((ctparam, itparam) => derivedTypeParam(ctparam).withMods(ctparam.rawMods.withAnnotations(itparam.mods.annotations)))
     val derivedVparamss = constrVparamss.nestedMap(derivedTermParam(_))
     val arity = constrVparamss.head.length
 
