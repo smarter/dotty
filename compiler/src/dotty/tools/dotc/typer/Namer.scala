@@ -1499,7 +1499,7 @@ class Namer { typer: Typer =>
     val unsafeInfo = rhsType.toBounds
     if (isDerived) sym.info = unsafeInfo
     else {
-      // sym.info = NoCompleter
+      sym.info = NoCompleter
       sym.info = checkNonCyclic(sym, unsafeInfo, reportErrors = true)
     }
     sym.normalizeOpaque()
