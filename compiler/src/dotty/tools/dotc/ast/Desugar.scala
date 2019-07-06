@@ -92,7 +92,8 @@ object desugar {
     override def ensureCompletions(implicit ctx: Context): Unit =
       if (!ctx.owner.is(Package))
         if (ctx.owner.isClass) {
-          ctx.owner.ensureCompleted()
+          // ctx.owner.ensureCompleted()
+          ctx.owner.completeConstr()
           if (ctx.owner.is(ModuleClass))
             ctx.owner.linkedClass.ensureCompleted()
         }

@@ -405,6 +405,12 @@ object SymDenotations {
      */
     final def ensureCompleted()(implicit ctx: Context): Unit = info
 
+    def completeConstr()(implicit ctx: Context): Unit = myInfo match {
+      case myInfo: typer.Namer#ClassCompleter =>
+        myInfo.completeConstr(this)
+      case _ =>
+    }
+
     /** The symbols defined in this class or object.
      *  Careful! This does not force the type, so is compilation order dependent.
      *  This method should be used only in the following circumstances:

@@ -1036,6 +1036,46 @@ class Namer { typer: Typer =>
       forwarderss.foreach(_.foreach(fwdr => fwdr.symbol.entered))
     }
 
+    private[this] var constrCompleted: Boolean = false
+    private[this] var myTempInfo: TempClassInfo = _
+    private[this] var mySelfInfo: TypeOrSymbol = NoType
+
+    def completeConstr(denot: SymDenotation): Unit = {
+      addAnnotations(denot.symbol)
+
+      mySelfInfo =
+        if (self.isEmpty) NoType
+        else if (cls.is(Module)) {
+          val moduleType = cls.owner.thisType select sourceModule
+          if (self.name == nme.WILDCARD) moduleType
+          else recordSym(
+            ctx.newSymbol(cls, self.name, self.mods.flags, moduleType, coord = self.span),
+            self)
+        }
+        else createSymbol(self)
+      val selfInfo = mySelfInfo
+
+      // pre-set info, so that parent types can refer to type params
+      myTempInfo = new TempClassInfo(cls.owner.thisType, cls, decls, selfInfo)
+      val tempInfo = myTempInfo
+      denot.info = tempInfo
+
+      val localCtx = ctx.inClassContext(selfInfo)
+
+      // Ensure constructor is completed so that any parameter accessors
+      // which have type trees deriving from its parameters can be
+      // completed in turn. Note that parent types access such parameter
+      // accessors, that's why the constructor needs to be completed before
+      // the parent types are elaborated.
+      index(constr)
+      index(rest)(localCtx)
+      symbolOfTree(constr).ensureCompleted()
+      myTempInfo = tempInfo
+      denot.info = this
+      constrCompleted = true
+    }
+
+
     /** The type signature of a ClassDef with given symbol */
     override def completeInCreationContext(denot: SymDenotation): Unit = {
       val parents = impl.parents
@@ -1098,9 +1138,10 @@ class Namer { typer: Typer =>
         }
       }
 
+      if (!constrCompleted) {
       addAnnotations(denot.symbol)
 
-      val selfInfo: TypeOrSymbol =
+      mySelfInfo =
         if (self.isEmpty) NoType
         else if (cls.is(Module)) {
           val moduleType = cls.owner.thisType select sourceModule
@@ -1110,9 +1151,11 @@ class Namer { typer: Typer =>
             self)
         }
         else createSymbol(self)
+      val selfInfo = mySelfInfo
 
       // pre-set info, so that parent types can refer to type params
-      val tempInfo = new TempClassInfo(cls.owner.thisType, cls, decls, selfInfo)
+      myTempInfo = new TempClassInfo(cls.owner.thisType, cls, decls, selfInfo)
+      val tempInfo = myTempInfo
       denot.info = tempInfo
 
       val localCtx = ctx.inClassContext(selfInfo)
@@ -1125,6 +1168,12 @@ class Namer { typer: Typer =>
       index(constr)
       index(rest)(localCtx)
       symbolOfTree(constr).ensureCompleted()
+      } else {
+        denot.info = myTempInfo
+      }
+      val tempInfo = myTempInfo
+      val selfInfo = mySelfInfo
+      val localCtx = ctx.inClassContext(selfInfo)
 
       val parentTypes = defn.adjustForTuple(cls, cls.typeParams,
         ensureFirstIsClass(parents.map(checkedParentType(_)), cls.span))
