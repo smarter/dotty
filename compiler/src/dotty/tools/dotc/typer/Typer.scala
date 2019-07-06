@@ -1694,7 +1694,7 @@ class Typer extends Namer
         ctx.featureWarning(nme.dynamics.toString, "extension of type scala.Dynamic", cls, isRequired, cdef.sourcePos)
       }
 
-      checkNonCyclicInherited(cls.thisType, cls.classParents, cls.info.decls, cdef.posd)
+      // checkNonCyclicInherited(cls.thisType, cls.classParents, cls.info.decls, cdef.posd)
 
       // check value class constraints
       checkDerivedValueClass(cls, body1)
