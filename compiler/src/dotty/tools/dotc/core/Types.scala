@@ -5109,19 +5109,25 @@ object Types {
 
   //   ----- Name Filters --------------------------------------------------
 
-  /** A name filter selects or discards a member name of a type `pre`.
+  /** A name filter selects or discards a member name of a type `pre`. */
+  abstract class NameFilter {
+    def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean
+  }
+
+
+  /** A name filter which can be used as an index in a cache
+   *  of member names, see `SymDenotations#MemberNames`.
+   *
    *  To enable efficient caching, name filters have to satisfy the
    *  following invariant: If `keep` is a name filter, and `pre` has
    *  class `C` as a base class, then
    *
    *    keep(pre, name)  implies  keep(C.this, name)
    */
-  abstract class NameFilter {
-    def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean
-  }
+  abstract class CacheableNameFilter extends NameFilter
 
   /** A filter for names of abstract types of a given type */
-  object abstractTypeNameFilter extends NameFilter {
+  object abstractTypeNameFilter extends CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
       name.isTypeName && {
         val mbr = pre.nonPrivateMember(name)
@@ -5130,7 +5136,7 @@ object Types {
   }
 
   /** A filter for names of abstract types of a given type */
-  object nonClassTypeNameFilter extends NameFilter {
+  object nonClassTypeNameFilter extends CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
       name.isTypeName && {
         val mbr = pre.member(name)
@@ -5139,13 +5145,13 @@ object Types {
   }
 
   /** A filter for names of deferred term definitions of a given type */
-  object abstractTermNameFilter extends NameFilter {
+  object abstractTermNameFilter extends CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
       name.isTermName && pre.nonPrivateMember(name).hasAltWith(_.symbol.is(Deferred))
   }
 
   /** A filter for names of type aliases of a given type */
-  object typeAliasNameFilter extends NameFilter {
+  object typeAliasNameFilter extends CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
       name.isTypeName && {
         val mbr = pre.nonPrivateMember(name)
@@ -5153,20 +5159,20 @@ object Types {
       }
   }
 
-  object typeNameFilter extends NameFilter {
+  object typeNameFilter extends CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean = name.isTypeName
   }
 
-  object fieldFilter extends NameFilter {
+  object fieldFilter extends CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
       name.isTermName && (pre member name).hasAltWith(!_.symbol.is(Method))
   }
 
-  object takeAllFilter extends NameFilter {
+  object takeAllFilter extends CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean = true
   }
 
-  object implicitFilter extends NameFilter {
+  object implicitFilter extends CacheableNameFilter {
     /** A dummy filter method.
      *  Implicit filtering is handled specially in computeMemberNames, so
      *  no post-filtering is needed.

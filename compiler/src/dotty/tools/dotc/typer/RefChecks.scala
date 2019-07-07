@@ -25,7 +25,7 @@ object RefChecks {
 
   val name: String = "refchecks"
 
-  private val defaultMethodFilter = new NameFilter {
+  private val defaultMethodFilter = new CacheableNameFilter {
     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean = name.is(DefaultGetterName)
   }
 

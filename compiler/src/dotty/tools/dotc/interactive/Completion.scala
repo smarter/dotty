@@ -16,7 +16,7 @@ import dotty.tools.dotc.core.Symbols.{NoSymbol, Symbol, defn}
 import dotty.tools.dotc.core.Scopes
 import dotty.tools.dotc.core.StdNames.{nme, tpnme}
 import dotty.tools.dotc.core.TypeError
-import dotty.tools.dotc.core.Types.{NameFilter, NamedType, NoType, Type}
+import dotty.tools.dotc.core.Types.{CacheableNameFilter, NamedType, NoType, Type}
 import dotty.tools.dotc.printing.Texts._
 import dotty.tools.dotc.util.{NameTransformer, NoSourcePosition, SourcePosition}
 
@@ -135,6 +135,12 @@ object Completion {
                           |                type    = ${buffer.mode.is(Mode.Type)}
                           |                results = $completionList%, %""")
     (offset, completionList)
+  }
+
+  /** Filter for names that should appear when looking for completions. */
+  private[this] object completionsFilter extends CacheableNameFilter {
+    def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
+      !name.isConstructorName && name.toTermName.info.kind == SimpleNameKind
   }
 
   private class CompletionBuffer(val mode: Mode, val prefix: String, pos: SourcePosition) {
@@ -323,13 +329,6 @@ object Completion {
       interactiv.println(i"implicit conversion targets considered: ${targets.toList}%, %")
       targets
     }
-
-    /** Filter for names that should appear when looking for completions. */
-   private[this] object completionsFilter extends NameFilter {
-     def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
-       !name.isConstructorName && name.toTermName.info.kind == SimpleNameKind
-   }
-
   }
 
   /**

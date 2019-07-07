@@ -1972,11 +1972,12 @@ object SymDenotations {
     }
 
     def memberNames(keepOnly: NameFilter)(implicit onBehalf: MemberNames, ctx: Context): Set[Name] =
-     if (this.is(PackageClass) || !Config.cacheMemberNames)
-        computeMemberNames(keepOnly) // don't cache package member names; they might change
-      else {
-        if (!memberNamesCache.isValid) memberNamesCache = MemberNames.newCache()
-        memberNamesCache(keepOnly, this)
+      keepOnly match {
+        case keepOnly: CacheableNameFilter if Config.cacheMemberNames && !this.is(PackageClass) => // don't cache package member names; they might change
+          if (!memberNamesCache.isValid) memberNamesCache = MemberNames.newCache()
+          memberNamesCache(keepOnly, this)
+        case _ =>
+          computeMemberNames(keepOnly)
       }
 
     def computeMemberNames(keepOnly: NameFilter)(implicit onBehalf: MemberNames, ctx: Context): Set[Name] = {
@@ -2301,13 +2302,13 @@ object SymDenotations {
 
   /** A cache for sets of member names, indexed by a NameFilter */
   trait MemberNames extends InheritedCache {
-    def apply(keepOnly: NameFilter, clsd: ClassDenotation)
+    def apply(keepOnly: CacheableNameFilter, clsd: ClassDenotation)
              (implicit onBehalf: MemberNames, ctx: Context): Set[Name]
   }
 
   object MemberNames {
     implicit val None: MemberNames = new InvalidCache with MemberNames {
-      def apply(keepOnly: NameFilter, clsd: ClassDenotation)(implicit onBehalf: MemberNames, ctx: Context) = ???
+      def apply(keepOnly: CacheableNameFilter, clsd: ClassDenotation)(implicit onBehalf: MemberNames, ctx: Context) = ???
     }
     def newCache()(implicit ctx: Context): MemberNames = new MemberNamesImpl(ctx.period)
   }
@@ -2382,7 +2383,7 @@ object SymDenotations {
           invalidateDependents()
         }
 
-    def apply(keepOnly: NameFilter, clsd: ClassDenotation)(implicit onBehalf: MemberNames, ctx: Context) = {
+    def apply(keepOnly: CacheableNameFilter, clsd: ClassDenotation)(implicit onBehalf: MemberNames, ctx: Context) = {
       assert(isValid)
       val cached = cache(keepOnly)
       try

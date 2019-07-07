@@ -363,13 +363,15 @@ object Checking {
    */
   def checkNonCyclicInherited(joint: Type, parents: List[Type], decls: Scope, posd: Positioned)(implicit ctx: Context): Unit = {
     def qualifies(sym: Symbol) = sym.name.isTypeName && !sym.is(Private)
-    val abstractTypeNames =
-      for (parent <- parents; mbr <- parent.abstractTypeMembers if qualifies(mbr.symbol))
-      yield mbr.name.asTypeName
+    val filter = new NameFilter {
+      def apply(pre: Type, name: Name)(implicit ctx: Context): Boolean =
+        decls.lookupEntry(name) != null && abstractTypeNameFilter(pre, name)
+    }
+    val abstractTypeNames = parents.flatMap(_.memberNames(filter))
 
    for (name <- abstractTypeNames)
       try {
-        val mbr = joint.member(name)
+        val mbr = joint.nonPrivateMember(name)
         mbr.info match {
           case bounds: TypeBounds =>
             !checkNonCyclic(mbr.symbol, bounds, reportErrors = true).isError
