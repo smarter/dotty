@@ -90,14 +90,16 @@ object desugar {
      *  in apply/unapply methods.
      */
     override def ensureCompletions(implicit ctx: Context): Unit =
-      if (!ctx.owner.is(Package))
-        if (ctx.owner.isClass) {
-          // ctx.owner.ensureCompleted()
-          ctx.owner.completeConstr()
-          if (ctx.owner.is(ModuleClass))
-            ctx.owner.linkedClass.ensureCompleted()
-        }
-        else ensureCompletions(ctx.outer)
+      if (!hasAttachment(untpd.OriginalSymbol)) {
+        if (!ctx.owner.is(Package))
+          if (ctx.owner.isClass) {
+            ctx.owner.ensureCompleted()
+            // ctx.owner.completeConstr()
+            if (ctx.owner.is(ModuleClass))
+              ctx.owner.linkedClass.ensureCompleted()
+          }
+          else ensureCompletions(ctx.outer)
+      }
 
     /** Return info of original symbol, where all references to siblings of the
      *  original symbol (i.e. sibling and original symbol have the same owner)

@@ -1044,42 +1044,6 @@ class Namer { typer: Typer =>
     private[this] var myTempInfo: TempClassInfo = _
     private[this] var mySelfInfo: TypeOrSymbol = NoType
 
-    def completeConstr(denot: SymDenotation): Unit = {
-      addAnnotations(denot.symbol)
-
-      mySelfInfo =
-        if (self.isEmpty) NoType
-        else if (cls.is(Module)) {
-          val moduleType = cls.owner.thisType select sourceModule
-          if (self.name == nme.WILDCARD) moduleType
-          else recordSym(
-            ctx.newSymbol(cls, self.name, self.mods.flags, moduleType, coord = self.span),
-            self)
-        }
-        else createSymbol(self)
-      val selfInfo = mySelfInfo
-
-      // pre-set info, so that parent types can refer to type params
-      myTempInfo = new TempClassInfo(cls.owner.thisType, cls, decls, selfInfo)
-      val tempInfo = myTempInfo
-      denot.info = tempInfo
-
-      val localCtx = ctx.inClassContext(selfInfo)
-
-      // Ensure constructor is completed so that any parameter accessors
-      // which have type trees deriving from its parameters can be
-      // completed in turn. Note that parent types access such parameter
-      // accessors, that's why the constructor needs to be completed before
-      // the parent types are elaborated.
-      index(constr)
-      index(rest)(localCtx)
-      symbolOfTree(constr).ensureCompleted()
-      myTempInfo = tempInfo
-      denot.info = this
-      constrCompleted = true
-    }
-
-
     /** The type signature of a ClassDef with given symbol */
     override def completeInCreationContext(denot: SymDenotation): Unit = {
       val parents = impl.parents
@@ -1175,6 +1139,9 @@ class Namer { typer: Typer =>
       } else {
         denot.info = myTempInfo
       }
+
+      // params.foreach(param => if (param.isType) typedAheadType(param))
+
       val tempInfo = myTempInfo
       val selfInfo = mySelfInfo
       val localCtx = ctx.inClassContext(selfInfo)
@@ -1469,55 +1436,65 @@ class Namer { typer: Typer =>
 
   def typeDefSig(tdef: TypeDef, sym: Symbol, tparamSyms: List[TypeSymbol])(implicit ctx: Context): Type = {
     def abstracted(tp: Type): Type = HKTypeLambda.fromParams(tparamSyms, tp)
-    val dummyInfo1 = abstracted(TypeBounds.empty)
-    sym.info = dummyInfo1
-    sym.setFlag(Provisional)
-      // Temporarily set info of defined type T to ` >: Nothing <: Any.
-      // This is done to avoid cyclic reference errors for F-bounds.
-      // This is subtle: `sym` has now an empty TypeBounds, but is not automatically
-      // made an abstract type. If it had been made an abstract type, it would count as an
-      // abstract type of its enclosing class, which might make that class an invalid
-      // prefix. I verified this would lead to an error when compiling io.ClassPath.
-      // A distilled version is in pos/prefix.scala.
-      //
-      // The scheme critically relies on an implementation detail of isRef, which
-      // inspects a TypeRef's info, instead of simply dealiasing alias types.
 
-    val isDerived = tdef.rhs.isInstanceOf[untpd.DerivedTypeTree]
-    val rhs = tdef.rhs match {
-      case LambdaTypeTree(_, body) => body
-      case rhs => rhs
-    }
-
-    // For match types: approximate with upper bound while evaluating the rhs.
-    val dummyInfo2 = rhs match {
-      case MatchTypeTree(bound, _, _) if !bound.isEmpty =>
-        abstracted(TypeBounds.upper(typedAheadType(bound).tpe))
+    tdef.rhs match {
+      case rhs: untpd.DerivedTypeTree =>
+        sym.resetFlag(Touched)
+        sym.info = new LazyType {
+          def complete(denot: SymDenotation)(implicit ctx: Context): Unit =
+            denot.info = typedAheadType(rhs).tpe
+        }
+        typedAheadType(rhs).tpe
+        sym.info
       case _ =>
-        dummyInfo1
+        val dummyInfo1 = abstracted(TypeBounds.empty)
+        sym.info = dummyInfo1
+        sym.setFlag(Provisional)
+        // Temporarily set info of defined type T to ` >: Nothing <: Any.
+        // This is done to avoid cyclic reference errors for F-bounds.
+        // This is subtle: `sym` has now an empty TypeBounds, but is not automatically
+        // made an abstract type. If it had been made an abstract type, it would count as an
+        // abstract type of its enclosing class, which might make that class an invalid
+        // prefix. I verified this would lead to an error when compiling io.ClassPath.
+        // A distilled version is in pos/prefix.scala.
+        //
+        // The scheme critically relies on an implementation detail of isRef, which
+        // inspects a TypeRef's info, instead of simply dealiasing alias types.
+
+        val rhs = tdef.rhs match {
+          case LambdaTypeTree(_, body) => body
+          case rhs => rhs
+        }
+
+        // For match types: approximate with upper bound while evaluating the rhs.
+        val dummyInfo2 = rhs match {
+          case MatchTypeTree(bound, _, _) if !bound.isEmpty =>
+            abstracted(TypeBounds.upper(typedAheadType(bound).tpe))
+          case _ =>
+            dummyInfo1
+        }
+        sym.info = dummyInfo2
+
+        val rhsBodyType = typedAheadType(rhs).tpe
+        val rhsType = abstracted(rhsBodyType)
+        val unsafeInfo = rhsType.toBounds
+
+        sym.info = NoCompleter
+        sym.info = checkNonCyclic(sym, unsafeInfo, reportErrors = true)
+
+        sym.normalizeOpaque()
+        sym.resetFlag(Provisional)
+
+        // Here we pay the price for the cavalier setting info to TypeBounds.empty above.
+        // We need to compensate by reloading the denotation of references that might
+        // still contain the TypeBounds.empty. If we do not do this, stdlib factories
+        // fail with a bounds error in PostTyper.
+        def ensureUpToDate(tref: TypeRef, outdated: Type) =
+          if (tref.info == outdated && sym.info != outdated) tref.recomputeDenot()
+        ensureUpToDate(sym.typeRef, dummyInfo1)
+        if (dummyInfo2 `ne` dummyInfo1) ensureUpToDate(sym.typeRef, dummyInfo2)
+
+        sym.info
     }
-    sym.info = dummyInfo2
-
-    val rhsBodyType = typedAheadType(rhs).tpe
-    val rhsType = if (isDerived) rhsBodyType else abstracted(rhsBodyType)
-    val unsafeInfo = rhsType.toBounds
-    if (isDerived) sym.info = unsafeInfo
-    else {
-      sym.info = NoCompleter
-      sym.info = checkNonCyclic(sym, unsafeInfo, reportErrors = true)
-    }
-    sym.normalizeOpaque()
-    sym.resetFlag(Provisional)
-
-    // Here we pay the price for the cavalier setting info to TypeBounds.empty above.
-    // We need to compensate by reloading the denotation of references that might
-    // still contain the TypeBounds.empty. If we do not do this, stdlib factories
-    // fail with a bounds error in PostTyper.
-    def ensureUpToDate(tref: TypeRef, outdated: Type) =
-      if (tref.info == outdated && sym.info != outdated) tref.recomputeDenot()
-    ensureUpToDate(sym.typeRef, dummyInfo1)
-    if (dummyInfo2 `ne` dummyInfo1) ensureUpToDate(sym.typeRef, dummyInfo2)
-
-    sym.info
   }
 }

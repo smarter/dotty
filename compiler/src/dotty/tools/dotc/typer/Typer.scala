@@ -1241,15 +1241,19 @@ class Typer extends Namer
     tree match {
       case tree: untpd.DerivedTypeTree =>
         tree.ensureCompletions
-        tree.getAttachment(untpd.OriginalSymbol) match {
-          case Some(origSym) =>
-            tree.derivedTree(origSym).withSpan(tree.span)
-            // btw, no need to remove the attachment. The typed
-            // tree is different from the untyped one, so the
-            // untyped tree is no longer accessed after all
-            // accesses with typedTypeTree are done.
-          case None =>
-            errorTree(tree, "Something's wrong: missing original symbol for type tree")
+        tree.getAttachment(TypedAhead) match {
+          case Some(ttree) => ttree
+          case none =>
+            tree.getAttachment(untpd.OriginalSymbol) match {
+              case Some(origSym) =>
+                tree.derivedTree(origSym).withSpan(tree.span)
+              // btw, no need to remove the attachment. The typed
+              // tree is different from the untyped one, so the
+              // untyped tree is no longer accessed after all
+              // accesses with typedTypeTree are done.
+              case none =>
+                errorTree(tree, "Something's wrong: missing original symbol for type tree")
+            }
         }
       case _ =>
         tree.withType(
