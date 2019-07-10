@@ -128,6 +128,7 @@ object desugar {
             mapOver(tp)
         }
       }
+      assert(!sym.flagsUNSAFE.is(Provisional), "XXX: " + sym.ownersIterator.toList)
       tpd.TypeTree(relocate(sym.info))
     }
   }
