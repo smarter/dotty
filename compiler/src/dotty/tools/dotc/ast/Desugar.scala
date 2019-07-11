@@ -128,6 +128,7 @@ object desugar {
             mapOver(tp)
         }
       }
+      // println("relocate: " + sym.ownersIterator.toList + " " + sym.infoOrCompleter)
       assert(!sym.flagsUNSAFE.is(Provisional), "XXX: " + sym.ownersIterator.toList)
       tpd.TypeTree(relocate(sym.info))
     }
@@ -412,9 +413,19 @@ object desugar {
     val tparamAccessors = impliedTparams//.map(toDefParam)
     val derivedTparams = tparamAccessors.map(tparam => toDefParam(derivedTypeParam(tparam)))
     val constrTparams = derivedTparams.map(tparam => tparam.withMods(tparam.rawMods.withAnnotations(Nil)))
- 
+
+    val caseAccessor = if (isCaseClass) CaseAccessor else EmptyFlags
+    val vparamAccessorss = originalVparamss match {
+      case first :: rest =>
+        first.map(p => p.withMods(p.rawMods | caseAccessor)) ::
+        rest
+      case _ =>
+        ListOfNil
+    }
+
+    val derivedVparamss = vparamAccessorss.nestedMap(param => toDefParam(derivedTermParam(param)))
     val constrVparamss =
-      if (originalVparamss.isEmpty) { // ensure parameter list is non-empty
+      if (derivedVparamss == ListOfNil) { // ensure parameter list is non-empty
         if (isCaseClass && originalTparams.isEmpty)
           ctx.error(CaseClassMissingParamList(cdef), namePos)
         ListOfNil
@@ -422,7 +433,7 @@ object desugar {
           ctx.error("Case classes should have a non-implicit parameter list", namePos)
         ListOfNil
       }
-      else originalVparamss.nestedMap(toDefParam)
+      else derivedVparamss
     val constr = cpy.DefDef(constr1)(tparams = constrTparams, vparamss = constrVparamss)
 
     val (normalizedBody, enumCases, enumCompanionRef) = {
@@ -457,7 +468,7 @@ object desugar {
 
     def anyRef = ref(defn.AnyRefAlias.typeRef)
 
-    val derivedVparamss = constrVparamss.nestedMap(derivedTermParam(_))
+    // val derivedVparamss = constrVparamss.nestedMap(derivedTermParam(_))
     val arity = constrVparamss.head.length
 
     val classTycon: Tree = new TypeRefTree // watching is set at end of method
@@ -749,14 +760,14 @@ object desugar {
       // val originalTparamsIt = impliedTparams.toIterator
       val originalVparamsIt = originalVparamss.toIterator.flatten
       // val tparamAccessors = derivedTparams.map(_.withMods(originalTparamsIt.next().mods))
-      val caseAccessor = if (isCaseClass) CaseAccessor else EmptyFlags
-      val vparamAccessors = derivedVparamss match {
-        case first :: rest =>
-          first.map(_.withMods(originalVparamsIt.next().mods | caseAccessor)) ++
-          rest.flatten.map(_.withMods(originalVparamsIt.next().mods))
-        case _ =>
-          Nil
-      }
+      val vparamAccessors = vparamAccessorss.flatten
+      // val vparamAccessors = derivedVparamss match {
+      //   case first :: rest =>
+      //     first.map(_.withMods(originalVparamsIt.next().mods | caseAccessor)) ++
+      //     rest.flatten.map(_.withMods(originalVparamsIt.next().mods))
+      //   case _ =>
+      //     Nil
+      // }
       cpy.TypeDef(cdef: TypeDef)(
         name = className,
         rhs = cpy.Template(impl)(constr, parents1, clsDerived, self1,

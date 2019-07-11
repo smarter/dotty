@@ -1250,6 +1250,7 @@ class Typer extends Namer
             // accesses with typedTypeTree are done.
           case None =>
             errorTree(tree, "Something's wrong: missing original symbol for type tree")
+            ???
         }
       case _ =>
         tree.withType(

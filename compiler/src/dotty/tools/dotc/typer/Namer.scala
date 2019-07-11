@@ -1128,7 +1128,8 @@ class Namer { typer: Typer =>
       // the parent types are elaborated.
       index(constr)
       index(rest)(localCtx)
-      symbolOfTree(constr).ensureCompleted()
+      // println("p: " + params.filter(_.isInstanceOf[TypeDef]).map(typedAheadExpr(_)))
+      // symbolOfTree(constr).ensureCompleted()
 
       val parentTypes = defn.adjustForTuple(cls, cls.typeParams,
         ensureFirstIsClass(parents.map(checkedParentType(_)), cls.span))
@@ -1399,8 +1400,12 @@ class Namer { typer: Typer =>
     //   3. Info of CP is computed (to be copied to DP).
     //   4. CP is completed.
     //   5. Info of CP is copied to DP and DP is completed.
+    if (isConstructor) {
+      sym.owner.typeParams.foreach(_.ensureCompleted())
+      // println("owner: " + sym.owner)
+      // println("tparams: " + sym.owner.typeParams.map(x => (x, x.info)))
+    }
     index(tparams)
-    if (isConstructor) sym.owner.typeParams.foreach(_.ensureCompleted())
     for (tparam <- tparams) typedAheadExpr(tparam)
 
     vparamss foreach completeParams
