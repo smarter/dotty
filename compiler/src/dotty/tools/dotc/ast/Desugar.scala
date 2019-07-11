@@ -343,7 +343,7 @@ object desugar {
   @sharable private val synthetic = Modifiers(Synthetic)
 
   private def toDefParam(tparam: TypeDef): TypeDef =
-    tparam.withMods(tparam.rawMods.withAnnotations(Nil) & EmptyFlags | Param)
+    tparam.withMods(tparam.rawMods & EmptyFlags | Param)
   private def toDefParam(vparam: ValDef): ValDef =
     vparam.withMods(vparam.rawMods & (GivenOrImplicit | Erased) | Param)
 
@@ -407,7 +407,11 @@ object desugar {
         else originalTparams
       }
       else originalTparams
-    val constrTparams = impliedTparams.map(toDefParam)
+
+    val tparamAccessors = impliedTparams//.map(toDefParam)
+    val derivedTparams = tparamAccessors.map(tparam => toDefParam(derivedTypeParam(tparam)))
+    val constrTparams = derivedTparams.map(tparam => tparam.withMods(tparam.rawMods.withAnnotations(Nil)))
+ 
     val constrVparamss =
       if (originalVparamss.isEmpty) { // ensure parameter list is non-empty
         if (isCaseClass && originalTparams.isEmpty)
@@ -452,8 +456,6 @@ object desugar {
 
     def anyRef = ref(defn.AnyRefAlias.typeRef)
 
-    val derivedTparams = (constrTparams, impliedTparams).zipped
-      .map((ctparam, itparam) => derivedTypeParam(ctparam).withMods(ctparam.rawMods.withAnnotations(itparam.mods.annotations)))
     val derivedVparamss = constrVparamss.nestedMap(derivedTermParam(_))
     val arity = constrVparamss.head.length
 
@@ -743,9 +745,9 @@ object desugar {
     }
 
     val cdef1 = addEnumFlags {
-      val originalTparamsIt = impliedTparams.toIterator
+      // val originalTparamsIt = impliedTparams.toIterator
       val originalVparamsIt = originalVparamss.toIterator.flatten
-      val tparamAccessors = derivedTparams.map(_.withMods(originalTparamsIt.next().mods))
+      // val tparamAccessors = derivedTparams.map(_.withMods(originalTparamsIt.next().mods))
       val caseAccessor = if (isCaseClass) CaseAccessor else EmptyFlags
       val vparamAccessors = derivedVparamss match {
         case first :: rest =>
