@@ -1143,7 +1143,7 @@ class Namer { typer: Typer =>
         original.putAttachment(Deriver, deriver)
       }
 
-      tempInfo.finalize(denot, parentTypes, selfInfo)
+      tempInfo.finalize(denot, parentTypes)
 
       Checking.checkWellFormed(cls)
       if (isDerivedValueClass(cls)) cls.setFlag(Final)
