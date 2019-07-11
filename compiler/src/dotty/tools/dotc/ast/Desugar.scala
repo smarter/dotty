@@ -7,7 +7,7 @@ import util.Spans._, Types._, Contexts._, Constants._, Names._, NameOps._, Flags
 import Symbols._, StdNames._, Trees._
 import Decorators._, transform.SymUtils._
 import NameKinds.{UniqueName, EvidenceParamName, DefaultGetterName}
-import typer.FrontEnd
+import typer.{FrontEnd, Namer}
 import util.{Property, SourceFile, SourcePosition}
 import util.NameTransformer.avoidIllegalChars
 import collection.mutable.ListBuffer
@@ -79,21 +79,29 @@ object desugar {
   }
 
   /** A type tree that computes its type from an existing parameter. */
-  class DerivedFromParamTree(implicit @constructorOnly src: SourceFile) extends DerivedTypeTree {
+  class DerivedFromParamTree()(implicit @constructorOnly src: SourceFile) extends DerivedTypeTree {
 
-    /** Make sure that for all enclosing module classes their companion classes
-     *  are completed. Reason: We need the constructor of such companion classes to
-     *  be completed so that OriginalSymbol attachments are pushed to DerivedTypeTrees
-     *  in apply/unapply methods.
+    /** Complete the appropriate constructors so that OriginalSymbol attachments are
+     *  pushed to DerivedTypeTrees.
      */
-    override def ensureCompletions(implicit ctx: Context): Unit =
+    override def ensureCompletions(implicit ctx: Context): Unit = {
+      def comp(sym: Symbol) =
+        sym.infoOrCompleter match {
+          case completer: Namer#ClassCompleter =>
+            completer.completeConstructor(sym)
+          case _ =>
+        }
+
+      // if (!hasAttachement(...))
+
       if (!ctx.owner.is(Package))
         if (ctx.owner.isClass) {
-          ctx.owner.ensureCompleted()
+          comp(ctx.owner)
           if (ctx.owner.is(ModuleClass))
-            ctx.owner.linkedClass.ensureCompleted()
+            comp(ctx.owner.linkedClass)
         }
-        else ensureCompletions(ctx.outer)
+        else ensureCompletions(ctx.outer) // ensureCompletions0
+    }
 
     /** Return info of original symbol, where all references to siblings of the
      *  original symbol (i.e. sibling and original symbol have the same owner)
@@ -125,15 +133,15 @@ object desugar {
     }
   }
 
+  /** A derived type definition watching `sym` */
+  def derivedTypeParam(sym: TypeSymbol)(implicit ctx: Context): TypeDef =
+    TypeDef(sym.name, new DerivedFromParamTree().watching(sym)).withFlags(TypeParam)
+
   /** A type definition copied from `tdef` with a rhs typetree derived from it */
   def derivedTypeParam(tdef: TypeDef)(implicit ctx: Context): TypeDef =
     cpy.TypeDef(tdef)(
       rhs = new DerivedFromParamTree().withSpan(tdef.rhs.span).watching(tdef)
     )
-
-  /** A derived type definition watching `sym` */
-  def derivedTypeParam(sym: TypeSymbol)(implicit ctx: Context): TypeDef =
-    TypeDef(sym.name, new DerivedFromParamTree().watching(sym)).withFlags(TypeParam)
 
   /** A value definition copied from `vdef` with a tpt typetree derived from it */
   def derivedTermParam(vdef: ValDef)(implicit ctx: Context): ValDef =
