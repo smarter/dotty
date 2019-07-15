@@ -10,6 +10,12 @@ object DottyPredef {
     PolyFunction { def apply(a: T1): R }
     // scala.Function1[T1, R]
 
+  def (f: Function1[T1, R])
+      compose[T1, R, A](g: A => T1): Function1[A, R] = { x => f(g(x)) }
+
+  def (f: Function1[T1, R])
+      andThen[T1, R, A](g: R => A): Function1[T1, A] = { x => g(f(x)) }
+
   type Function2[-T1, -T2, +R] =
     PolyFunction { def apply(a: T1, b: T2): R }
     // scala.Function2[T1, T2, R]
