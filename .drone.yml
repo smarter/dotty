@@ -74,7 +74,7 @@ steps:
   - ./project/scripts/sbt ";compile ;test"
   when:
     event:
-    - push
+#   - push
     - tag
     - deployment
 
