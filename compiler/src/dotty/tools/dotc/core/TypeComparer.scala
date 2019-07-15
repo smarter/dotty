@@ -1470,32 +1470,35 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
         case _ => false
       }
 
-      def isSubFunction(info1: Type, info2: Type): Boolean = (info1, info2) match {
-        case (info1: PolyType, info2: PolyType) =>
-          val saved = comparedTypeLambdas
-          comparedTypeLambdas += info1
-          comparedTypeLambdas += info2
-          try
-            matchingPolyParams(info1, info2) &&
+      def isSubFunction(info1: Type, info2: Type): Boolean = trace(i"isSubFunction($info1, $info2)", subtyping) {
+        (info1, info2) match {
+          case (info1: PolyType, info2: PolyType) =>
+            val saved = comparedTypeLambdas
+            comparedTypeLambdas += info1
+            comparedTypeLambdas += info2
+            try
+              matchingPolyParams(info1, info2) &&
             isSubFunction(info1.resultType, info2.resultType.subst(info2, info1))
-          finally comparedTypeLambdas = saved
-        case (info1: MethodType, info2: MethodType) =>
-          val saved = comparedTermLambdas
-          comparedTermLambdas += info1
-          comparedTermLambdas += info2
-          try {
-            val paramss1 = info1.paramInfoss
-            val paramss2 = info2.paramInfoss.nestedMap(_.subst(info2, info1))
-            assert(paramss1.length == 1)
-            assert(paramss2.length == 1)
+            finally comparedTypeLambdas = saved
+          case (info1: MethodType, info2: MethodType) =>
+            val saved = comparedTermLambdas
+            comparedTermLambdas += info1
+            comparedTermLambdas += info2
+            try {
+              val paramss1 = info1.paramInfoss
+              val paramss2 = info2.paramInfoss.nestedMap(_.subst(info2, info1))
+              assert(paramss1.length == 1)
+              assert(paramss2.length == 1)
 
-            info1.isImplicitMethod == info2.isImplicitMethod &&
-            (paramss2.head, paramss1.head).zipped.forall(isSubType) &&
-            isSubType(info1.resultType, info2.resultType.subst(info2, info1))
-          }
-          finally comparedTermLambdas = saved
-        case _ =>
-          false
+              info1.isImplicitMethod == info2.isImplicitMethod &&
+              sameLength(paramss1.head, paramss2.head) &&
+                (paramss2.head, paramss1.head).zipped.forall(isSubType) &&
+              isSubType(info1.resultType, info2.resultType.subst(info2, info1))
+            }
+            finally comparedTermLambdas = saved
+          case _ =>
+            false
+        }
       }
 
       def qualifies(m: SingleDenotation) =
