@@ -5,12 +5,20 @@ object DottyPredef {
   type Function0[+R] =
     PolyFunction { def apply(): R }
     // scala.Function0[R]
+
   type Function1[-T1, +R] =
     PolyFunction { def apply(a: T1): R }
     // scala.Function1[T1, R]
+
   type Function2[-T1, -T2, +R] =
     PolyFunction { def apply(a: T1, b: T2): R }
     // scala.Function2[T1, T2, R]
+
+  def (f: Function2[T1, T2, R])
+      tupled[T1, T2, R]: Function1[(T1, T2), R] = {
+    case ((x1, x2)) => f(x1, x2)
+  }
+
   type Function3[-T1, -T2, -T3, +R] =
     PolyFunction { def apply(a: T1, b: T2, c: T3): R }
     // scala.Function3[T1, T2, T3, R]
