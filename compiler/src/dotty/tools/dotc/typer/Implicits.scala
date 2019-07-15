@@ -717,23 +717,57 @@ trait Implicits { self: Typer =>
           if (defn.isErasedFunctionType(fun) || defn.isErasedFunctionType(fun)) -1 // TODO support?
           else if (defn.isFunctionType(fun)) {
             // TupledFunction[(...) => R, ?]
-            fun.dropDependentRefinement.dealias.argInfos match {
-              case funArgs :+ funRet if functionTypeEqual(fun, defn.tupleType(funArgs) :: Nil, funRet, tupled) =>
-                // TupledFunction[(...funArgs...) => funRet, ?]
-                funArgs.size
-              case _ => -1
-            }
-          } else if (defn.isFunctionType(tupled)) {
-            // TupledFunction[?, (...) => R]
-            tupled.dropDependentRefinement.dealias.argInfos match {
-              case tupledArgs :: funRet :: Nil =>
-                defn.tupleTypes(tupledArgs.dealias) match {
-                  case Some(funArgs) if functionTypeEqual(tupled, funArgs, funRet, fun) =>
-                    // TupledFunction[?, ((...funArgs...)) => funRet]
+            fun.dealias match {
+              case RefinedType(parent, nme.apply, refinedInfo) if parent.classSymbol.derivesFrom(defn.PolyFunctionClass) =>
+                val funRet = refinedInfo.finalResultType
+                refinedInfo.paramInfoss match {
+                  case funArgs :: Nil =>
+                    // TupledFunction[(...funArgs...) => funRet, ?]
+                    if (functionTypeEqual(fun, defn.tupleType(funArgs) :: Nil, funRet, tupled))
+                      funArgs.size
+                    else
+                      -1
+                  case _ =>
+                    -1
+                }
+              case _ =>
+                // XX: remove once functions >= 3 made refinements
+                fun.dropDependentRefinement.dealias.argInfos match {
+                  case funArgs :+ funRet if functionTypeEqual(fun, defn.tupleType(funArgs) :: Nil, funRet, tupled) =>
+                    // TupledFunction[(...funArgs...) => funRet, ?]
                     funArgs.size
                   case _ => -1
                 }
-              case _ => -1
+            }
+          } else if (defn.isFunctionType(tupled)) {
+            // TupledFunction[?, (...) => R]
+            tupled.dealias match {
+              case RefinedType(parent, nme.apply, refinedInfo) if parent.classSymbol.derivesFrom(defn.PolyFunctionClass) =>
+                val funRet = refinedInfo.finalResultType
+                refinedInfo.paramInfoss match {
+                  case List(tupledArg) :: Nil =>
+                    defn.tupleTypes(tupledArg.dealias) match {
+                      case Some(funArgs) if functionTypeEqual(tupled, funArgs, funRet, fun) =>
+                        // TupledFunction[?, ((...funArgs...)) => funRet]
+                        funArgs.size
+                      case _ => -1
+                    }
+                  case _ =>
+                    -1
+                }
+              case _ =>
+                // XX: remove once functions >= 3 made refinements
+                tupled.dropDependentRefinement.dealias.argInfos match {
+                  case tupledArgs :: funRet :: Nil =>
+                    defn.tupleTypes(tupledArgs.dealias) match {
+                      case Some(funArgs) if functionTypeEqual(tupled, funArgs, funRet, fun) =>
+                        // TupledFunction[?, ((...funArgs...)) => funRet]
+                        funArgs.size
+                      case _ => -1
+                    }
+                  case _ =>
+                    -1
+                }
             }
           }
           else {
