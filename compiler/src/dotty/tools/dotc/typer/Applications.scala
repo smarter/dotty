@@ -336,10 +336,18 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
       else
         args
 
+    private[this] var depTypeVars: List[TypeVar] = _
+
     protected def init(): Unit = methType match {
       case methType: MethodType =>
         // apply the result type constraint, unless method type is dependent
-        val resultApprox = resultTypeApprox(methType)
+        val resultApprox =
+          if (methType.isResultDependent) {
+            depTypeVars = methType.paramInfos.map(newDepTypeVar)
+            methType.resultType.substParams(methType, depTypeVars)
+          }
+          else
+            methType.resultType
         if (!constrainResult(methRef.symbol, resultApprox, resultType))
           if (ctx.typerState.isCommittable)
             // defer the problem until after the application;
@@ -350,6 +358,10 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
 
         // match all arguments with corresponding formal parameters
         matchArgs(orderedArgs, methType.paramInfos, 0)
+        if (depTypeVars != null)
+          (depTypeVars, orderedArgs).zipped.foreach { (tvar, arg) =>
+            tvar.instantiateWith(typeOfArg(arg))
+          }
       case _ =>
         if (methType.isError) ok = false
         else fail(s"$methString does not take parameters")
