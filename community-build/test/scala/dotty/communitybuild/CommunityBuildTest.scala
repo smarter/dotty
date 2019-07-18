@@ -189,6 +189,12 @@ class CommunityBuildTest {
     updateCommand = "update"
   )
 
+  @Test def effpi = test(
+    project       = "effpi",
+    testCommand   = ";set ThisBuild / useEffpiPlugin := false; effpi/test:compile; plugin/test:compile; benchmarks/test:compile; examples/test:compile; pluginBenchmarks/test:compile",
+    updateCommand = ";set ThisBuild / useEffpiPlugin := false; effpi/test:update; plugin/test:update; benchmarks/test:update; examples/test:update; pluginBenchmarks/test:update"
+  )
+
   // TODO @oderky? It got broken by #5458
   // @Test def pdbp = test(
   //   project       = "pdbp",
