@@ -1841,7 +1841,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
    */
   def extMethodApply(methodRef: untpd.Tree, receiver: Tree, pt: Type)(implicit ctx: Context) = {
     val (core, pt1) = pt.revealIgnored match {
-      case PolyProto(targs, restpe) => (untpd.TypeApply(methodRef, targs.map(untpd.TypedSplice(_))), restpe)
+      case PolyProto(targs, restpe) => (untpd.TypeApply(methodRef, targs.map(untpd.TypedSplice(_))), IgnoredProto(restpe))
       case _ => (methodRef, pt)
     }
     val app =
