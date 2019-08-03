@@ -20,6 +20,8 @@ import StdNames.nme
  * Created by dark on 26/11/14.
  */
 class CollectEntryPoints extends MiniPhase {
+  ???
+
   def phaseName: String = "Collect entry points"
 
   override def transformDefDef(tree: tpd.DefDef)(implicit ctx: Context): tpd.Tree = {
