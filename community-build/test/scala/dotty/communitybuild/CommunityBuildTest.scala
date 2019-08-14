@@ -147,7 +147,7 @@ class CommunityBuildTest {
 
   @Test def minitest = test(
     project       = "minitest",
-    testCommand   = "dotty-community-build/compile",
+    testCommand   = "dotty-community-build/compile;dotty-community-build/test:compile",
     updateCommand = "dotty-community-build/update"
   )
 
