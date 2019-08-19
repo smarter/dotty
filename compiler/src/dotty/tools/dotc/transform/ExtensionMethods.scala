@@ -222,7 +222,11 @@ object ExtensionMethods {
       val companion = imeth.owner.companionModule
       val companionInfo = companion.info
       val candidates = extensionNames(imeth) map (companionInfo.decl(_).symbol) filter (_.exists)
-      val matching = candidates filter (c => FullParameterization.memberSignature(c.info) == imeth.signature)
+      def matchingSig(sig1: Signature, sig2: Signature) = (sig1, sig2) match {
+        case (Signature(paramsSig1, resSig1), Signature(paramsSig2, resSig2)) =>
+          Signature(paramsSig1.filterNot(_.isInstanceOf[Int]), resSig1) == Signature(paramsSig2.filterNot(_.isInstanceOf[Int]), resSig2)
+      }
+      val matching = candidates filter (c => matchingSig(FullParameterization.memberSignature(c.info), imeth.signature))
       assert(matching.nonEmpty,
        i"""no extension method found for:
           |
