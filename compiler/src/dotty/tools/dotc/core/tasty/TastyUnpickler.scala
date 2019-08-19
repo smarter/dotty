@@ -36,6 +36,14 @@ class TastyUnpickler(reader: TastyReader) {
   private def readName(): TermName = nameAtRef(readNameRef())
   private def readString(): String = readName().toString
 
+  private def readParam(): Signature.Param = {
+    val ref = readNat()
+    if (ref < 256)
+      ref
+    else
+      nameAtRef(NameRef(ref - 256)).toTypeName
+  }
+
   private def readNameContents(): TermName = {
     val tag = readByte()
     val length = readNat()
@@ -58,7 +66,7 @@ class TastyUnpickler(reader: TastyReader) {
       case SIGNED =>
         val original = readName()
         val result = readName().toTypeName
-        val params = until(end)(readName().toTypeName)
+        val params = until[Signature.Param](end)(readParam())
         var sig = Signature(params, result)
         SignedName(original, sig)
       case _ =>

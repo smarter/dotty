@@ -1,10 +1,11 @@
 package dotty.tools.dotc
 package core
 
+import scala.annotation.tailrec
+
 import Names._, Types._, Contexts._, StdNames._, Decorators._
 import TypeErasure.sigName
-
-import scala.annotation.tailrec
+import Signature._
 
 /** The signature of a denotation.
  *  Overloaded denotations with the same name are distinguished by
@@ -31,11 +32,10 @@ import scala.annotation.tailrec
  *   - tpnme.WILDCARD       Arises from a Wildcard or error type
  *   - tpnme.Uninstantiated Arises from an uninstantiated type variable
  */
-case class Signature(paramsSig: List[TypeName], resSig: TypeName) {
-  import Signature._
+case class Signature(paramsSig: List[Param], resSig: TypeName) {
 
   /** Two names are consistent if they are the same or one of them is tpnme.Uninstantiated */
-  private def consistent(name1: TypeName, name2: TypeName) =
+  private def consistent(name1: Param, name2: Param) =
     name1 == name2 || name1 == tpnme.Uninstantiated || name2 == tpnme.Uninstantiated
 
   /** Does this signature coincide with that signature on their parameter parts?
@@ -43,7 +43,7 @@ case class Signature(paramsSig: List[TypeName], resSig: TypeName) {
    *  equal or on of them is tpnme.Uninstantiated.
    */
   final def consistentParams(that: Signature)(implicit ctx: Context): Boolean = {
-    @tailrec def loop(names1: List[TypeName], names2: List[TypeName]): Boolean =
+    @tailrec def loop(names1: List[Param], names2: List[Param]): Boolean =
       if (names1.isEmpty) names2.isEmpty
       else !names2.isEmpty && consistent(names1.head, names2.head) && loop(names1.tail, names2.tail)
     if (ctx.erasedTypes && (this == NotAMethod) != (that == NotAMethod))
@@ -56,13 +56,14 @@ case class Signature(paramsSig: List[TypeName], resSig: TypeName) {
 
   /** `that` signature, but keeping all corresponding parts of `this` signature. */
   final def updateWith(that: Signature): Signature = {
-    def update(name1: TypeName, name2: TypeName): TypeName =
+    def update[T <: Param](name1: T, name2: T): T =
       if (consistent(name1, name2)) name1 else name2
     if (this == that) this
     else if (!this.paramsSig.hasSameLengthAs(that.paramsSig)) that
     else {
       val mapped = Signature(
-          this.paramsSig.zipWithConserve(that.paramsSig)(update),
+          // DOTTY: we shouldn't have to explicitly pass a type argument to `update`
+          this.paramsSig.zipWithConserve(that.paramsSig)(update[Param]),
           update(this.resSig, that.resSig))
       if (mapped == this) this else mapped
     }
@@ -95,7 +96,8 @@ case class Signature(paramsSig: List[TypeName], resSig: TypeName) {
    *  Like Signature#apply, the result is only cacheable if `isUnderDefined == false`.
    */
   def prepend(params: List[Type], isJava: Boolean)(implicit ctx: Context): Signature =
-    Signature(params.map(p => sigName(p, isJava)) ++ paramsSig, resSig)
+    // DOTTY: We shouldn't have to explicitly pass type arguments list to `++`
+    Signature(params.map(p => sigName(p, isJava)).++[Param, List[Param]](paramsSig), resSig)
 
   /** A signature is under-defined if its paramsSig part contains at least one
    *  `tpnme.Uninstantiated`. Under-defined signatures arise when taking a signature
@@ -106,6 +108,7 @@ case class Signature(paramsSig: List[TypeName], resSig: TypeName) {
 }
 
 object Signature {
+  type Param = TypeName | Int
 
   enum MatchDegree {
     case NoMatch, ParamMatch, FullMatch

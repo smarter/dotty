@@ -3402,7 +3402,10 @@ object Types {
     assert(resType.isInstanceOf[TermType], this)
     assert(paramNames.nonEmpty)
 
-    def computeSignature(implicit ctx: Context): Signature = resultSignature
+    def computeSignature(implicit ctx: Context): Signature = {
+      val res = resultSignature
+      Signature(paramNames.length :: res.paramsSig, res.resSig)
+    }
 
     override def isContextualMethod = resType.isContextualMethod
     override def isImplicitMethod = resType.isImplicitMethod
