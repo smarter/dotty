@@ -9,7 +9,6 @@ import Decorators._, transform.SymUtils._
 import NameKinds.{UniqueName, EvidenceParamName, DefaultGetterName}
 import typer.{FrontEnd, Namer}
 import util.{Property, SourceFile, SourcePosition}
-import util.NameTransformer.avoidIllegalChars
 import collection.mutable.ListBuffer
 import reporting.diagnostic.messages._
 import reporting.trace
@@ -932,7 +931,7 @@ object desugar {
 
   /** Invent a name for an anonympus given of type or template `impl`. */
   def inventGivenName(impl: Tree)(implicit ctx: Context): SimpleName =
-    avoidIllegalChars(s"given_${inventName(impl)}".toTermName.asSimpleName)
+    s"given_${inventName(impl)}".toTermName.asSimpleName
 
   /** The normalized name of `mdef`. This means
    *   1. Check that the name does not redefine a Scala core class.
@@ -1244,7 +1243,7 @@ object desugar {
     else {
       var fileName = ctx.source.file.name
       val sourceName = fileName.take(fileName.lastIndexOf('.'))
-      val groupName = avoidIllegalChars((sourceName ++ str.TOPLEVEL_SUFFIX).toTermName.asSimpleName)
+      val groupName = (sourceName ++ str.TOPLEVEL_SUFFIX).toTermName.asSimpleName
       val grouped = ModuleDef(groupName, Template(emptyConstructor, Nil, Nil, EmptyValDef, nestedStats))
       cpy.PackageDef(pdef)(pdef.pid, topStats :+ grouped)
     }
