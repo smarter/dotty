@@ -149,7 +149,7 @@ class TyperState(private val previous: TyperState /* | Null */, private[this] va
   def markShared(): Unit = isShared = true
 
   def fresh(mode: Mode): TyperState = {
-    assert(this.mode != Committed, s"$this: calling fresh on already committed constraint $constraint")
+    assert(this.mode != Committed || mode == Test, s"$this: calling fresh on already committed constraint $constraint")
     val ts = new TyperState(this, mode).setReporter(new StoreReporter(reporter))
     ts
   }
