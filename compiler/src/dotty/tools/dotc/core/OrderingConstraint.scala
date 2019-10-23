@@ -499,6 +499,16 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         }
     }
 
+  def foreachTypeVarComplete(op: TypeVar => Unit): Unit =
+    boundsMap.foreachBinding { (poly, entries) =>
+      for (i <- 0 until paramCount(entries)) {
+        typeVar(entries, i) match {
+          case tv: TypeVar => op(tv)
+          case _ =>
+        }
+      }
+    }
+
   def & (other: Constraint, otherHasErrors: Boolean)(implicit ctx: Context): OrderingConstraint = {
 
     def merge[T](m1: ArrayValuedMap[T], m2: ArrayValuedMap[T], join: (T, T) => T): ArrayValuedMap[T] = {

@@ -156,7 +156,7 @@ object Inferencing {
               if (hi frozen_<:< lo) =>
                 val inst = ctx.typeComparer.approximation(param, fromBelow = true)
                 typr.println(i"replace singleton $param := $inst")
-                ctx.typerState.constraint = constraint.replace(param, inst)
+                ctx.typerState.unsafeSetConstraintTo(constraint.replace(param, inst))
               case _ =>
             }
           case _ =>

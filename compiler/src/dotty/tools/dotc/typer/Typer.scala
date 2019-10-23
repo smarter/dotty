@@ -2596,8 +2596,9 @@ class Typer extends Namer
         // where there is no error, while minimizing the amount of code inside the
         // `explore` block.
         def implicitArgsOrError(): List[Tree] | (ErrorType, List[Tree]) =
-          ctx.typerState.explore { rollbackConstraint =>
-            val args = implicitArgs(wtp.paramInfos, 0)
+          // FIXME: type shouldn't be needed
+          ctx.typerState.explore[List[Tree] | (ErrorType, List[Tree])] { rollbackConstraint =>
+            val args = implicitArgs(wtp.paramInfos, 0, pt)
             val propFail = propagatedFailure(args)
             if (propFail.exists) {
               // If there are several arguments, some arguments might already
@@ -2614,12 +2615,12 @@ class Typer extends Namer
         implicitArgsOrError() match {
           case (errorTp: ErrorType, args: List[Tree]) =>
             def issueErrors(): Tree = {
-              (wtp.paramNames, wtp.paramInfos, args).zipped.foreach { (paramName, formal, arg) =>
+              wtp.paramNames.lazyZip(wtp.paramInfos).lazyZip(args).foreach { (paramName, formal, arg) =>
                 arg.tpe match {
                   case failure: SearchFailureType =>
                     ctx.error(
                       missingArgMsg(arg, formal, implicitParamString(paramName, methodStr, tree)),
-                      tree.pos.endPos)
+                      tree.sourcePos.endPos)
                   case _ =>
                 }
               }
@@ -2629,10 +2630,10 @@ class Typer extends Namer
             // If method has default params, fall back to regular application
             // where all inferred implicits are passed as named args.
             if (methPart(tree).symbol.hasDefaultParams && !errorTp.isInstanceOf[AmbiguousImplicits]) {
-              val namedArgs = (wtp.paramNames, args).zipped.flatMap { (pname, arg) =>
+              val namedArgs = wtp.paramNames.lazyZip(args).flatMap { (pname, arg) =>
                 if (arg.tpe.isError) Nil else untpd.NamedArg(pname, untpd.TypedSplice(arg)) :: Nil
               }
-              tryEither { implicit ctx =>
+              tryEither {
                 val app = cpy.Apply(tree)(untpd.TypedSplice(tree), namedArgs)
                 if (wtp.isContextualMethod) app.setGivenApply()
                 typr.println(i"try with default implicit args $app")

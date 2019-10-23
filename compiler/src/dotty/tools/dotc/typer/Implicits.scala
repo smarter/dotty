@@ -418,7 +418,7 @@ object Implicits {
       }
 
       val ctx1 = ctx.fresh.setDisposableTyperState()
-      ctx1.typerState.constraint = constraint
+      ctx1.typerState.unsafeSetConstraintTo(constraint)
       replace(ctx1)
     }
 
@@ -646,7 +646,7 @@ trait Implicits { self: Typer =>
        //      (ctx.fresh.addMode(Mode.ImplicitExploration).setDisposableTyperState()).isSuccess
        // TODO: investigate why we can't TyperState#test here
        // FIXED :)
-        || ctx.fresh.addMode(Mode.ImplicitExploration).test { implicit ctx =>
+        || ctx.fresh.addMode(Mode.ImplicitExploration).test {
              inferView(dummyTreeOfType(from), to).isSuccess
            }
        )
