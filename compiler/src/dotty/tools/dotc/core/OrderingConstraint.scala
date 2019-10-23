@@ -427,6 +427,12 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           tp.substParam(param, replacement)
       }
 
+      typeVarOfParam(param) match {
+        case tvar: TypeVar =>
+          ctx.typerState.recordInstantiation(tvar, tp)
+        case _ =>
+      }
+
       var current =
         if (isRemovable(poly)) remove(poly) else updateEntry(param, replacement)
       current.foreachParam {(p, i) =>

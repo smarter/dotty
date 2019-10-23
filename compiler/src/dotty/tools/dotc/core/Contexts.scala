@@ -529,9 +529,9 @@ object Contexts {
     def setScope(scope: Scope): this.type = { this.scope = scope; this }
     def setNewScope: this.type = { this.scope = newScope; this }
     def setTyperState(typerState: TyperState): this.type = { this.typerState = typerState; this }
-    def setNewTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(true))
-    def setDisposableTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(false))
-    def setReporter(reporter: Reporter): this.type = setTyperState(typerState.fresh().setReporter(reporter))
+    def setNewTyperState(): this.type = setTyperState(typerState.fresh(TyperState.Mode.Committable))
+    def setDisposableTyperState(): this.type = setTyperState(typerState.fresh(TyperState.Mode.Test))
+    def setReporter(reporter: Reporter): this.type = setTyperState(typerState.fresh(typerState.mode).setReporter(reporter))
     def setTypeAssigner(typeAssigner: TypeAssigner): this.type = { this.typeAssigner = typeAssigner; this }
     def setTyper(typer: Typer): this.type = { this.scope = typer.scope; setTypeAssigner(typer) }
     def setImportInfo(importInfo: ImportInfo): this.type = { this.importInfo = importInfo; this }
@@ -609,7 +609,7 @@ object Contexts {
     outer = NoContext
     period = InitialPeriod
     mode = Mode.None
-    typerState = new TyperState(null)
+    typerState = new TyperState(null, TyperState.Mode.Committable)
     owner = NoSymbol
     tree = untpd.EmptyTree
     typeAssigner = TypeAssigner

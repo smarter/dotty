@@ -2576,9 +2576,9 @@ class Typer extends Namer
                 arg :: implicitArgs(formals2, argIndex + 1, pt)
             }
         }
-        val args = implicitArgs(wtp.paramInfos, 0, pt)
+        // val args = implicitArgs(wtp.paramInfos, 0, pt)
 
-        def propagatedFailure(args: List[Tree]): Type = args match {
+        def propagatedFailure(args: List[Tree]): ErrorType | NoType.type = args match {
           case arg :: args1 =>
             arg.tpe match {
               case ambi: AmbiguousImplicits =>
@@ -2592,51 +2592,65 @@ class Typer extends Namer
           case Nil => NoType
         }
 
-        val propFail = propagatedFailure(args)
+        // Returning a union here allows us to avoid tupling in the common case
+        // where there is no error, while minimizing the amount of code inside the
+        // `explore` block.
+        def implicitArgsOrError(): List[Tree] | (ErrorType, List[Tree]) =
+          ctx.typerState.explore { rollbackConstraint =>
+            val args = implicitArgs(wtp.paramInfos, 0)
+            val propFail = propagatedFailure(args)
+            if (propFail.exists) {
+              // If there are several arguments, some arguments might already
+              // have influenced the context, binding variables, but later ones
+              // might fail. In that case the constraint needs to be reset.
+              rollbackConstraint()
 
-        def issueErrors(): Tree = {
-          wtp.paramNames.lazyZip(wtp.paramInfos).lazyZip(args).foreach { (paramName, formal, arg) =>
-            arg.tpe match {
-              case failure: SearchFailureType =>
-                ctx.error(
-                  missingArgMsg(arg, formal, implicitParamString(paramName, methodStr, tree)),
-                  tree.sourcePos.endPos)
+              (propFail.asInstanceOf[ErrorType], args)
+            }
+            else
+              args
+          }
+
+        implicitArgsOrError() match {
+          case (errorTp: ErrorType, args: List[Tree]) =>
+            def issueErrors(): Tree = {
+              (wtp.paramNames, wtp.paramInfos, args).zipped.foreach { (paramName, formal, arg) =>
+                arg.tpe match {
+                  case failure: SearchFailureType =>
+                    ctx.error(
+                      missingArgMsg(arg, formal, implicitParamString(paramName, methodStr, tree)),
+                      tree.pos.endPos)
+                  case _ =>
+                }
+              }
+              untpd.Apply(tree, args).withType(errorTp)
+            }
+
+            // If method has default params, fall back to regular application
+            // where all inferred implicits are passed as named args.
+            if (methPart(tree).symbol.hasDefaultParams && !errorTp.isInstanceOf[AmbiguousImplicits]) {
+              val namedArgs = (wtp.paramNames, args).zipped.flatMap { (pname, arg) =>
+                if (arg.tpe.isError) Nil else untpd.NamedArg(pname, untpd.TypedSplice(arg)) :: Nil
+              }
+              tryEither { implicit ctx =>
+                val app = cpy.Apply(tree)(untpd.TypedSplice(tree), namedArgs)
+                if (wtp.isContextualMethod) app.setGivenApply()
+                typr.println(i"try with default implicit args $app")
+                typed(app, pt, locked)
+              } { (_, _) =>
+                issueErrors()
+              }
+            } else issueErrors()
+          case args: List[Tree] =>
+            tree match {
+              case tree: Block =>
+                readaptSimplified(tpd.Block(tree.stats, tpd.Apply(tree.expr, args)))
               case _ =>
+                readaptSimplified(tpd.Apply(tree, args))
             }
-          }
-          untpd.Apply(tree, args).withType(propFail)
-        }
-
-        if (propFail.exists) {
-          // If there are several arguments, some arguments might already
-          // have influenced the context, binding variables, but later ones
-          // might fail. In that case the constraint needs to be reset.
-          ctx.typerState.constraint = constr
-
-          // If method has default params, fall back to regular application
-          // where all inferred implicits are passed as named args.
-          if (methPart(tree).symbol.hasDefaultParams && !propFail.isInstanceOf[AmbiguousImplicits]) {
-            val namedArgs = wtp.paramNames.lazyZip(args).flatMap { (pname, arg) =>
-              if (arg.tpe.isError) Nil else untpd.NamedArg(pname, untpd.TypedSplice(arg)) :: Nil
-            }
-            tryEither {
-              val app = cpy.Apply(tree)(untpd.TypedSplice(tree), namedArgs)
-              if (wtp.isContextualMethod) app.setGivenApply()
-              typr.println(i"try with default implicit args $app")
-              typed(app, pt, locked)
-            } { (_, _) =>
-              issueErrors()
-            }
-          }
-          else issueErrors()
-        }
-        else tree match {
-          case tree: Block =>
-            readaptSimplified(tpd.Block(tree.stats, tpd.Apply(tree.expr, args)))
-          case _ =>
-            readaptSimplified(tpd.Apply(tree, args))
         }
       }
+
       pt.revealIgnored match {
         case pt: FunProto if pt.isGivenApply =>
           // We can end up here if extension methods are called with explicit given arguments.

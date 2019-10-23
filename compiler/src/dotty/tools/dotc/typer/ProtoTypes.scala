@@ -67,24 +67,25 @@ object ProtoTypes {
     /** Check that the result type of the current method
      *  fits the given expected result type.
      */
-    def constrainResult(mt: Type, pt: Type)(implicit ctx: Context): Boolean = {
-      val savedConstraint = ctx.typerState.constraint
-      val res = pt.widenExpr match {
-        case pt: FunProto =>
-          mt match {
-            case mt: MethodType => constrainResult(resultTypeApprox(mt), pt.resultType)
-            case _ => true
-          }
-        case _: ValueTypeOrProto if !disregardProto(pt) =>
-          isCompatible(normalize(mt, pt), pt)
-        case pt: WildcardType if pt.optBounds.exists =>
-          isCompatible(normalize(mt, pt), pt)
-        case _ =>
-          true
+    def constrainResult(mt: Type, pt: Type)(implicit ctx: Context): Boolean =
+      ctx.typerState.explore { rollbackConstraint =>
+        val savedConstraint = ctx.typerState.constraint
+        val res = pt.widenExpr match {
+          case pt: FunProto =>
+            mt match {
+              case mt: MethodType => constrainResult(resultTypeApprox(mt), pt.resultType)
+              case _ => true
+            }
+          case _: ValueTypeOrProto if !disregardProto(pt) =>
+            isCompatible(normalize(mt, pt), pt)
+          case pt: WildcardType if pt.optBounds.exists =>
+            isCompatible(normalize(mt, pt), pt)
+          case _ =>
+            true
+        }
+        if (!res) rollbackConstraint()
+        res
       }
-      if (!res) ctx.typerState.resetConstraintTo(savedConstraint)
-      res
-    }
 
     /** Constrain result with special case if `meth` is an inlineable method in an inlineable context.
      *  In that case, we should always succeed and not constrain type parameters in the expected type,
@@ -481,8 +482,8 @@ object ProtoTypes {
     val state = ctx.typerState
     val addTypeVars = alwaysAddTypeVars || !owningTree.isEmpty
     if (tl.isInstanceOf[PolyType])
-      assert(!ctx.typerState.isCommittable || addTypeVars,
-        s"inconsistent: no typevars were added to committable constraint ${state.constraint}")
+      assert(!ctx.typerState.isRetainable || addTypeVars,
+        s"inconsistent: no typevars were added to retainable constraint ${state.constraint}")
       // hk type lambdas can be added to constraints without typevars during match reduction
 
     def newTypeVars(tl: TypeLambda): List[TypeTree] =
@@ -502,7 +503,7 @@ object ProtoTypes {
 
   def constrained(tl: TypeLambda, owningTree: untpd.Tree)(implicit ctx: Context): (TypeLambda, List[TypeTree]) =
     constrained(tl, owningTree,
-      alwaysAddTypeVars = tl.isInstanceOf[PolyType] && ctx.typerState.isCommittable)
+      alwaysAddTypeVars = tl.isInstanceOf[PolyType] && ctx.typerState.isRetainable)
 
   /**  Same as `constrained(tl, EmptyTree)`, but returns just the created type lambda */
   def constrained(tl: TypeLambda)(implicit ctx: Context): TypeLambda =
