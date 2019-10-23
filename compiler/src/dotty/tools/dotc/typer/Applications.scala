@@ -1320,7 +1320,7 @@ trait Applications extends Compatibility {
         isApplicableMethodRef(alt2, formals1, WildcardType) ||
         tp1.paramInfos.isEmpty && tp2.isInstanceOf[LambdaType]
       case tp1: PolyType => // (2)
-        val nestedCtx = ctx.fresh.setExploreTyperState()
+        val nestedCtx = ctx.fresh.setDisposableTyperState()
         locally {
           implicit val ctx = nestedCtx
 

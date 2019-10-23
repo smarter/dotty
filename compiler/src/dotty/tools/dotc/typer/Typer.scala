@@ -1908,7 +1908,7 @@ class Typer extends Namer
     res match {
       case closure(_, _, _) =>
       case _ =>
-        val recovered = typed(qual)(ctx.fresh.setExploreTyperState())
+        val recovered = typed(qual)(ctx.fresh.setDisposableTyperState())
         ctx.errorOrMigrationWarning(OnlyFunctionsCanBeFollowedByUnderscore(recovered.tpe.widen), tree.sourcePos)
         if (ctx.scala2Mode) {
           // Under -rewrite, patch `x _` to `(() => x)`

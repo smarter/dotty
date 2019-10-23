@@ -210,7 +210,7 @@ object Completion {
         if (!mode.is(Mode.Import) && !qual.tpe.isRef(defn.NullClass))
           // Implicit conversions do not kick in when importing
           // and for `NullClass` they produce unapplicable completions (for unclear reasons)
-          implicitConversionTargets(qual)(ctx.fresh.setExploreTyperState())
+          implicitConversionTargets(qual)(ctx.fresh.setDisposableTyperState())
             .foreach(addAccessibleMembers)
       }
 

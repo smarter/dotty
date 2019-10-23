@@ -417,7 +417,7 @@ object Implicits {
         map(tp)
       }
 
-      val ctx1 = ctx.fresh.setExploreTyperState()
+      val ctx1 = ctx.fresh.setDisposableTyperState()
       ctx1.typerState.constraint = constraint
       replace(ctx1)
     }
@@ -643,7 +643,7 @@ trait Implicits { self: Typer =>
     && from.isValueType
     && (  from.isValueSubType(to)
        || inferView(dummyTreeOfType(from), to)
-            (ctx.fresh.addMode(Mode.ImplicitExploration).setExploreTyperState()).isSuccess
+            (ctx.fresh.addMode(Mode.ImplicitExploration).setDisposableTyperState()).isSuccess
           // TODO: investigate why we can't TyperState#test here
        )
     )
@@ -1023,7 +1023,7 @@ trait Implicits { self: Typer =>
                             ctx.typeComparer.instanceType(tparam, fromBelow = variance < 0))
                           resType.substParams(poly, instanceTypes)
                         }
-                        instantiate(ctx.fresh.setExploreTyperState().setOwner(caseClass))
+                        instantiate(ctx.fresh.setDisposableTyperState().setOwner(caseClass))
                       case _ =>
                         caseClass.typeRef
                     }
@@ -1396,7 +1396,7 @@ trait Implicits { self: Typer =>
             val SelectionProto(name: TermName, mbrType, _, _) = pt
             val result = extMethodApply(untpd.Select(untpdGenerated, name), argument, mbrType)
             if (!ctx.reporter.hasErrors && cand.isConversion) {
-              val testCtx = ctx.fresh.setExploreTyperState()
+              val testCtx = ctx.fresh.setDisposableTyperState()
               tryConversion(testCtx)
               if (testCtx.reporter.hasErrors)
                 ctx.error(em"ambiguous implicit: $generated is eligible both as an implicit conversion and as an extension method container")
