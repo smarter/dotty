@@ -261,7 +261,7 @@ trait TreeUtils
   }
 
   /** Bind the `rhs` to a `val` and use it in `body` */
-  def let(rhs: Term)(body: Ident => Term): Term = {
+  def let(rhs: Term)(body: Ident => Term): Term = ??? /*{
     import scala.quoted.QuoteContext
     given QuoteContext = new QuoteContext(this)
     val expr = (rhs.seal: @unchecked) match {
@@ -275,7 +275,7 @@ trait TreeUtils
         }
     }
     expr.unseal
-  }
+  }*/
 
   /** Bind the given `terms` to names and use them in the `body` */
   def lets(terms: List[Term])(body: List[Term] => Term): Term = {
