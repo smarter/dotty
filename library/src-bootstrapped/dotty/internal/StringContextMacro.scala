@@ -254,7 +254,7 @@ object StringContextMacro {
      */
     def skipWidth(i : Int, s : String, l : Int) = {
       var j = i
-      var width = (false, 0)
+      var width: (Boolean, Int) = (false, 0)
       while (j < l && Character.isDigit(s.charAt(j))){
         width = (true, j)
         j += 1

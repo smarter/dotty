@@ -86,7 +86,7 @@ object IArray {
    *  @param   elem the element computation
    */
   def fill[T: ClassTag](n: Int)(elem: => T): IArray[T] =
-    Array.fill(n)(elem).asInstanceOf
+    Array.fill[T](n)(elem).asInstanceOf
 
   /** Returns a two-dimensional immutable array that contains the results of some element computation a number
    *  of times. Each element is determined by a separate computation.
@@ -96,7 +96,7 @@ object IArray {
    *  @param   elem the element computation
    */
   def fill[T: ClassTag](n1: Int, n2: Int)(elem: => T): IArray[IArray[T]] =
-    Array.fill(n1, n2)(elem).asInstanceOf
+    Array.fill[T](n1, n2)(elem).asInstanceOf
 
   /** Returns a three-dimensional immutable array that contains the results of some element computation a number
    *  of times. Each element is determined by a separate computation.
@@ -107,7 +107,7 @@ object IArray {
    *  @param   elem the element computation
    */
   def fill[T: ClassTag](n1: Int, n2: Int, n3: Int)(elem: => T): IArray[IArray[IArray[T]]] =
-    Array.fill(n1, n2, n3)(elem).asInstanceOf
+    Array.fill[T](n1, n2, n3)(elem).asInstanceOf
 
   /** Returns a four-dimensional immutable array that contains the results of some element computation a number
    *  of times. Each element is determined by a separate computation.
@@ -119,7 +119,7 @@ object IArray {
    *  @param   elem the element computation
    */
   def fill[T: ClassTag](n1: Int, n2: Int, n3: Int, n4: Int)(elem: => T): IArray[IArray[IArray[IArray[T]]]] =
-    Array.fill(n1, n2, n3, n4)(elem).asInstanceOf
+    Array.fill[T](n1, n2, n3, n4)(elem).asInstanceOf
 
   /** Returns a five-dimensional immutable array that contains the results of some element computation a number
    *  of times. Each element is determined by a separate computation.
@@ -132,7 +132,7 @@ object IArray {
    *  @param   elem the element computation
    */
   def fill[T: ClassTag](n1: Int, n2: Int, n3: Int, n4: Int, n5: Int)(elem: => T): IArray[IArray[IArray[IArray[IArray[T]]]]] =
-    Array.fill(n1, n2, n3, n4, n5)(elem).asInstanceOf
+    Array.fill[T](n1, n2, n3, n4, n5)(elem).asInstanceOf
 
   /** Returns an immutable array containing values of a given function over a range of integer
    *  values starting from 0.
