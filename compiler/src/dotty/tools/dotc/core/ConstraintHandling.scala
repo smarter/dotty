@@ -305,11 +305,11 @@ trait ConstraintHandling[AbstractContext] {
   def widenInferred(inst: Type, bound: Type)(implicit actx: AbstractContext): Type = {
     def widenOr(tp: Type) = {
       val tpw = tp.widenUnion
-      if ((tpw ne tp) && tpw <:< bound) tpw else tp
+      if ((tpw ne tp) && (tpw frozen_<:< bound)) tpw else tp
     }
     def widenSingle(tp: Type) = {
       val tpw = tp.widenSingletons
-      if ((tpw ne tp) && tpw <:< bound) tpw else tp
+      if ((tpw ne tp) && (tpw frozen_<:< bound)) tpw else tp
     }
     val wideInst =
       if (isSubTypeWhenFrozen(bound, defn.SingletonType)) inst
