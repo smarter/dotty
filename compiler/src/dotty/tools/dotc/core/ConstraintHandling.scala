@@ -311,9 +311,10 @@ trait ConstraintHandling[AbstractContext] {
       val tpw = tp.widenSingletons
       if ((tpw ne tp) && bounds(param).contains(tpw)) tpw else tp
     }
-    val wideInst =
-      if (isSubTypeWhenFrozen(param, defn.SingletonType)) inst
+    val wideInst = inFrozenConstraint {
+      if (isSubType(param, defn.SingletonType)) inst
       else widenOr(widenSingle(inst))
+    }
     wideInst.dropRepeatedAnnot
   }
 
