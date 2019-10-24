@@ -302,23 +302,7 @@ trait ConstraintHandling[AbstractContext] {
    * At this point we also drop the @Repeated annotation to avoid inferring type arguments with it,
    * as those could leak the annotation to users (see run/inferred-repeated-result).
    */
-  def widenInferred(inst: Type, param: TypeParamRef)(implicit actx: AbstractContext): Type = {
-    def widenOr(tp: Type) = {
-      val tpw = tp.widenUnion
-      if ((tpw ne tp) && bounds(param).contains(tpw)) tpw else tp
-    }
-    def widenSingle(tp: Type) = {
-      val tpw = tp.widenSingletons
-      if ((tpw ne tp) && bounds(param).contains(tpw)) tpw else tp
-    }
-    val wideInst = inFrozenConstraint {
-      if (isSubType(param, defn.SingletonType)) inst
-      else widenOr(widenSingle(inst))
-    }
-    wideInst.dropRepeatedAnnot
-  }
-
-  def widenInferred2(inst: Type, bound: Type)(implicit actx: AbstractContext): Type = {
+  def widenInferred(inst: Type, bound: Type)(implicit actx: AbstractContext): Type = {
     def widenOr(tp: Type) = {
       val tpw = tp.widenUnion
       if ((tpw ne tp) && (tpw <:< bound)) tpw else tp

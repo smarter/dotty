@@ -3830,8 +3830,13 @@ object Types {
      *  instantiation can be a singleton type only if the upper bound
      *  is also a singleton type.
      */
-    def instantiate(fromBelow: Boolean)(implicit ctx: Context): Type =
-      instantiateWith(ctx.typeComparer.instanceType(origin, fromBelow))
+    def instantiate(fromBelow: Boolean)(implicit ctx: Context): Type = {
+      val tp = ctx.typeComparer.instanceType(origin, fromBelow)
+      // instanceType runs subtype checks, might have instantiated this tvar as a side-effect
+      if (!this.isInstantiated)
+        instantiateWith(tp)
+      tp
+    }
 
     /** For uninstantiated type variables: Is the lower bound different from Nothing? */
     def hasLowerBound(implicit ctx: Context): Boolean =
