@@ -65,19 +65,19 @@ steps:
     - tag
     - promote
 
-- name: test_java11
-  pull: default
-  image: lampepfl/dotty:2019-10-17
-  depends_on: [ clone ]
-  commands:
-  - export PATH="/usr/lib/jvm/java-11-openjdk-amd64/bin:$PATH"
-  - cp -R . /tmp/6/ && cd /tmp/6/
-  - ./project/scripts/sbt ";compile ;test"
-  when:
-    event:
-    - push
-    - tag
-    - promote
+# - name: test_java11
+#   pull: default
+#   image: lampepfl/dotty:2019-10-17
+#   depends_on: [ clone ]
+#   commands:
+#   - export PATH="/usr/lib/jvm/java-11-openjdk-amd64/bin:$PATH"
+#   - cp -R . /tmp/6/ && cd /tmp/6/
+#   - ./project/scripts/sbt ";compile ;test"
+#   when:
+#     event:
+#     - push
+#     - tag
+#     - promote
 
 - name: documentation
   pull: default
@@ -86,7 +86,7 @@ steps:
   - test
   - test_bootstrapped
   - community_build
-  - test_java11
+  # - test_java11
   commands:
   - ./project/scripts/genDocs
   environment:
@@ -106,7 +106,7 @@ steps:
   - test_bootstrapped
   - community_build
   - test_sbt
-  - test_java11
+  # - test_java11
   commands:
   - ./project/scripts/sbtPublish ";project dotty-bootstrapped ;publishSigned ;sonatypeBundleRelease"
   environment:
@@ -133,7 +133,7 @@ steps:
   - test_bootstrapped
   - community_build
   - test_sbt
-  - test_java11
+  # - test_java11
   commands:
   - ./project/scripts/sbt dist-bootstrapped/packArchive
   - ./project/scripts/sbtPublish ";project dotty-bootstrapped ;publishSigned ;sonatypeBundleRelease"
@@ -176,7 +176,7 @@ steps:
   - test_bootstrapped
   - community_build
   - test_sbt
-  - test_java11
+  # - test_java11
   commands:
   - ./project/scripts/sbtPublish ";project sbt-dotty ;publishSigned ;sonatypeBundleRelease"
   environment:
