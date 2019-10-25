@@ -307,15 +307,15 @@ object ProtoTypes {
       else {
         val prevConstraint = this.ctx.typerState.constraint
 
-        try {
-          implicit val ctx = this.ctx
-          val args1 = args.mapconserve(cacheTypedArg(_, typer.typed(_), force = false))
-          if (!args1.exists(arg => isUndefined(arg.tpe))) state.typedArgs = args1
-          args1
-        }
-        finally
-          if (this.ctx.typerState.constraint ne prevConstraint)
-            ctx.typerState.mergeConstraintWith(this.ctx.typerState)
+        // try {
+          // implicit val ctx = this.ctx
+        val args1 = args.mapconserve(cacheTypedArg(_, typer.typed(_), force = false))
+        if (!args1.exists(arg => isUndefined(arg.tpe))) state.typedArgs = args1
+        args1
+        // }
+        // finally
+        //   if (this.ctx.typerState.constraint ne prevConstraint)
+        //     ctx.typerState.mergeConstraintWith(this.ctx.typerState)
       }
 
     /** Type single argument and remember the unadapted result in `myTypedArg`.
