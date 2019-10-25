@@ -373,9 +373,9 @@ object ProtoTypes {
 
     override def deepenProto(implicit ctx: Context): FunProto = derivedFunProto(args, resultType.deepenProto, typer)
 
-    override def withContext(newCtx: Context): ProtoType =
-      if (newCtx `eq` ctx) this
-      else new FunProto(args, resType)(typer, isGivenApply, state)(newCtx)
+    override def withContext(newCtx: Context): ProtoType = this
+      // if (newCtx `eq` ctx) this
+      // else new FunProto(args, resType)(typer, isGivenApply, state)(newCtx)
   }
 
   /** A prototype for expressions that appear in function position
