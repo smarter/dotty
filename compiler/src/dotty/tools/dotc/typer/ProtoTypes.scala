@@ -308,10 +308,15 @@ object ProtoTypes {
         val prevConstraint = this.ctx.typerState.constraint
 
         // try {
-          // implicit val ctx = this.ctx
-        val args1 = args.mapconserve(cacheTypedArg(_, typer.typed(_), force = false))
-        if (!args1.exists(arg => isUndefined(arg.tpe))) state.typedArgs = args1
-        args1
+        // implicit val ctx = this.ctx
+        val octx = ctx
+
+        {
+          implicit val ctx: Context = octx.addMode(Mode.ImplicitsEnabled)
+          val args1 = args.mapconserve(cacheTypedArg(_, typer.typed(_), force = false))
+          if (!args1.exists(arg => isUndefined(arg.tpe))) state.typedArgs = args1
+          args1
+        }
         // }
         // finally
         //   if (this.ctx.typerState.constraint ne prevConstraint)
