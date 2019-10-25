@@ -323,7 +323,7 @@ object ProtoTypes {
      */
     def typedArg(arg: untpd.Tree, formal: Type)(implicit ctx: Context): Tree = {
       val locked = ctx.typerState.ownedVars
-      val targ = cacheTypedArg(arg, typer.typedUnadapted(_, formal, locked), force = true)
+      val targ = cacheTypedArg(arg, typer.typedUnadapted(_, formal, locked)(this.ctx), force = true)
       typer.adapt(targ, formal, locked)
     }
 
