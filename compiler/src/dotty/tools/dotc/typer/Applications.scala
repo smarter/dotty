@@ -800,7 +800,7 @@ trait Applications extends Compatibility {
   /** Subclass of Application for type checking an Apply node with typed arguments. */
   class ApplyToTyped(app: untpd.Apply, fun: Tree, methRef: TermRef, args: List[Tree], resultType: Type)(implicit ctx: Context)
   extends TypedApply(app, fun, methRef, args, resultType) {
-    def typedArg(arg: Tree, formal: Type): TypedArg = adapt(arg, formal.widenExpr)
+    def typedArg(arg: Tree, formal: Type): TypedArg = arg//adapt(arg, formal.widenExpr)
     def treeToArg(arg: Tree): Tree = arg
     def typeOfArg(arg: Tree): Type = arg.tpe
   }
