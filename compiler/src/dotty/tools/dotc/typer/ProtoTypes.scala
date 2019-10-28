@@ -272,7 +272,7 @@ object ProtoTypes {
       case _ => false
     }
 
-    private def cacheTypedArg(arg: untpd.Tree, typerFn: untpd.Tree => Tree, force: Boolean)(implicit ctx: Context): Tree = {
+    private def cacheTypedArg(arg: untpd.Tree, typerFn: (given Context) => untpd.Tree => Tree, force: Boolean)(implicit ctx: Context): Tree = {
       var targ = state.typedArg(arg)
       if (targ == null)
         untpd.functionWithUnknownParamType(arg) match {
@@ -287,9 +287,9 @@ object ProtoTypes {
           case Some(_) if !force =>
             targ = arg.withType(WildcardType)
           case _ =>
-            targ = typerFn(arg)
+            targ = typerFn(given this.ctx)(arg)
             if (!ctx.reporter.hasUnreportedErrors) {
-              Inferencing.fullyDefinedType(targ.tpe, s"targ = $targ, tpe = ${targ.tpe}", targ.sourcePos.span)
+              Inferencing.fullyDefinedType(targ.tpe, s"targ = $targ, tpe = ${targ.tpe}", targ.sourcePos.span)(this.ctx)
               state.typedArg = state.typedArg.updated(arg, targ)
             }
         }
@@ -319,9 +319,9 @@ object ProtoTypes {
      *  used to avoid repeated typings of trees when backtracking.
      */
     def typedArg(arg: untpd.Tree, formal: Type)(implicit ctx: Context): Tree = {
-      val locked = ctx.typerState.ownedVars
+      val locked = this.ctx.typerState.ownedVars
       val targ = cacheTypedArg(arg, typer.typedUnadapted(_, formal, locked), force = true)
-      typer.adapt(targ, formal, locked)
+      typer.adapt(targ, formal, ctx.typerState.ownedVars)//or locked works too but makes less sense
     }
 
     /** The type of the argument `arg`, or `NoType` if `arg` has not been typed before
