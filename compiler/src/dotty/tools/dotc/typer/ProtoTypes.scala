@@ -288,8 +288,10 @@ object ProtoTypes {
             targ = arg.withType(WildcardType)
           case _ =>
             targ = typerFn(arg)
-            if (!ctx.reporter.hasUnreportedErrors)
+            if (!ctx.reporter.hasUnreportedErrors) {
+              Inferencing.fullyDefinedType(targ.tpe, s"targ = $targ, tpe = ${targ.tpe}", targ.sourcePos.span)
               state.typedArg = state.typedArg.updated(arg, targ)
+            }
         }
       targ
     }
