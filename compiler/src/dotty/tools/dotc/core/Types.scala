@@ -640,16 +640,20 @@ object Types {
           //
           // Without the `openedTwice` trick, Typer.scala fails to Ycheck
           // at phase resolveSuper.
-          val rt =
-            if (tp.opened) { // defensive copy
-              tp.openedTwice = true
-              RecType(rt => tp.parent.substRecThis(tp, rt.recThis))
-            }
-            else tp
-          rt.opened = true
-          try go(rt.parent).mapInfo(_.substRecThis(rt, pre))
-          finally
-            if (!rt.openedTwice) rt.opened = false
+          if (tp eq pre)
+            go(tp.parent)
+          else {
+            val rt =
+              if (tp.opened) { // defensive copy
+                tp.openedTwice = true
+                RecType(rt => tp.parent.substRecThis(tp, rt.recThis))
+              }
+              else tp
+            rt.opened = true
+            try go(rt.parent).mapInfo(_.substRecThis(rt, pre))
+            finally
+              if (!rt.openedTwice) rt.opened = false
+          }
         }
 
       def goRefined(tp: RefinedType) = {
