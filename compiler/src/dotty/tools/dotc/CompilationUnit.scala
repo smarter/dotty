@@ -18,14 +18,20 @@ class CompilationUnit protected (val source: SourceFile) {
 
   override def toString: String = source.toString
 
-  var untpdTree: untpd.Tree = untpd.EmptyTree
+  private[this] var _untpdTree: untpd.Tree = untpd.EmptyTree
+  def untpdTree: untpd.Tree = _untpdTree
+  def untpdTree_=(x: untpd.Tree): Unit = _untpdTree = x
 
-  var tpdTree: tpd.Tree = tpd.EmptyTree
+  private[this] var _tpdTree: tpd.Tree = tpd.EmptyTree
+  def tpdTree: tpd.Tree = _tpdTree
+  def tpdTree_=(x: tpd.Tree): Unit = _tpdTree = x
 
   def isJava: Boolean = source.file.name.endsWith(".java")
 
+  private[this] var _pickled: Map[ClassSymbol, Array[Byte]] = Map()
   /** Pickled TASTY binaries, indexed by class. */
-  var pickled: Map[ClassSymbol, Array[Byte]] = Map()
+  def pickled: Map[ClassSymbol, Array[Byte]] = _pickled
+  def pickled_=(x: Map[ClassSymbol, Array[Byte]]): Unit = _pickled = x
 
   /** The fresh name creator for the current unit.
    *  FIXME(#7661): This is not fine-grained enough to enable reproducible builds,
@@ -33,15 +39,19 @@ class CompilationUnit protected (val source: SourceFile) {
    */
   val freshNames: FreshNameCreator = new FreshNameCreator.Default
 
+  private[this] var _needsStaging: Boolean = false
   /** Will be set to `true` if contains `Quote`.
    *  The information is used in phase `Staging` in order to avoid traversing trees that need no transformations.
    */
-  var needsStaging: Boolean = false
+  def needsStaging: Boolean = _needsStaging
+  def needsStaging_=(x: Boolean): Unit = _needsStaging = x
 
   /** A structure containing a temporary map for generating inline accessors */
   val inlineAccessors: InlineAccessors = new InlineAccessors
 
-  var suspended: Boolean = false
+  private[this] var _suspended: Boolean = false
+  def suspended: Boolean = _suspended
+  def suspended_=(x: Boolean): Unit = _suspended = x
 
   def suspend()(given ctx: Context): Nothing =
     if !suspended then
@@ -113,4 +123,10 @@ object CompilationUnit {
   }
 }
 
-object NoCompilationUnit extends CompilationUnit(NoSource)
+object NoCompilationUnit extends CompilationUnit(NoSource) {
+  override def untpdTree_=(x: untpd.Tree): Unit = ???
+  override def tpdTree_=(x: tpd.Tree): Unit = ???
+  override def pickled_=(x: Map[ClassSymbol, Array[Byte]]): Unit = ???
+  override def needsStaging_=(x: Boolean): Unit = ???
+  override def suspended_=(x: Boolean): Unit = ???
+}
