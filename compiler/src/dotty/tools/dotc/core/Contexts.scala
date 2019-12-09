@@ -44,7 +44,7 @@ object Contexts {
   private val (sbtCallbackLoc,      store2) = store1.newLocation[AnalysisCallback]()
   private val (printerFnLoc,        store3) = store2.newLocation[Context => Printer](new RefinedPrinter(_))
   private val (settingsStateLoc,    store4) = store3.newLocation[SettingsState]()
-  private val (compilationUnitLoc,  store5) = store4.newLocation[CompilationUnit]()
+  private val (compilationUnitLoc,  store5) = store4.newLocation[CompilationUnit](NoCompilationUnit)
   private val (runLoc,              store6) = store5.newLocation[Run]()
   private val (profilerLoc,         store7) = store6.newLocation[Profiler]()
   private val (notNullInfosLoc,     store8) = store7.newLocation[List[NotNullInfo]]()

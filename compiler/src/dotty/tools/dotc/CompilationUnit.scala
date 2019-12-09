@@ -112,3 +112,5 @@ object CompilationUnit {
     }
   }
 }
+
+object NoCompilationUnit extends CompilationUnit(NoSource)
