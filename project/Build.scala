@@ -192,6 +192,8 @@ object Build {
       state
     },
 
+    useSuperShell := false,
+
     // Credentials to release to Sonatype
     credentials ++= (
       for {
