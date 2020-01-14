@@ -276,7 +276,11 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
             case _ =>
               secondTry
         end compareNamed
-        compareNamed(tp1, tp2)
+
+        if !ctx.erasedTypes && (tp2.symbol eq defn.FromJavaObjectSymbol) then
+          recur(tp1, defn.AnyType)
+        else
+          compareNamed(tp1, tp2)
       case tp2: ProtoType =>
         isMatchedByProto(tp2, tp1)
       case tp2: BoundType =>
@@ -1732,6 +1736,7 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
               }
               else formal2.isAnyRef
             (isSameTypeWhenFrozen(formal1, formal2a)
+             // XX: delete? but what about null handling?
              || tp1.isJavaMethod && formal2IsObject && formal1.isAny
              || tp2.isJavaMethod && formal1IsObject && formal2.isAny
             )

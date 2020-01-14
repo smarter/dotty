@@ -147,8 +147,10 @@ class ClassfileParser(
           in.nextChar
           defn.AnyType
         }
-        else
-          pool.getSuperClass(in.nextChar).typeRef
+        else {
+          val tp = pool.getSuperClass(in.nextChar).typeRef
+          if (tp eq defn.FromJavaObjectType) defn.ObjectType else tp
+        }
       val ifaceCount = in.nextChar
       var ifaces = for (i <- (0 until ifaceCount).toList) yield pool.getSuperClass(in.nextChar).typeRef
         // Dotty deviation: was
@@ -306,7 +308,7 @@ class ClassfileParser(
 
   /** Map direct references to Object to references to Any */
   final def objToAny(tp: Type)(implicit ctx: Context): Type =
-    if (tp.isDirectRef(defn.ObjectClass) && !ctx.phase.erasedTypes) defn.AnyType else tp
+    tp //if (tp.isDirectRef(defn.ObjectClass) && !ctx.phase.erasedTypes) defn.AnyType else tp
 
   def constantTagToType(tag: Int)(using Context): Type =
     (tag: @switch) match {
@@ -357,12 +359,12 @@ class ClassfileParser(
                       variance match {
                         case '+' => objToAny(TypeBounds.upper(sig2type(tparams, skiptvs)))
                         case '-' =>
-                          val tp = sig2type(tparams, skiptvs)
-                          // sig2type seems to return AnyClass regardless of the situation:
-                          // we don't want Any as a LOWER bound.
-                          if (tp.isDirectRef(defn.AnyClass)) TypeBounds.empty
-                          else TypeBounds.lower(tp)
-                        case '*' => TypeBounds.empty
+                          val argTp = sig2type(tparams, skiptvs)
+                          // Interpret `sig2type` returning `Any` as "no bounds";
+                          // morally equivalent to TypeBounds.empty, but we're representing Java code, so use FromJavaObjectType for AnyType.
+                          if (argTp.typeSymbol == defn.AnyClass) TypeBounds.upper(defn.FromJavaObjectType)
+                          else TypeBounds(argTp, defn.FromJavaObjectType)
+                        case '*' => TypeBounds.upper(defn.FromJavaObjectType)
                       }
                     case _ => sig2type(tparams, skiptvs)
                   }
@@ -378,7 +380,8 @@ class ClassfileParser(
           }
 
           val classSym = classNameToSymbol(subName(c => c == ';' || c == '<'))
-          var tpe = processClassType(processInner(classSym.typeRef))
+          val classTpe = if (classSym eq defn.ObjectClass) defn.FromJavaObjectType else classSym.typeRef
+          var tpe = processClassType(processInner(classTpe))
           while (sig(index) == '.') {
             accept('.')
             val name = subName(c => c == ';' || c == '<' || c == '.').toTypeName
@@ -466,8 +469,10 @@ class ClassfileParser(
       else {
         classTParams = tparams
         val parents = new ListBuffer[Type]()
-        while (index < end)
-          parents += sig2type(tparams, skiptvs = false)  // here the variance doesn't matter
+        while (index < end) {
+          val parent = sig2type(tparams, skiptvs = false)
+          parents += (if (parent eq defn.FromJavaObjectType) defn.ObjectType else parent) // here the variance doesn't matter
+        }
         TempClassInfoType(parents.toList, instanceScope, owner)
       }
     if (ownTypeParams.isEmpty) tpe else TempPolyType(ownTypeParams, tpe)

@@ -311,6 +311,22 @@ class Definitions {
   @tu lazy val AnyRefAlias: TypeSymbol = enterAliasType(tpnme.AnyRef, ObjectType)
   def AnyRefType: TypeRef = AnyRefAlias.typeRef
 
+  /** A type alias of Object (also named Object in case it shows up in error messages)
+   *  used to represent any reference to Object in a Java method signature, the
+   *  secret sauce is that subtype checking treats it specially:
+   *    tp <:< FromJavaObject
+   *  reduces to:
+   *    tp <:< Any
+   *  This is necessary to avoid usability problems when interacting with Java methods,
+   *  where Object is the top type.
+   */
+  @tu lazy val FromJavaObjectSymbol: TypeSymbol =
+    val sym = newSymbol(ObjectClass.owner, tpnme.Object, JavaDefined, TypeAlias(ObjectType))
+    // The alias is intentionally not entered in its owner.
+    sym
+  def FromJavaObjectType: TypeRef = FromJavaObjectSymbol.typeRef
+
+
     @tu lazy val Object_eq: TermSymbol = enterMethod(ObjectClass, nme.eq, methOfAnyRef(BooleanType), Final)
     @tu lazy val Object_ne: TermSymbol = enterMethod(ObjectClass, nme.ne, methOfAnyRef(BooleanType), Final)
     @tu lazy val Object_synchronized: TermSymbol = enterPolyMethod(ObjectClass, nme.synchronized_, 1,
