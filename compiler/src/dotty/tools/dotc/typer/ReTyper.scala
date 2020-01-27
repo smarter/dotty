@@ -57,7 +57,7 @@ class ReTyper extends Typer with ReChecking {
     val expr1 = tree.expr match {
       case id: untpd.Ident if (ctx.mode is Mode.Pattern) && untpd.isVarPattern(id) && (id.name == nme.WILDCARD || id.name == nme.WILDCARD_STAR) =>
         tree.expr.withType(tpt1.tpe)
-      case _ => typed(tree.expr)
+      case _ => typed(tree.expr, tpt1.tpe)
     }
     untpd.cpy.Typed(tree)(expr1, tpt1).withType(tree.typeOpt)
   }
