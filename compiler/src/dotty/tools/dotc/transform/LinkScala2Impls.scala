@@ -61,6 +61,7 @@ class LinkScala2Impls extends MiniPhase with IdentityDenotTransformer { thisPhas
         newImpl(sym.asTerm).enteredAfter(thisPhase)
     // The trait is now fully augmented so the flag isn't needed anymore.
     mixin.resetFlag(Scala2xPartiallyAugmented)
+    mixin.transformAfter(thisPhase, d => { d.resetFlag(Scala2xPartiallyAugmented); d })
   }
 
   override def prepareForTemplate(impl: Template)(implicit ctx: Context): Context = {
