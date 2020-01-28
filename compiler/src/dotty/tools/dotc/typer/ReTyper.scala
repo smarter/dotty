@@ -58,7 +58,13 @@ class ReTyper extends Typer with ReChecking {
       case id: untpd.Ident if (ctx.mode is Mode.Pattern) && untpd.isVarPattern(id) && (id.name == nme.WILDCARD || id.name == nme.WILDCARD_STAR) =>
         tree.expr.withType(tpt1.tpe)
       case _ =>
-        typed(tree.expr, tpt1.tpe.underlyingIfRepeated(isJava = ctx.compilationUnit.isJava))
+        val pt =
+          if (tpt1.tpe.isRepeatedParam) {
+            val isJava = false //tpt1.tpe.derivesFrom(defn.ArrayClass)
+            tpt1.tpe.underlyingIfRepeated(isJava)
+          } else tpt1.tpe
+
+        typed(tree.expr, pt)
     }
     untpd.cpy.Typed(tree)(expr1, tpt1).withType(tree.typeOpt)
   }
