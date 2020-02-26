@@ -1489,7 +1489,7 @@ object Types {
       case wc: WildcardType =>
         wc.optBounds match {
           case bounds: TypeBounds => bounds
-          case NoType => TypeBounds.empty
+          case NoType => TypeBounds.emptySimpleKind
         }
       case _ => TypeAlias(this)
     }
@@ -2782,7 +2782,7 @@ object Types {
           normalize(tp.parent.substRecThis(tp, rt.recThis))
         case tp @ RefinedType(parent, rname, rinfo) =>
           val rinfo1 = rinfo match {
-            case TypeAlias(ref @ TypeRef(RecThis(`rt`), _)) if ref.name == rname => TypeBounds.empty
+            case TypeAlias(ref @ TypeRef(RecThis(`rt`), _)) if ref.name == rname => TypeBounds.emptySimpleKind // ???
             case _ => rinfo
           }
           tp.derivedRefinedType(normalize(parent), rname, rinfo1)
@@ -3588,9 +3588,9 @@ object Types {
     def unapply(tl: HKTypeLambda): Some[(List[LambdaParam], Type)] =
       Some((tl.typeParams, tl.resType))
 
-    def any(n: Int)(implicit ctx: Context): HKTypeLambda =
+    def any(n: Int)(implicit ctx: Context): HKTypeLambda = // ???, see sole usage
       apply(syntheticParamNames(n))(
-        pt => List.fill(n)(TypeBounds.empty), pt => defn.AnyType)
+        pt => List.fill(n)(TypeBounds.emptySimpleKind), pt => defn.AnyType)
 
     override def fromParams[PI <: ParamInfo.Of[TypeName]](params: List[PI], resultType: Type)(implicit ctx: Context): Type =
       resultType match
@@ -3654,10 +3654,6 @@ object Types {
 
     def unapply(tl: PolyType): Some[(List[LambdaParam], Type)] =
       Some((tl.typeParams, tl.resType))
-
-    def any(n: Int)(implicit ctx: Context): PolyType =
-      apply(syntheticParamNames(n))(
-        pt => List.fill(n)(TypeBounds.empty), pt => defn.AnyType)
   }
 
   private object DepStatus {
@@ -3878,7 +3874,7 @@ object Types {
 
     def tyconTypeParams(implicit ctx: Context): List[ParamInfo] = {
       val tparams = tycon.typeParams
-      if (tparams.isEmpty) HKTypeLambda.any(args.length).typeParams else tparams
+      if (tparams.isEmpty) HKTypeLambda.any(args.length).typeParams /* ??? */ else tparams
     }
 
     def hasWildcardArg(implicit ctx: Context): Boolean = args.exists(isBounds)
@@ -4516,7 +4512,8 @@ object Types {
   object TypeBounds {
     def apply(lo: Type, hi: Type)(implicit ctx: Context): TypeBounds =
       unique(new RealTypeBounds(lo, hi))
-    def empty(implicit ctx: Context): TypeBounds = apply(defn.NothingType, defn.AnyKindType)
+    def emptySimpleKind(implicit ctx: Context): TypeBounds = apply(defn.NothingType, defn.AnyType)
+    def emptyAnyKind(implicit ctx: Context): TypeBounds = apply(defn.NothingType, defn.AnyKindType)
     def upper(hi: Type)(implicit ctx: Context): TypeBounds = apply(defn.NothingType, hi)
     def lower(lo: Type)(implicit ctx: Context): TypeBounds = apply(lo, defn.AnyType)
   }

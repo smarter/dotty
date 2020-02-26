@@ -968,7 +968,7 @@ class Namer { typer: Typer =>
       val tparamSyms = completerTypeParams(sym)(ictx)
       given ctx as Context = nestedCtx
       def abstracted(tp: TypeBounds): TypeBounds = HKTypeLambda.boundsFromParams(tparamSyms, tp)
-      val dummyInfo1 = abstracted(TypeBounds.empty)
+      val dummyInfo1 = abstracted(TypeBounds.emptySimpleKind)
       sym.info = dummyInfo1
       sym.setFlag(Provisional)
         // Temporarily set info of defined type T to ` >: Nothing <: Any.

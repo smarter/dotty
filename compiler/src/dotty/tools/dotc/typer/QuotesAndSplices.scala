@@ -134,7 +134,7 @@ trait QuotesAndSplices {
 
       val typeSymInfo = pt match
         case pt: TypeBounds => pt
-        case _ => TypeBounds.empty
+        case _ => TypeBounds.emptySimpleKind
       val typeSym = ctx.newSymbol(spliceOwner(ctx), name, EmptyFlags, typeSymInfo, NoSymbol, tree.expr.span)
       typeSym.addAnnotation(Annotation(New(ref(defn.InternalQuoted_patternBindHoleAnnot.typeRef)).withSpan(tree.expr.span)))
       val pat = typedPattern(tree.expr, defn.QuotedTypeClass.typeRef.appliedTo(typeSym.typeRef))(

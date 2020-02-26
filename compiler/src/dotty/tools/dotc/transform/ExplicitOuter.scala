@@ -171,7 +171,7 @@ object ExplicitOuter {
         outerCls.appliedRef
       else
         outerThis.baseType(outerCls).orElse(
-  		    outerCls.typeRef.appliedTo(outerCls.typeParams.map(_ => TypeBounds.empty)))
+  		    outerCls.typeRef.appliedTo(outerCls.typeParams.map(_ => TypeBounds.emptyAnyKind)))
     val info = if (flags.is(Method)) ExprType(target) else target
     ctx.withPhaseNoEarlier(ctx.explicitOuterPhase.next) // outer accessors are entered at explicitOuter + 1, should not be defined before.
        .newSymbol(owner, name, Synthetic | flags, info, coord = cls.coord)

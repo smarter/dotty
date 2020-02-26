@@ -246,7 +246,7 @@ trait ConstraintHandling[AbstractContext] {
     val avoidParam = new TypeMap {
       override def stopAtStatic = true
       def avoidInArg(arg: Type): Type =
-        if (param.occursIn(arg)) TypeBounds.empty else arg
+        if (param.occursIn(arg)) TypeBounds.emptyAnyKind else arg
       def apply(tp: Type) = mapOver {
         tp match {
           case tp @ AppliedType(tycon, args) =>
@@ -254,7 +254,7 @@ trait ConstraintHandling[AbstractContext] {
           case tp: RefinedType if param occursIn tp.refinedInfo =>
             tp.parent
           case tp: WildcardType =>
-            val bounds = tp.optBounds.orElse(TypeBounds.empty).bounds
+            val bounds = tp.optBounds.orElse(TypeBounds.emptySimpleKind).bounds
             // Try to instantiate the wildcard to a type that is known to conform to it.
             // This means:
             //  If fromBelow is true, we minimize the type overall
@@ -363,7 +363,7 @@ trait ConstraintHandling[AbstractContext] {
     else {
       val pinfos = param.binder.paramInfos
       if (pinfos != null) pinfos(param.paramNum) // pinfos == null happens in pos/i536.scala
-      else TypeBounds.empty
+      else TypeBounds.emptyAnyKind
     }
   }
 
@@ -380,7 +380,7 @@ trait ConstraintHandling[AbstractContext] {
             val lower = constraint.lower(param)
             val upper = constraint.upper(param)
             if lower.nonEmpty && !bounds.lo.isRef(defn.NothingClass)
-               || upper.nonEmpty && !bounds.hi.isAny
+               || upper.nonEmpty && !bounds.hi.isAnyKind
             then constr_println(i"INIT*** $tl")
             lower.forall(addOneBound(_, bounds.hi, isUpper = true)) &&
               upper.forall(addOneBound(_, bounds.lo, isUpper = false))

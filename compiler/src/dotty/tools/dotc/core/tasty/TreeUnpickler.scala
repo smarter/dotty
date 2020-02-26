@@ -826,7 +826,7 @@ class TreeUnpickler(reader: TastyReader,
             TypeDef(readTemplate(localCtx))
           }
           else {
-            sym.info = TypeBounds.empty // needed to avoid cyclic references when unpickling rhs, see i3816.scala
+            sym.info = TypeBounds.emptySimpleKind // needed to avoid cyclic references when unpickling rhs, see i3816.scala
             sym.setFlag(Provisional)
             val rhs = readTpt()(localCtx)
             sym.info = new NoCompleter {

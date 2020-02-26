@@ -887,7 +887,7 @@ class Typer extends Namer
     def interpolateWildcards = new TypeMap {
       def apply(t: Type): Type = t match
         case WildcardType(bounds: TypeBounds) =>
-          newTypeVar(apply(bounds.orElse(TypeBounds.empty)).bounds)
+          newTypeVar(apply(bounds.orElse(TypeBounds.emptySimpleKind)).bounds)
         case _ => mapOver(t)
     }
     pt.stripTypeVar.dealias match {
@@ -1444,7 +1444,7 @@ class Typer extends Namer
           args = args.take(tparams.length)
         }
         def typedArg(arg: untpd.Tree, tparam: ParamInfo) = {
-          def tparamBounds = TypeBounds.empty//tparam.paramInfoAsSeenFrom(tpt1.tpe.appliedTo(tparams.map(_ => TypeBounds.empty)))
+          def tparamBounds = TypeBounds.emptyAnyKind
           val (desugaredArg, argPt) =
             if ctx.mode.is(Mode.Pattern) then
               (if (untpd.isVarPattern(arg)) desugar.patternVar(arg) else arg, tparamBounds)
@@ -3135,7 +3135,7 @@ class Typer extends Namer
           val tp1 =
             if (ctx.compilationUnit.isJava)
               // Cook raw type
-              AppliedType(tree.tpe, tp.typeParams.map(Function.const(TypeBounds.empty)))
+              AppliedType(tree.tpe, tp.typeParams.map(Function.const(TypeBounds.emptySimpleKind)))
             else
               // Eta-expand higher-kinded type
               tree.tpe.EtaExpand(tp.typeParamSymbols)

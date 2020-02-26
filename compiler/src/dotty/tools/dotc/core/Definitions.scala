@@ -49,7 +49,7 @@ class Definitions {
     ctx.newCompleteClassSymbol(owner, name, flags | Permanent | NoInits | Open, parents, decls).entered
 
   private def enterTypeField(cls: ClassSymbol, name: TypeName, flags: FlagSet, scope: MutableScope) =
-    scope.enter(newSymbol(cls, name, flags, TypeBounds.empty))
+    scope.enter(newSymbol(cls, name, flags, TypeBounds.emptySimpleKind))
 
   private def enterTypeParam(cls: ClassSymbol, name: TypeName, flags: FlagSet, scope: MutableScope) =
     enterTypeField(cls, name, flags | ClassTypeParamCreationFlags, scope)
@@ -149,13 +149,13 @@ class Definitions {
 
   private def enterBinaryAlias(name: TypeName, op: (Type, Type) => Type): TypeSymbol =
     enterAliasType(name,
-      HKTypeLambda(TypeBounds.empty :: TypeBounds.empty :: Nil)(
+      HKTypeLambda(TypeBounds.emptySimpleKind :: TypeBounds.emptySimpleKind :: Nil)(
       tl => op(tl.paramRefs(0), tl.paramRefs(1))))
 
   private def enterPolyMethod(cls: ClassSymbol, name: TermName, typeParamCount: Int,
                     resultTypeFn: PolyType => Type,
                     flags: FlagSet = EmptyFlags,
-                    bounds: TypeBounds = TypeBounds.empty,
+                    bounds: TypeBounds = TypeBounds.emptySimpleKind,
                     useCompleter: Boolean = false) = {
     val tparamNames = PolyType.syntheticParamNames(typeParamCount)
     val tparamInfos = tparamNames map (_ => bounds)
@@ -379,7 +379,7 @@ class Definitions {
   def UncheckedNullAliasType: TypeRef = UncheckedNullAlias.typeRef
 
   @tu lazy val ImplicitScrutineeTypeSym =
-    newSymbol(ScalaPackageClass, tpnme.IMPLICITkw, EmptyFlags, TypeBounds.empty).entered
+    newSymbol(ScalaPackageClass, tpnme.IMPLICITkw, EmptyFlags, TypeBounds.emptySimpleKind).entered
   def ImplicitScrutineeTypeRef: TypeRef = ImplicitScrutineeTypeSym.typeRef
 
 
@@ -652,7 +652,7 @@ class Definitions {
 
   @tu lazy val ModuleSerializationProxyClass: ClassSymbol = ctx.requiredClass("scala.runtime.ModuleSerializationProxy")
     @tu lazy val ModuleSerializationProxyConstructor: TermSymbol =
-      ModuleSerializationProxyClass.requiredMethod(nme.CONSTRUCTOR, List(ClassType(TypeBounds.empty)))
+      ModuleSerializationProxyClass.requiredMethod(nme.CONSTRUCTOR, List(ClassType(TypeBounds.emptySimpleKind)))
 
   @tu lazy val MirrorClass: ClassSymbol = ctx.requiredClass("scala.deriving.Mirror")
   @tu lazy val Mirror_ProductClass: ClassSymbol = ctx.requiredClass("scala.deriving.Mirror.Product")

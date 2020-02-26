@@ -34,7 +34,7 @@ object ClassfileParser {
   def cook(implicit ctx: Context): TypeMap = new TypeMap {
     def apply(tp: Type): Type = tp match {
       case tp: TypeRef if tp.symbol.typeParams.nonEmpty =>
-        AppliedType(tp, tp.symbol.typeParams.map(Function.const(TypeBounds.empty)))
+        AppliedType(tp, tp.symbol.typeParams.map(Function.const(TypeBounds.emptySimpleKind)))
       case tp @ AppliedType(tycon, args) =>
         // disregard tycon itself, but map over it to visit the prefix
         tp.derivedAppliedType(mapOver(tycon), args.mapConserve(this))
@@ -361,9 +361,9 @@ class ClassfileParser(
                           val tp = sig2type(tparams, skiptvs)
                           // sig2type seems to return AnyClass regardless of the situation:
                           // we don't want Any as a LOWER bound.
-                          if (tp.isDirectRef(defn.AnyClass)) TypeBounds.empty
+                          if (tp.isDirectRef(defn.AnyClass)) TypeBounds.emptySimpleKind
                           else TypeBounds.lower(tp)
-                        case '*' => TypeBounds.empty
+                        case '*' => TypeBounds.emptySimpleKind
                       }
                     case _ => sig2type(tparams, skiptvs)
                   }

@@ -455,7 +455,7 @@ object SymDenotations {
           assert(!alias.isEmpty)
           TypeBounds(lo.tpe, hi.tpe)
         case _ =>
-          TypeBounds.empty
+          TypeBounds.emptySimpleKind
 
       info match
         case TypeAlias(alias) if isOpaqueAlias && owner.isClass =>
