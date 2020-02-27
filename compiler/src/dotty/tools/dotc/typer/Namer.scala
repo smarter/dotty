@@ -1353,6 +1353,15 @@ class Namer { typer: Typer =>
    */
   def valOrDefDefSig(mdef: ValOrDefDef, sym: Symbol, typeParams: List[Symbol], paramss: List[List[Symbol]], paramFn: Type => Type)(implicit ctx: Context): Type = {
 
+    // Approximate a type `tp` with a type that does not contain skolem types.
+    val deskolemize = new ApproximatingTypeMap {
+      def apply(tp: Type) = /*trace(i"deskolemize($tp) at $variance", show = true)*/
+        tp match {
+          case tp: SkolemType => range(defn.NothingType, atVariance(1)(apply(tp.info)))
+          case _ => mapOver(tp)
+        }
+    }
+
     def inferredType = {
       /** A type for this definition that might be inherited from elsewhere:
        *  If this is a setter parameter, the corresponding getter type.
@@ -1451,16 +1460,7 @@ class Namer { typer: Typer =>
       }
       def rhsType = typedAheadExpr(mdef.rhs, (inherited orElse rhsProto).widenExpr)(rhsCtx).tpe
 
-      // Approximate a type `tp` with a type that does not contain skolem types.
-      val deskolemize = new ApproximatingTypeMap {
-        def apply(tp: Type) = /*trace(i"deskolemize($tp) at $variance", show = true)*/
-          tp match {
-            case tp: SkolemType => range(defn.NothingType, atVariance(1)(apply(tp.info)))
-            case _ => mapOver(tp)
-          }
-      }
-
-      def cookedRhsType = deskolemize(dealiasIfUnit(widenRhs(rhsType)))
+      def cookedRhsType = dealiasIfUnit(widenRhs(rhsType))
       def lhsType = fullyDefinedType(cookedRhsType, "right-hand side", mdef.span)
       //if (sym.name.toString == "y") println(i"rhs = $rhsType, cooked = $cookedRhsType")
       if (inherited.exists)
@@ -1480,22 +1480,25 @@ class Namer { typer: Typer =>
       case _: untpd.DerivedTypeTree =>
         WildcardType
       case TypeTree() =>
-        checkMembersOK(inferredType, mdef.sourcePos)
+        checkMembersOK(deskolemize(inferredType), mdef.sourcePos)
       case DependentTypeTree(tpFun) =>
         val tpe = tpFun(paramss.head)
-        if (isFullyDefined(tpe, ForceDegree.none)) tpe
-        else typedAheadExpr(mdef.rhs, tpe).tpe
+        deskolemize(
+          if (isFullyDefined(tpe, ForceDegree.none)) tpe
+          else typedAheadExpr(mdef.rhs, tpe).tpe
+        )
       case TypedSplice(tpt: TypeTree) if !isFullyDefined(tpt.tpe, ForceDegree.none) =>
         val rhsType = typedAheadExpr(mdef.rhs, tpt.tpe).tpe
         mdef match {
           case mdef: DefDef if mdef.name == nme.ANON_FUN =>
-            val hygienicType = avoid(rhsType, paramss.flatten)
+            val hygienicType = deskolemize(avoid(rhsType, paramss.flatten))
             if (!hygienicType.isValueType || !(hygienicType <:< tpt.tpe))
               ctx.error(i"return type ${tpt.tpe} of lambda cannot be made hygienic;\n" +
                 i"it is not a supertype of the hygienic type $hygienicType", mdef.sourcePos)
             //println(i"lifting $rhsType over $paramss -> $hygienicType = ${tpt.tpe}")
             //println(TypeComparer.explained { implicit ctx => hygienicType <:< tpt.tpe })
           case _ =>
+            ???
         }
         WildcardType
       case _ =>
