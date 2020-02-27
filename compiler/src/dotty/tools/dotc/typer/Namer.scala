@@ -1480,10 +1480,10 @@ class Namer { typer: Typer =>
       case _: untpd.DerivedTypeTree =>
         WildcardType
       case TypeTree() =>
-        checkMembersOK(deskolemize(inferredType), mdef.sourcePos)
+        checkMembersOK(/*deskolemize*/(inferredType), mdef.sourcePos)
       case DependentTypeTree(tpFun) =>
         val tpe = tpFun(paramss.head)
-        deskolemize(
+        /*deskolemize*/(
           if (isFullyDefined(tpe, ForceDegree.none)) tpe
           else typedAheadExpr(mdef.rhs, tpe).tpe
         )
@@ -1491,7 +1491,7 @@ class Namer { typer: Typer =>
         val rhsType = typedAheadExpr(mdef.rhs, tpt.tpe).tpe
         mdef match {
           case mdef: DefDef if mdef.name == nme.ANON_FUN =>
-            val hygienicType = deskolemize(avoid(rhsType, paramss.flatten))
+            val hygienicType = /*deskolemize*/(avoid(rhsType, paramss.flatten))
             if (!hygienicType.isValueType || !(hygienicType <:< tpt.tpe))
               ctx.error(i"return type ${tpt.tpe} of lambda cannot be made hygienic;\n" +
                 i"it is not a supertype of the hygienic type $hygienicType", mdef.sourcePos)

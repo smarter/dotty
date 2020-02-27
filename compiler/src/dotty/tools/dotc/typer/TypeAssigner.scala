@@ -128,6 +128,8 @@ trait TypeAssigner {
             tp.origin, fromBelow = variance > 0 || variance == 0 && tp.hasLowerBound)
           val lo1 = apply(lo)
           if (lo1 ne lo) lo1 else tp
+        case tp: SkolemType =>
+          range(defn.NothingType, atVariance(1)(apply(tp.info)))
         case _ =>
           mapOver(tp)
       }
