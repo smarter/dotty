@@ -627,6 +627,8 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
   }
 
   implicit def symHelper(sym: Symbol): SymbolHelper = new SymbolHelper {
+    def exists: Boolean = sym.exists
+
     // names
     def showFullName: String = sym.showFullName
     def javaSimpleName: String = toDenot(sym).name.mangledString // addModuleSuffix(simpleName.dropLocal)
@@ -759,12 +761,14 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
         toDenot(sym)(shiftedContext).lexicallyEnclosingClass(shiftedContext)
       } else NoSymbol
     def nextOverriddenSymbol: Symbol = toDenot(sym).nextOverriddenSymbol
+    def allOverriddenSymbols: List[Symbol] = toDenot(sym).allOverriddenSymbols.toList
 
     // members
     def primaryConstructor: Symbol = toDenot(sym).primaryConstructor
 
     /** For currently compiled classes: All locally defined classes including local classes.
      *  The empty list for classes that are not currently compiled.
+
      */
     def nestedClasses: List[Symbol] = definedClasses(ctx.flattenPhase)
 
@@ -875,6 +879,8 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
     def <:<(other: Type): Boolean = tp <:< other
 
     def memberInfo(s: Symbol): Type = tp.memberInfo(s)
+
+    def decl(name: Name): Symbol = tp.decl(name).symbol
 
     def decls: List[Symbol] = tp.decls.toList
 
