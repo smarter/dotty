@@ -1165,8 +1165,10 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
           receiver != methodOwner && // fast path - the boolean is used to pick either of these two, if they are the same it does not matter
             style.isVirtual &&
             receiver.isEmittedInterface &&
-            Object_Type.decl(method.name).exists && // fast path - compute overrideChain on the next line only if necessary
-            method.allOverriddenSymbols.last.owner == ObjectClass
+            Object_Type.decl(method.name).exists && { // fast path - compute overrideChain on the next line only if necessary
+              val syms = method.allOverriddenSymbols
+              !syms.isEmpty && syms.last.owner == ObjectClass
+            }
         }
         if (isTraitMethodOverridingObjectMember) methodOwner else receiver
       }
