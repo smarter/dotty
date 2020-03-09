@@ -24,6 +24,7 @@ import java.io.{File => JFile, InputStream}
 trait DottyBytecodeTest {
   import AsmNode._
   import ASMConverters._
+  import DottyBytecodeTest._
 
   protected object Opcode {
     val newarray       = 188
@@ -80,6 +81,15 @@ trait DottyBytecodeTest {
   protected def getField(classNode: ClassNode, name: String): FieldNode =
     classNode.fields.asScala.find(_.name == name) getOrElse
       sys.error(s"Didn't find field '$name' in class '${classNode.name}'")
+
+  def assertInvoke(m: MethodNode, receiver: String, method: String): Unit =
+    assertInvoke(instructionsFromMethod(m), receiver, method)
+  def assertInvoke(l: List[Instruction], receiver: String, method: String): Unit = {
+    assert(l.exists {
+      case Invoke(_, `receiver`, `method`, _, _) => true
+      case _ => false
+    }, l.stringLines)
+  }
 
   def diffInstructions(isa: List[Instruction], isb: List[Instruction]): String = {
     val len = Math.max(isa.length, isb.length)
@@ -194,3 +204,9 @@ trait DottyBytecodeTest {
     )
   }
 }
+object DottyBytecodeTest {
+  implicit class listStringLines[T](val l: List[T]) extends AnyVal {
+    def stringLines = l.mkString("\n")
+  }
+}
+
