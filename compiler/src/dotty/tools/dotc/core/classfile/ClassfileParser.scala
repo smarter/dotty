@@ -8,7 +8,7 @@ import dotty.tools.tasty.{ TastyReader, TastyHeaderUnpickler }
 import Contexts._, Symbols._, Types._, Names._, StdNames._, NameOps._, Scopes._, Decorators._
 import SymDenotations._, unpickleScala2.Scala2Unpickler._, Constants._, Annotations._, util.Spans._
 import NameKinds.DefaultGetterName
-import ast.tpd._, util._
+import ast.untpd, ast.tpd._, util._
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, IOException }
 
 import java.lang.Integer.toHexString
@@ -480,7 +480,9 @@ class ClassfileParser(
   }
   // sigToType
 
-  def parseAnnotArg(skip: Boolean = false)(implicit ctx: Context): Option[Tree] = {
+  def parseAnnotArg(skip: Boolean = false)(implicit ctx: Context): Option[untpd.Tree] = {
+    import untpd._
+
     val tag = in.nextByte.toChar
     val index = in.nextChar
     tag match {
@@ -517,10 +519,7 @@ class ClassfileParser(
         else if (skip) None
         else {
           val elems = arr.toList
-          val elemType =
-            if (elems.isEmpty) WildcardType // No way to figure out the element type without forcing the annotation constructor
-            else elems.head.tpe.widen
-          Some(JavaSeqLiteral(elems, TypeTree(elemType)))
+          Some(untpd.JavaSeqLiteral(elems, TypeTree()))
         }
       case ANNOTATION_TAG =>
         parseAnnotation(index, skip) map (_.tree)
@@ -533,12 +532,12 @@ class ClassfileParser(
   def parseAnnotation(attrNameIndex: Char, skip: Boolean = false)(implicit ctx: Context): Option[Annotation] = try {
     val attrType = pool.getType(attrNameIndex)
     val nargs = in.nextChar
-    val argbuf = new ListBuffer[Tree]
+    val argbuf = new ListBuffer[untpd.Tree]
     var hasError = false
     for (i <- 0 until nargs) {
       val name = pool.getName(in.nextChar)
       parseAnnotArg(skip) match {
-        case Some(arg) => argbuf += NamedArg(name, arg)
+        case Some(arg) => argbuf += untpd.NamedArg(name, arg)
         case None => hasError = !skip
       }
     }

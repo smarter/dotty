@@ -56,7 +56,7 @@ object Typer {
 
   /** Assert tree has a position, unless it is empty or a typed splice */
   def assertPositioned(tree: untpd.Tree)(implicit ctx: Context): Unit =
-    if (!tree.isEmpty && !tree.isInstanceOf[untpd.TypedSplice] && ctx.typerState.isGlobalCommittable)
+    if (false && !tree.isEmpty && !tree.isInstanceOf[untpd.TypedSplice] && ctx.typerState.isGlobalCommittable)
       assert(tree.span.exists, i"position not set for $tree # ${tree.uniqueId} of ${tree.getClass} in ${tree.source}")
 
   /** A context property that indicates the owner of any expressions to be typed in the context
