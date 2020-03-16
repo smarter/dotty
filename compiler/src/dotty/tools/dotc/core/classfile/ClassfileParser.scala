@@ -485,15 +485,20 @@ class ClassfileParser(
 
     val tag = in.nextByte.toChar
     val index = in.nextChar
+
+    // Constants need to actually be typed as constants no matter the expected
+    // type, so we can't rely on untpd.Literal.
+    def lit(c: Constant): Tree = TypedSplice(ast.tpd.Literal(c))
+
     tag match {
       case STRING_TAG =>
-        if (skip) None else Some(Literal(Constant(pool.getName(index).toString)))
+        if (skip) None else Some(lit(Constant(pool.getName(index).toString)))
       case BOOL_TAG | BYTE_TAG | CHAR_TAG | SHORT_TAG =>
-        if (skip) None else Some(Literal(pool.getConstant(index, tag)))
+        if (skip) None else Some(lit(pool.getConstant(index, tag)))
       case INT_TAG | LONG_TAG | FLOAT_TAG | DOUBLE_TAG =>
-        if (skip) None else Some(Literal(pool.getConstant(index)))
+        if (skip) None else Some(lit(pool.getConstant(index)))
       case CLASS_TAG =>
-        if (skip) None else Some(Literal(Constant(pool.getType(index))))
+        if (skip) None else Some(lit(Constant(pool.getType(index))))
       case ENUM_TAG =>
         val t = pool.getType(index)
         val n = pool.getName(in.nextChar)
@@ -502,7 +507,7 @@ class ClassfileParser(
         if (skip)
           None
         else if (s != NoSymbol)
-          Some(Literal(Constant(s)))
+          Some(lit(Constant(s)))
         else {
           ctx.warning(s"""While parsing annotations in ${in.file}, could not find $n in enum $module.\nThis is likely due to an implementation restriction: an annotation argument cannot refer to a member of the annotated class (SI-7014).""")
           None
