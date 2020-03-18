@@ -1553,7 +1553,7 @@ object Trees {
       val fun = receiver.select(selected).appliedToTypes(targs)
 
       val apply = untpd.Apply(fun, args)
-      typer.ApplyToUntyped(apply, fun, selected, proto, expectedType).result
+      typer.ApplyTo(apply, fun, selected, proto, expectedType)
     }
 
 
