@@ -1649,13 +1649,9 @@ class Typer extends Namer
     }
   }
 
-  def completeAnnotations(mdef: untpd.MemberDef, sym: Symbol)(implicit ctx: Context): Unit = {
+  def completeAnnotations(sym: Symbol)(implicit ctx: Context): Unit = {
     // necessary to force annotation trees to be computed.
     sym.annotations.foreach(_.ensureCompleted)
-    lazy val annotCtx = annotContext(mdef, sym)
-    // necessary in order to mark the typed ahead annotations as definitely typed:
-    for (annot <- untpd.modsDeco(mdef).mods.annotations)
-      checkAnnotApplicable(typedAnnotation(annot)(annotCtx), sym)
   }
 
   def typedAnnotation(annot: untpd.Tree)(implicit ctx: Context): Tree =
@@ -1663,7 +1659,7 @@ class Typer extends Namer
 
   def typedValDef(vdef: untpd.ValDef, sym: Symbol)(implicit ctx: Context): Tree = {
     val ValDef(name, tpt, _) = vdef
-    completeAnnotations(vdef, sym)
+    completeAnnotations(sym)
     if (sym.isOneOf(GivenOrImplicit)) checkImplicitConversionDefOK(sym)
     val tpt1 = checkSimpleKinded(typedType(tpt))
     val rhs1 = vdef.rhs match {
@@ -1705,7 +1701,7 @@ class Typer extends Namer
       return EmptyTree
     }
     val DefDef(name, tparams, vparamss, tpt, _) = ddef
-    completeAnnotations(ddef, sym)
+    completeAnnotations(sym)
     val tparams1 = tparams mapconserve (typed(_).asInstanceOf[TypeDef])
     val vparamss1 = vparamss nestedMapconserve (typed(_).asInstanceOf[ValDef])
     vparamss1.foreach(checkNoForwardDependencies)
@@ -1765,7 +1761,7 @@ class Typer extends Namer
 
   def typedTypeDef(tdef: untpd.TypeDef, sym: Symbol)(implicit ctx: Context): Tree = {
     val TypeDef(name, rhs) = tdef
-    completeAnnotations(tdef, sym)
+    completeAnnotations(sym)
     val rhs1 = tdef.rhs match {
       case rhs @ LambdaTypeTree(tparams, body) =>
         val tparams1 = tparams.map(typed(_)).asInstanceOf[List[TypeDef]]
@@ -1855,7 +1851,7 @@ class Typer extends Namer
       }
     }
 
-    completeAnnotations(cdef, cls)
+    completeAnnotations(cls)
     val constr1 = typed(constr).asInstanceOf[DefDef]
     val parentsWithClass = ensureFirstTreeIsClass(parents.mapconserve(typedParent).filterConserve(!_.isEmpty), cdef.nameSpan)
     val parents1 = ensureConstrCall(cls, parentsWithClass)(superCtx)

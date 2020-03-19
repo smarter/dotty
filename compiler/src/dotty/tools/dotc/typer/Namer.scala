@@ -854,7 +854,14 @@ class Namer { typer: Typer =>
           if (cls eq sym)
             ctx.error("An annotation class cannot be annotated with iself", annotTree.sourcePos)
           else {
-            val ann = Annotation.deferred(cls)(typedAnnotation(annotTree))
+            val ann = Annotation.deferred(cls) {
+              // We can't reuse the `annotCtx` defined above here otherwise it
+              // would be captured in this closure.
+              val annotCtx = annotContext(original, sym)
+              val annotTree1 = typedAnnotation(annotTree)(annotCtx)
+              checkAnnotApplicable(annotTree1, sym)
+              annotTree1
+            }
             sym.addAnnotation(ann)
           }
         }

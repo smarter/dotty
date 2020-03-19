@@ -354,7 +354,7 @@ class ReifyQuotes extends MacroTransform {
 
           case tree: DefTree if level >= 1 =>
             val newAnnotations = tree.symbol.annotations.mapconserve { annot =>
-              val newAnnotTree = transform(annot.tree)(using ctx.withOwner(tree.symbol))
+              val newAnnotTree = transform(annot.tree)
               if (annot.tree == newAnnotTree) annot
               else ConcreteAnnotation(newAnnotTree)
             }
