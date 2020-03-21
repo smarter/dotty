@@ -1,3 +1,3 @@
-class foo(x: Any) extends annotation.StaticAnnotation
+// class foo(x: Any) extends annotation.StaticAnnotation
 
-@foo(new AnyRef { }) trait A
+@foo({class Duck; new Duck}) trait A

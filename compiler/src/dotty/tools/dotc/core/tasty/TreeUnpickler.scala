@@ -394,16 +394,20 @@ class TreeUnpickler(reader: TastyReader,
           readPackageRef().termRef
         case TYPEREF =>
           val name = readName().toTypeName
-          TypeRef(readType(), name)
+          val t = TypeRef(readType(), name)
+          assert(t.underlying.exists, t)
+          t
         case TERMREF =>
           val sname = readName()
           val prefix = readType()
-          sname match {
+          val t = sname match {
             case SignedName(name, sig) =>
               TermRef(prefix, name, prefix.member(name).atSignature(sig))
             case name =>
               TermRef(prefix, name)
           }
+          assert(t.underlying.exists, t)
+          t
         case THIS =>
           ThisType.raw(readType().asInstanceOf[TypeRef])
         case RECtype =>
