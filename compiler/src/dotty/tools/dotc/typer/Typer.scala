@@ -1641,22 +1641,49 @@ class Typer extends Namer
    *  enclosing class.
    */
   def annotContext(mdef: untpd.Tree, sym: Symbol)(implicit ctx: Context): Context = {
+    def classCtx = ctx.outersIterator.dropWhile(!_.isClassDefContext).next()
+    // keep withModeBits, like LazyReader? use an inner loop method
 
+    if (sym.isClass)
+      classCtx.outer.fresh.setOwner(sym.primaryConstructor)
+    else {
+      ctx.property(ExprOwner) match {
+        case Some(exprOwner) /*if c.owner.isClass*/ => ctx.exprContext(mdef, exprOwner)
+        case _ =>
+          if (ctx.owner.isClass)
+            assert(ctx.owner.primaryConstructor.exists, ctx.owner.showLocated)
+            // note the lack of .outer: still have access to class definitions
+            classCtx.fresh.setOwner(ctx.owner.primaryConstructor)
+          else
+            annotContext(mdef, sym)(ctx.outer)
+      }
+    }
+  }
 
-
+  /*
     // def isInner(owner: Symbol) = owner == sym || sym.is(Param) && owner == sym.owner
     // val c = ctx.outersIterator.dropWhile(c => isInner(c.owner)).next()
-    // println("c: " + c)
-    // println("c.p: " + c.property(ExprOwner))
     ctx.property(ExprOwner) match {
       case Some(exprOwner) /*if c.owner.isClass*/ => ctx.exprContext(mdef, exprOwner)
       case _ =>
         if (ctx.owner.isClass)
-          ctx.withOwner(ctx.owner.primaryConstructor)
+          // copy-pasted from superOrThisCallContext
+          // if mdef is a class
+          //   classCtx.outer.fresh.setOwner(primary)
+          // otherwise
+          //   classCtx.fresh.setOwner(primary)
+          // FIXME: check what happens for class foo { { @foo val x: Int } }
+          //        should use the ExprOwner context ==> localdummy
+
+          // println("oo:" + ctx.outer.scope.toList)
+          // ctx.outer might still have owner as class!
+          if (sym.isClass)
+            ctx.outer.fresh.setOwner(ctx.owner.primaryConstructor)
+          // ctx.withOwner(ctx.owner.primaryConstructor)
         else
           annotContext(mdef, sym)(ctx.outer)
     }
-  }
+   */
 
   def completeAnnotations(sym: Symbol)(implicit ctx: Context): Unit = {
     // necessary to force annotation trees to be computed.

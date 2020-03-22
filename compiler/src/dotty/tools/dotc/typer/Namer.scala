@@ -849,6 +849,14 @@ class Namer { typer: Typer =>
     protected def addAnnotations(sym: Symbol): Unit = original match {
       case original: untpd.MemberDef =>
         for (annotTree <- untpd.modsDeco(original).mods.annotations) {
+          // class a
+          // val x
+          // class b {
+          //   class a
+          //   val x
+          //   @a(x) def foo: Int = 1 // inner a, outer x ?
+          //   we want inner x too
+          // }
           val cls = typedAheadAnnotationClass(annotTree)
           if (cls eq sym)
             ctx.error("An annotation class cannot be annotated with iself", annotTree.sourcePos)
