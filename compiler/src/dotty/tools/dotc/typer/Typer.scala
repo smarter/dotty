@@ -540,7 +540,7 @@ class Typer extends Namer
   def typedSuper(tree: untpd.Super, pt: Type)(implicit ctx: Context): Tree = {
     val qual1 = typed(tree.qual)
     val inConstrCall = pt match {
-      case pt: SelectionProto if pt.name == nme.CONSTRUCTOR => true
+      case pt: SelectionProto if pt.name == nme.CONSTRUCTOR => assert(false, s"$tree, ${ctx.owner.showLocated}, ${tree.sourcePos}"); true
       case _ => false
     }
     val enclosingInlineable = ctx.owner.ownersIterator.findSymbol(_.isInlineMethod)
