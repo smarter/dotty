@@ -848,16 +848,13 @@ class Namer { typer: Typer =>
 
     protected def addAnnotations(sym: Symbol): Unit = original match {
       case original: untpd.MemberDef =>
-        lazy val annotCtx = annotContext(original, sym)
         for (annotTree <- untpd.modsDeco(original).mods.annotations) {
-          val cls = typedAheadAnnotationClass(annotTree)(annotCtx)
+          val cls = typedAheadAnnotationClass(annotTree)
           if (cls eq sym)
             ctx.error("An annotation class cannot be annotated with iself", annotTree.sourcePos)
           else {
             val ann = Annotation.deferred(cls) {
-              // We can't reuse the `annotCtx` defined above here otherwise it
-              // would be captured in this closure.
-              val annotCtx = annotContext(original, sym)
+              val annotCtx = annotContext(original, sym)(ctx.withOwner(sym))
               val annotTree1 = typedAnnotation(annotTree)(annotCtx)
               checkAnnotApplicable(annotTree1, sym)
               annotTree1

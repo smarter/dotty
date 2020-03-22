@@ -1641,16 +1641,20 @@ class Typer extends Namer
    *  enclosing class.
    */
   def annotContext(mdef: untpd.Tree, sym: Symbol)(implicit ctx: Context): Context = {
-    println("mdef: " + mdef)
-    println("sym: " + sym)
-    println("sym.owner: " + sym.owner)
-    def isInner(owner: Symbol) = owner == sym || sym.is(Param) && owner == sym.owner
-    val c = ctx.outersIterator.dropWhile(c => isInner(c.owner)).next()
-    println("c: " + c)
-    println("c.p: " + c.property(ExprOwner))
-    c.property(ExprOwner) match {
-      case Some(exprOwner) if c.owner.isClass => c.exprContext(mdef, exprOwner)
-      case _ => c
+
+
+
+    // def isInner(owner: Symbol) = owner == sym || sym.is(Param) && owner == sym.owner
+    // val c = ctx.outersIterator.dropWhile(c => isInner(c.owner)).next()
+    // println("c: " + c)
+    // println("c.p: " + c.property(ExprOwner))
+    ctx.property(ExprOwner) match {
+      case Some(exprOwner) /*if c.owner.isClass*/ => ctx.exprContext(mdef, exprOwner)
+      case _ =>
+        if (ctx.owner.isClass)
+          ctx.withOwner(ctx.owner.primaryConstructor)
+        else
+          annotContext(mdef, sym)(ctx.outer)
     }
   }
 
