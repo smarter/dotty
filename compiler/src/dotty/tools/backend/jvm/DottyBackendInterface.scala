@@ -251,7 +251,7 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
           case StringTag =>
             assert(const.value != null, const) // TODO this invariant isn't documented in `case class Constant`
             av.visit(name, const.stringValue) // `stringValue` special-cases null, but that execution path isn't exercised for a const with StringTag
-          case ClazzTag => av.visit(name, const.typeValue.toTypeKind(bcodeStore)(innerClasesStore).toASMType)
+          case ClazzTag => av.visit(name, TypeErasure.erasure(const.typeValue).toTypeKind(bcodeStore)(innerClasesStore).toASMType)
           case EnumTag =>
             val edesc = innerClasesStore.typeDescriptor(const.tpe.asInstanceOf[bcodeStore.int.Type]) // the class descriptor of the enumeration class.
             val evalue = const.symbolValue.name.mangledString // value the actual enumeration value.
