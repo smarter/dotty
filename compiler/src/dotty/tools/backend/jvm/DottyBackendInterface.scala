@@ -598,7 +598,7 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
 
     def assocs: List[(Name, Tree)] = assocsFromApply(a.tree)
 
-    def symbol: Symbol = a.tree.symbol
+    def symbol: Symbol = a.symbol
 
     def args: List[Tree] = List.empty // those arguments to scala-defined annotations. they are never emitted
   }
@@ -1098,8 +1098,31 @@ class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Ma
   object Constant extends ConstantDeconstructor {
     def get: Any = field.value
   }
+
+  /** Extracts the type of the thrown exception from an AnnotationInfo.
+    *
+    * Supports both “old-style” `@throws(classOf[Exception])`
+    * as well as “new-style” `@throws[Exception]("cause")` annotations.
+    */
   object ThrownException extends ThrownException {
-    def unapply(a: Annotation): Option[Symbol] = None // todo
+    def unapply(a: Annotation): Option[Symbol] =
+      if (a.symbol != ThrowsClass)
+        None
+      else a.argumentConstant(0) match {
+        // old-style: @throws(classOf[Exception]) (which is throws[T](classOf[Exception]))
+        case Some(Constant(tpe: Type)) =>
+          Some(TypeErasure.erasure(tpe).classSymbol)
+        // new-style: @throws[Exception], @throws[Exception]("cause")
+        case Some(_) =>
+          stripApply(a.tree) match {
+            case TypeApply(_, List(tpt)) =>
+              Some(TypeErasure.erasure(tpt.tpe).classSymbol)
+            case _ =>
+              None
+          }
+        case _ =>
+          None
+      }
   }
 
   object Try extends TryDeconstructor {
