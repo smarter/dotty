@@ -23,5 +23,6 @@ one warning found
 
 // #2461
 object arrays3 {
-  def apply[X](xs : X*) : java.util.List[X] = java.util.Arrays.asList(xs: _*)
+  // XX: instead, adaption in typer with toObjetArray
+  def apply[X <: AnyRef](xs : X*) : java.util.List[X] = java.util.Arrays.asList(xs: _*)
 }
