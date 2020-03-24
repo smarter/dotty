@@ -969,7 +969,7 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
         else if (tp1.derivesFrom(defn.ArrayClass))
           recur(tp1, tp2.underlyingIfRepeated(isJava = true))
         else
-          false
+          defn.isBottomType(tp1)
       } else {
 
       tycon2 match {
