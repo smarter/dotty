@@ -963,6 +963,15 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
         else
           fallback(tycon2bounds.lo)
 
+      if (tp2.isRepeatedParam && !tp1.isRepeatedParam) {
+        if (tp1.derivesFrom(defn.SeqClass))
+          recur(tp1, tp2.underlyingIfRepeated(isJava = false))
+        else if (tp1.derivesFrom(defn.ArrayClass))
+          recur(tp1, tp2.underlyingIfRepeated(isJava = true))
+        else
+          false
+      } else {
+
       tycon2 match {
         case param2: TypeParamRef =>
           isMatchingApply(tp1) ||
@@ -991,6 +1000,7 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
           fallback(tycon2.lowerBound)
         case _ =>
           false
+      }
       }
     }
 

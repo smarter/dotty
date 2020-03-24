@@ -694,9 +694,9 @@ class Typer extends Namer
 
     if (untpd.isWildcardStarArg(tree)) {
       def typedWildcardStarArgExpr = {
-        val ptArg =
-          if (ctx.mode.is(Mode.QuotedPattern)) pt.underlyingIfRepeated(isJava = false)
-          else WildcardType
+        val ptArg = pt
+          // if (ctx.mode.is(Mode.QuotedPattern)) pt.underlyingIfRepeated(isJava = false)
+          // else WildcardType
         val tpdExpr = typedExpr(tree.expr, ptArg)
         tpdExpr.tpe.widenDealias match {
           case defn.ArrayOf(_) =>
