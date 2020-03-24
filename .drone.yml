@@ -33,10 +33,10 @@ steps:
   - cp -R . /tmp/1/ && cd /tmp/1/
   - ./project/scripts/sbt ";compile ;test"
   - ./project/scripts/cmdTests
-  # when:
-  #   event:
-  #   - tag
-  #   - promote
+  when:
+    event:
+    - tag
+    - promote
 
 
 - name: test_bootstrapped
@@ -47,10 +47,10 @@ steps:
   - cp -R . /tmp/2/ && cd /tmp/2/
   - ./project/scripts/sbt ";dotty-bootstrapped/compile ;dotty-bootstrapped/test;sjsSandbox/run;sjsSandbox/test;sjsJUnitTests/test ;configureIDE"
   - ./project/scripts/bootstrapCmdTests
-  # when:
-  #   event:
-  #   - tag
-  #   - promote
+  when:
+    event:
+    - tag
+    - promote
 
 - name: community_build
   pull: default
