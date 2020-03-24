@@ -235,7 +235,7 @@ object Types {
         case tp: OrType =>
           loop(tp.tp1) && loop(tp.tp2)
         case tp: JavaArrayType =>
-          cls == defn.ObjectClass
+          cls == defn.ArrayClass || cls == defn.ObjectClass
         case _ =>
           false
       }
