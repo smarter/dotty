@@ -3092,7 +3092,7 @@ class Typer extends Namer
       // try converting a constant to the target type
       val folded = ConstFold(tree, pt)
       if (folded ne tree)
-        return adaptConstant(folded, folded.tpe.asInstanceOf[ConstantType])
+        return readapt(adaptConstant(folded, folded.tpe.asInstanceOf[ConstantType]))
 
       // Try to capture wildcards in type
       val captured = captureWildcards(wtp)
