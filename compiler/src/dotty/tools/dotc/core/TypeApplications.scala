@@ -389,12 +389,14 @@ class TypeApplications(val self: Type) extends AnyVal {
   }
 
   /** If this is a repeated parameter `*T`, translate it to either `Seq[T]` or
-   *  `Array[? <: T]` depending on the value of `toArray`, keep other types as
-   *  they are.
+   *  `Array[? <: T]` depending on the value of `toArray`, if this is a
+   *  prototype `<?>` then treat it like `*<?>`, keep other types as they are.
    */
   def translateFromRepeated(toArray: Boolean)(using Context): Type =
-    if self.isRepeatedParam then
-      val seqClass = if (toArray) defn.ArrayClass else defn.SeqClass
+    val seqClass = if (toArray) defn.ArrayClass else defn.SeqClass
+    if self eq WildcardType then
+      seqClass.typeRef.appliedTo(WildcardType)
+    else if self.isRepeatedParam then
       // We want `Array[? <: T]` because arrays aren't covariant until after
       // erasure. See `tests/pos/i5140`.
       translateParameterized(defn.RepeatedParamClass, seqClass, wildcardArg = toArray)
