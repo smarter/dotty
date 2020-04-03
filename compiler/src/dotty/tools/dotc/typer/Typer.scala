@@ -727,18 +727,14 @@ class Typer extends Namer
     if (untpd.isWildcardStarArg(tree)) {
       def typedWildcardStarArgExpr = {
         val ptArg =
-          if (ctx.mode.is(Mode.QuotedPattern)) pt.underlyingIfRepeated(isJava = false)
-          else WildcardType
+          if (ctx.mode.is(Mode.QuotedPattern)) pt.underlyingIfRepeated(isJava = false) // TODO: figure out why union doesn't work
+          else pt.underlyingIfRepeated(isJava = false) | pt.underlyingIfRepeated(isJava = true)
         val tpdExpr = typedExpr(tree.expr, ptArg)
         tpdExpr.tpe.widenDealias match {
           case defn.ArrayOf(_) =>
-            val starType = defn.ArrayType.appliedTo(WildcardType)
-            val exprAdapted = adapt(tpdExpr, starType)
-            arrayToRepeated(exprAdapted)
+            arrayToRepeated(tpdExpr)
           case _ =>
-            val starType = defn.SeqType.appliedTo(defn.AnyType)
-            val exprAdapted = adapt(tpdExpr, starType)
-            seqToRepeated(exprAdapted)
+            seqToRepeated(tpdExpr)
         }
       }
       cases(
