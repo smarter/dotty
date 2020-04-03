@@ -392,7 +392,11 @@ class TypeApplications(val self: Type) extends AnyVal {
    *  or, if isJava is true, Array type, else the type itself.
    */
   def underlyingIfRepeated(isJava: Boolean)(implicit ctx: Context): Type =
-    if (self.isRepeatedParam) {
+    if (self eq WildcardType) {
+      val seqClass = if (isJava) defn.ArrayClass else defn.SeqClass
+      seqClass.typeRef.appliedTo(WildcardType)
+    }
+    else if (self.isRepeatedParam) {
       val seqClass = if (isJava) defn.ArrayClass else defn.SeqClass
       // If `isJava` is set, then we want to turn `RepeatedParam[T]` into `Array[? <: T]`,
       // since arrays aren't covariant until after erasure. See `tests/pos/i5140`.
