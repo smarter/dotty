@@ -726,19 +726,19 @@ class Typer extends Namer
 
     if (untpd.isWildcardStarArg(tree)) {
       def typedWildcardStarArgExpr = {
+        // A sequence argument `xs: _*` can be either a `Seq[T]` or an `Array[_ <: T]`,
+        // irrespective of whether the method we're calling is a Java or Scala method,
+        // so the expected type is the union `Seq[T] | Array[_ <: T]`.
         val ptArg =
+          // FIXME(#8680): Quoted patterns do not support Array repeated arguments
           if (ctx.mode.is(Mode.QuotedPattern)) pt.translateFromRepeated(toArray = false)
-          else WildcardType
+          else pt.translateFromRepeated(toArray = false) | pt.translateFromRepeated(toArray = true)
         val tpdExpr = typedExpr(tree.expr, ptArg)
         tpdExpr.tpe.widenDealias match {
           case defn.ArrayOf(_) =>
-            val starType = defn.ArrayType.appliedTo(WildcardType)
-            val exprAdapted = adapt(tpdExpr, starType)
-            arrayToRepeated(exprAdapted)
+            arrayToRepeated(tpdExpr)
           case _ =>
-            val starType = defn.SeqType.appliedTo(defn.AnyType)
-            val exprAdapted = adapt(tpdExpr, starType)
-            seqToRepeated(exprAdapted)
+            seqToRepeated(tpdExpr)
         }
       }
       cases(
