@@ -1560,6 +1560,16 @@ class Typer extends Namer
       else if (tpt1.symbol == defn.orType)
         checkedArgs = checkedArgs.mapconserve(arg =>
           checkSimpleKinded(checkNoWildcard(arg)))
+      else if (ctx.compilationUnit.isJava)
+        if (tpt1.symbol eq defn.ArrayClass) || (tpt1.symbol eq defn.RepeatedParamClass) then
+          checkedArgs match {
+            case List(arg) =>
+              val elemtp = arg.tpe
+              // Copy-pasted from ClassfileParser
+              if (elemtp.typeSymbol.isAbstractOrParamType && !(elemtp.derivesFrom(defn.ObjectClass)))
+                checkedArgs = List(TypeTree(AndType(elemtp, defn.ObjectType)).withSpan(arg.span))
+            case _ =>
+          }
       assignType(cpy.AppliedTypeTree(tree)(tpt1, checkedArgs), tpt1, checkedArgs)
     }
   }
