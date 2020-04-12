@@ -240,7 +240,7 @@ object TypeTestsCasts {
 
         def transformAsInstanceOf(testType: Type): Tree = {
           def testCls = testType.widen.classSymbol
-          if (expr.tpe <:< testType)
+          if (erasure(expr.tpe) <:< testType)
             Typed(expr, tree.args.head)
           else if (testCls eq defn.BoxedUnitClass)
             // as a special case, casting to Unit always successfully returns Unit
