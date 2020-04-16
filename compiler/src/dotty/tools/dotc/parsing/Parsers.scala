@@ -2845,6 +2845,8 @@ object Parsers {
              else if isIdent(nme.raw.MINUS) then variance(Contravariant)
              else EmptyFlags)
         atSpan(start, nameStart) {
+          if isIdent(nme.?) then
+            syntaxError("? is not a valid parameter name")
           val name =
             if (isAbstractOwner && in.token == USCORE) {
               in.nextToken()
