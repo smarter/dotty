@@ -371,6 +371,62 @@ object TypeErasure {
       }
   }
 
+  def intersectionDominator(parents: List[Type]): Type = {
+    // symbol for refinements/intersections have isClass = true, isTrait = false
+    // type param upper-bounded by intersection and intersection will behave the same,
+    // except the former has isClass = false ==> use tp.typeSymbol.isClass for those ?
+    // singleton also have a typeSymbol, isClass/isTrait delegate
+    // type alias get dealiased (matters for isClass/isTrait) <-- done in collectParents
+    // println("parents: " + parents.map(x => (x, x.typeSymbol, x.typeSymbol.isClass, x.typeSymbol.isTrait)))
+
+    class RefinedSymbol(syms: List[ClassSymbol]) // isClass = True, isTrait = false, ownClass = true
+    def scala2TypeSymbol(tp: Type): RefinedSymbol = tp match {
+      case (_: RefinedType) | (_: AndType) =>
+        RefinedSymbol(tp.classSymbols)
+      case _ =>
+    }
+
+    def baseTypes(tp: Type) = tp match 
+
+    def isnbc(tp1: Type, tp2: Type): Boolean = (tp1 eq tp2) || {
+      if (tp2.isInstanceOf[RefinedType | AndType])
+        return false
+      // (a, a) ==> true
+      // (_, refined or and) ==> false
+      // (refinedOrAnd, class) ==> class in refinedOrAnd.classSymbols
+      // (refinedOrAnd, abstract) ==> (and.tp1, abstract) || (and.tp2, abstract)
+      // (class, abstract) ==> false (even if type T >: SomeClass)
+      // (abstract, class) ==> class in abstract.classSymbols
+      // (abstract1, abstract2) ==> (upper of abstract1, abstract2)
+      // singletons are always dealiased
+    }
+
+
+    println("parents: " + parents)
+    val z = {
+      val psyms = parents map (_.typeSymbol)
+
+      /*if (psyms contains ArrayClass) {
+        // treat arrays specially
+        arrayType(
+          intersectionDominator(
+            parents filter (_.typeSymbol == ArrayClass) map (_.typeArgs.head)))
+      } else*/ {
+        // implement new spec for erasure of refined types.
+        def isUnshadowed(psym: Symbol) =
+          !(psyms exists (qsym => (psym ne qsym) && (qsym isNonBottomSubClass psym)))
+        val cs = parents.iterator.filter { p => // isUnshadowed is a bit expensive, so try classes first
+          val psym = p.typeSymbol
+          psym.initialize
+          psym.isClass && !psym.isTrait && isUnshadowed(psym)
+        }
+        (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(p.typeSymbol))).next()
+      }
+    }
+    println("z: " + z)
+    z
+  }
+
   /** Does the (possibly generic) type `tp` have the same erasure in all its
    *  possible instantiations?
    */
@@ -465,7 +521,22 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     case tp: TypeProxy =>
       this(tp.underlying)
     case AndType(tp1, tp2) =>
-      erasedGlb(this(tp1), this(tp2), isJava)
+      val parents = mutable.ListBuffer[Type]()
+      def collectParents(tp: Type, parents: ListBuffer[Type]) = tp match {
+        case AndType(tp1, tp2) =>
+          collectParents(tp1, parents)
+          collectParents(tp2, parents)
+        case _ =>
+          // Scala 2 seem to always dealias the parents
+          parents += tp.dealias
+      }
+      collectParents(tp1, parents)
+      collectParents(tp2, parents)
+      intersectionDominator(parents.toList)
+
+      val old = erasedGlb(this(tp1), this(tp2), isJava)
+      println("old: " + old)
+      old
     case OrType(tp1, tp2) =>
       ctx.typeComparer.orType(this(tp1), this(tp2), isErased = true)
     case tp: MethodType =>
