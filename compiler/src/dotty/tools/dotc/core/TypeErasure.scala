@@ -12,6 +12,7 @@ import transform.ContextFunctionResults._
 import Decorators._
 import Definitions.MaxImplementedFunctionArity
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 
 /** Erased types are:
  *
@@ -416,6 +417,9 @@ object TypeErasure {
     type Scala2RefinedType = RefinedType | AndType
     type PseudoSymbol = Type
 
+    def (psym: PseudoSymbol).isClass = psym.typeSymbol.isClass
+    def (psym: PseudoSymbol).isTrait = psym.typeSymbol.is(Trait)
+
     def pseudoSymbol(tp: Type): PseudoSymbol = {
       val tp1 = tp.dealias/*Widen.stripTypeVar.stripLazyRef.stripAnnots*/ match {
         // case tp: AppliedType =>
@@ -489,10 +493,11 @@ object TypeErasure {
     // (abstract1, abstract2) ==> (upper of abstract1, abstract2)
     // singletons are always dealiased
 
-    println("parents: " + parents)
+    // println("parents: " + parents.map(_.show))
     val z = {
       val psyms = parents.map(pseudoSymbol)
 
+      // TODO: deal with this
       /*if (psyms contains ArrayClass) {
         // treat arrays specially
         arrayType(
@@ -506,10 +511,10 @@ object TypeErasure {
           val psym = pseudoSymbol(p)
           psym.isClass && !psym.isTrait && isUnshadowed(psym)
         }
-        (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(typeRepr(p)))).next()
+        (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
       }
     }
-    println("z: " + z)
+    // println("z: " + z.show)
     z
   }
 
@@ -607,8 +612,8 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     case tp: TypeProxy =>
       this(tp.underlying)
     case AndType(tp1, tp2) =>
-      val parents = mutable.ListBuffer[Type]()
-      def collectParents(tp: Type, parents: ListBuffer[Type]) = tp match {
+      val parents = ListBuffer[Type]()
+      def collectParents(tp: Type, parents: ListBuffer[Type]): Unit = tp match {
         case AndType(tp1, tp2) =>
           collectParents(tp1, parents)
           collectParents(tp2, parents)
@@ -618,11 +623,17 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       }
       collectParents(tp1, parents)
       collectParents(tp2, parents)
-      intersectionDominator(parents.toList)
 
-      val old = erasedGlb(this(tp1), this(tp2), isJava)
-      println("old: " + old)
-      old
+      if (isJava)
+        this(parents.head)
+      else {
+        val old = erasedGlb(this(tp1), this(tp2), isJava)
+        // println("old: " + old.show)
+
+        val s2 = intersectionDominator(parents.toList)
+
+        this(s2)
+      }
     case OrType(tp1, tp2) =>
       ctx.typeComparer.orType(this(tp1), this(tp2), isErased = true)
     case tp: MethodType =>
