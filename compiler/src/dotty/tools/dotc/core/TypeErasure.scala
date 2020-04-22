@@ -493,9 +493,10 @@ object TypeErasure {
     // (abstract1, abstract2) ==> (upper of abstract1, abstract2)
     // singletons are always dealiased
 
-    // println("parents: " + parents.map(_.show))
+    // println("parents: " + parents/*.map(_.show)*/)
     val z = {
       val psyms = parents.map(pseudoSymbol)
+      // println("psyms: " + psyms/*.map(_.show)*/)
 
       // TODO: deal with this
       /*if (psyms contains ArrayClass) {
@@ -506,7 +507,7 @@ object TypeErasure {
       } else*/ {
         // implement new spec for erasure of refined types.
         def isUnshadowed(psym: PseudoSymbol) =
-          !(psyms exists (qsym => (psym ne qsym) && isnbc(qsym, psym)))
+          !(psyms exists (qsym => !(psym =:= qsym) && isnbc(qsym, psym)))
         val cs = parents.iterator.filter { p => // isUnshadowed is a bit expensive, so try classes first
           val psym = pseudoSymbol(p)
           psym.isClass && !psym.isTrait && isUnshadowed(psym)
