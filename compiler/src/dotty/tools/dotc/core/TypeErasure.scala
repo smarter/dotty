@@ -337,6 +337,7 @@ object TypeErasure {
 
             // Pick the last minimum to prioritise classes over traits
             minimums.lastOption match {
+              // TODO: valueErasure is suspect, should this be in the class and "this(" ?
               case Some(lub) => valueErasure(lub.typeRef)
               case _ => defn.ObjectType
             }
