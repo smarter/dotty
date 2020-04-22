@@ -649,38 +649,79 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
 
     // RefinedType and AndType are both represented in Scala2 by RefinedType
     type Scala2RefinedType = RefinedType | AndType
-    type PseudoSymbol = Type
+    // TODO: we probably only need AndType and RefinedType instead of Type,
+    // everything else should go through dealiasWiden.typeSymbol
+    type PseudoSymbol = Type | Symbol
 
-    def (psym: PseudoSymbol).isClass = psym.typeSymbol.isClass
-    def (psym: PseudoSymbol).isTrait = psym.typeSymbol.is(Trait)
+    def (psym: PseudoSymbol).isClass = psym match {
+      case tp: Type =>
+        tp.typeSymbol.isClass
+      case sym: Symbol =>
+        sym.isClass
+    }
+    def (psym: PseudoSymbol).isTrait = psym match {
+      case tp: Type =>
+        tp.typeSymbol.is(Trait)
+      case sym: Symbol =>
+        sym.is(Trait)
+    }
 
-    def pseudoSymbol(tp: Type): PseudoSymbol = {
-      val tp1 = tp.dealias/*Widen.stripTypeVar.stripLazyRef.stripAnnots*/ match {
-        // case tp: AppliedType =>
-        //   tp.underlying // not supertype: type Foo[X] <: List[X] ==> Foo
-        case tp: TypeRef =>
-          tp
-        // needed for TODO below, also need isnbc to handle Refined directly
-        // case tp: RefinedType =>
-        //   tp
-        case tp: TypeProxy =>
-          tp.underlying // not .supertype: type Foo[X] <: List[X] ==> Foo
-        case tp: OrType =>
-          this(tp)
-        case _ =>
-          tp
+    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol) = (psym1, psym2) match {
+      case (tp1: Type, tp2: Type) =>
+        tp1 =:= tp2
+      case (sym1: Symbol, sym2: Symbol) =>
+        sym1 eq sym2
+      case _ =>
+        false
+    }
+
+    def pseudoSymbol(sym: PseudoSymbol): PseudoSymbol = {
+      sym match {
+        case sym: Symbol =>
+          sym
+        case tp: Type =>
+          val tp1: PseudoSymbol = tp.dealias/*Widen.stripTypeVar.stripLazyRef.stripAnnots*/ match {
+            // case tp: AppliedType =>
+            //   tp.underlying // not supertype: type Foo[X] <: List[X] ==> Foo
+            case tp: TypeRef =>
+              tp.typeSymbol
+            // needed for TODO below, also need isnbc to handle Refined directly
+            // case tp: RefinedType =>
+            //   tp
+            case tp: TypeProxy =>
+              tp.underlying // not .supertype: type Foo[X] <: List[X] ==> Foo
+            case tp: OrType =>
+              this(tp)
+            case _ =>
+              tp
+          }
+          if (tp1 ne tp)
+            pseudoSymbol(tp1)
+          else
+            tp1
       }
-      if (tp1 ne tp)
-        pseudoSymbol(tp1)
-      else
-        tp1
     }
 
     // TODO: isnbc((A & B) {...}, A & B) should return false,
     // but will return true if we normalize lhs
 
-    def isnbc(tp1: Type, tp2: Type): Boolean = {
+    def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
       def go(tp1: PseudoSymbol, tp2: PseudoSymbol) = (tp1 eq tp2) || (tp1, tp2).match {
+        case (sym1: Symbol, sym2: Symbol) =>
+          if (sym1.isClass && sym2.isClass)
+            sym1.derivesFrom(sym2)
+          else if (!sym1.isClass) {
+            sym1.info match {
+              case info: TypeBounds =>
+                isnbc(info.hi, sym2)
+              case _ =>
+                false
+            }
+          }
+          else
+            // (class, abstract) ==> false (even if type T >: SomeClass)
+            false
+
         case (_, _: AndType) =>
           // In Scala 2, intersections are represented as refined types, and
           // refined types get their own unique synthetic class symbol, so they're
@@ -695,21 +736,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
         // case (OrType(tp11, tp12), _) =>
         //   isnbc(tp11, tp2) && isnbc(tp12, tp2)
         case (tp1: TypeRef, tp2: TypeRef) =>
-          val sym1 = tp1.symbol
-          val sym2 = tp2.symbol
-          if (sym1.isClass && sym2.isClass)
-            sym1.derivesFrom(sym2)
-          else if (!sym1.isClass) {
-            tp1.info match {
-              case info: TypeBounds =>
-                isnbc(info.hi, tp2)
-              case _ =>
-                false
-            }
-          }
-          else
-            // (class, abstract) ==> false (even if type T >: SomeClass)
-            false
+          isnbc(tp1.typeSymbol, tp2.typeSymbol)
         case _ =>
           false
       }
@@ -731,7 +758,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
 
     // println("parents: " + parents/*.map(_.show)*/)
     val z = {
-      val psyms = parents.map(pseudoSymbol)
+      val psyms: List[PseudoSymbol] = parents.map(pseudoSymbol)
       // println("psyms: " + psyms/*.map(_.show)*/)
 
       // TODO: deal with this
@@ -743,7 +770,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       } else*/ {
         // implement new spec for erasure of refined types.
         def isUnshadowed(psym: PseudoSymbol) =
-          !(psyms exists (qsym => !(psym =:= qsym) && isnbc(qsym, psym)))
+          !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
         val cs = parents.iterator.filter { p => // isUnshadowed is a bit expensive, so try classes first
           val psym = pseudoSymbol(p)
           psym.isClass && !psym.isTrait && isUnshadowed(psym)
