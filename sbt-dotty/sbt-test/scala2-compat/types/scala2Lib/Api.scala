@@ -59,5 +59,12 @@ class E {
   def e_23(e: A with this.type): Unit = {}
   def e_24(e: this.type with A): Unit = {}
 
-  // TODO: refinements
+  // TODO: refinements, value classes, inner classes
+  // class Outer {
+  //   trait TraitX extends ClassY
+  //   class ClassY
+  // }
+  // object Api {
+  //   def foo(o1: Outer, o2: Outer): o1.ClassY with o2.TraitX = {}
+  // }
 }
