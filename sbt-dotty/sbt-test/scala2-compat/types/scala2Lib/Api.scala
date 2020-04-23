@@ -1,4 +1,4 @@
-package scala2Lib
+// package scala2Lib
 
 class foo extends scala.annotation.StaticAnnotation
 
@@ -29,7 +29,7 @@ class E {
 
   val sing: B = null
   def a_09(a: A with sing.type): Unit = {}
-  def b_10(a: sing.type with A): Unit = {}
+  def b_10(b: sing.type with A): Unit = {}
 
   type V >: SubB <: B
   def b_11(b: V): Unit = {}
@@ -40,20 +40,24 @@ class E {
 
   type DEq = D
   def d_15(d: A with DEq): Unit = {}
-  def d_16(d: DEq with A): Unit = {}
+  def d_16(d: A with (DEq @foo)): Unit = {}
+  def d_17(d: DEq with A): Unit = {}
+  def d_18(d: (DEq @foo) with A): Unit = {}
 
   type DSub <: D
-  def a_17(a: A with DSub): Unit = {}
-  def e_18(e: DSub with E): Unit = {}
+  def a_19(a: A with DSub): Unit = {}
+  def e_20(e: DSub with E): Unit = {}
 
   type W1 <: A with Cov[Any]
   type X1 <: Cov[Int] with W1
-  def a_19(a: X1): Unit = {}
+  def a_21(a: X1): Unit = {}
 
   type W2 <: A with Cov[Any]
   type X2 <: Cov[Int] with W2
-  def a_20(a: X2): Unit = {}
+  def a_22(a: X2): Unit = {}
 
-  def e_21(e: A with this.type): Unit = {}
-  def e_22(e: this.type with A): Unit = {}
+  def e_23(e: A with this.type): Unit = {}
+  def e_24(e: this.type with A): Unit = {}
+
+  // TODO: refinements
 }

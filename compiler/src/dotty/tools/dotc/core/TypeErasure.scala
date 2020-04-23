@@ -474,8 +474,8 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
           collectParents(tp1, parents)
           collectParents(tp2, parents)
         case _ =>
-          // Scala 2 seem to always dealias the parents
-          parents += tp.dealias
+          // Experimentally matches what Scala 2 does
+          parents += tp.dealiasKeepAnnots
       }
       collectParents(tp1, parents)
       collectParents(tp2, parents)
