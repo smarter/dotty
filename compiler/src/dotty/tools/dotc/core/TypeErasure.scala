@@ -761,13 +761,11 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       val psyms: List[PseudoSymbol] = parents.map(pseudoSymbol)
       // println("psyms: " + psyms/*.map(_.show)*/)
 
-      // TODO: deal with this
-      /*if (psyms contains ArrayClass) {
+      if (psyms contains defn.ArrayClass) {
         // treat arrays specially
-        arrayType(
-          intersectionDominator(
-            parents filter (_.typeSymbol == ArrayClass) map (_.typeArgs.head)))
-      } else*/ {
+        JavaArrayType(this(
+          intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg })))
+      } else {
         // implement new spec for erasure of refined types.
         def isUnshadowed(psym: PseudoSymbol) =
           !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
