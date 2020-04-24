@@ -654,12 +654,16 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     type PseudoSymbol = Type | Symbol
 
     def (psym: PseudoSymbol).isClass = psym match {
+      case tp: (RefinedType | AndType) =>
+        true
       case tp: Type =>
         tp.typeSymbol.isClass
       case sym: Symbol =>
         sym.isClass
     }
     def (psym: PseudoSymbol).isTrait = psym match {
+      case tp: (RefinedType | AndType) =>
+        false
       case tp: Type =>
         tp.typeSymbol.is(Trait)
       case sym: Symbol =>
@@ -686,13 +690,13 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
             case tp: TypeRef =>
               tp.typeSymbol
             // needed for TODO below, also need isnbc to handle Refined directly
-            // case tp: RefinedType =>
-            //   tp
+            case tp: RefinedType =>
+              tp
             case tp: TypeProxy =>
               tp.underlying // not .supertype: type Foo[X] <: List[X] ==> Foo
             case tp: OrType =>
               this(tp)
-            case _ =>
+            case tp =>
               tp
           }
           if (tp1 ne tp)
@@ -701,9 +705,6 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
             tp1
       }
     }
-
-    // TODO: isnbc((A & B) {...}, A & B) should return false,
-    // but will return true if we normalize lhs
 
     def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
       def go(tp1: PseudoSymbol, tp2: PseudoSymbol) = (tp1 eq tp2) || (tp1, tp2).match {
@@ -722,7 +723,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
             // (class, abstract) ==> false (even if type T >: SomeClass)
             false
 
-        case (_, _: AndType) =>
+        case (_, _: (RefinedType | AndType)) =>
           // In Scala 2, intersections are represented as refined types, and
           // refined types get their own unique synthetic class symbol, so they're
           // not considered a supertype of anything.
@@ -730,6 +731,11 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
         // case (_, OrType(tp21, tp22)) =>
         //   isnbc(tp1, tp21) && isnbc(tp1, tp22)
         case (tp1: RefinedType, _) =>
+          // isnbc((A & B) {...}, A & B) should return false,
+          // recursion is OK though because we got rid of RefinedType on the rhs
+          // in the case before, and we never recurse on the rhs
+          // TODO: remove second param from `go` to make this obvious!
+          assert(tp1.parent ne tp2)
           isnbc(tp1.parent, tp2)
         case (AndType(tp11, tp12), _) =>
           isnbc(tp11, tp2) || isnbc(tp12, tp2)
@@ -756,10 +762,10 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     // (abstract1, abstract2) ==> (upper of abstract1, abstract2)
     // singletons are always dealiased
 
-    // println("parents: " + parents/*.map(_.show)*/)
+    // println("parents: " + parents.map(_.show))
     val z = {
       val psyms: List[PseudoSymbol] = parents.map(pseudoSymbol)
-      // println("psyms: " + psyms/*.map(_.show)*/)
+      // println("psyms: " + psyms.map(_.show))
 
       if (psyms contains defn.ArrayClass) {
         // treat arrays specially
