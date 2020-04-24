@@ -695,6 +695,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
             case tp: TypeProxy =>
               tp.underlying // not .supertype: type Foo[X] <: List[X] ==> Foo
             case tp: OrType =>
+              // TODO: Use erasure to keep VCs around ? Need test case with class NonVC intersect (OrType(class VC and underlying trait, SomeStuff))
               this(tp)
             case tp =>
               tp
