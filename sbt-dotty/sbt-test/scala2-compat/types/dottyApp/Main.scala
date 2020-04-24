@@ -36,5 +36,15 @@ object Main {
     z.f_32(null.asInstanceOf)
     z.f_33(null.asInstanceOf)
     z.f_34(null.asInstanceOf)
+
+    val methods = classOf[scala2Lib.Z].getDeclaredMethods.toList ++ classOf[dottyApp.Z].getDeclaredMethods.toList
+    methods.foreach { m =>
+      m.getName match {
+        case s"${prefix}_${ordinal}" =>
+          val paramClass = m.getParameterTypes()(0).getSimpleName
+          assert(prefix == paramClass.toLowerCase, s"Method `$m` erased to `$paramClass` which does not match its prefix `$prefix`")
+        case _ =>
+      }
+    }
   }
 }
