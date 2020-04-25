@@ -6,6 +6,7 @@ import core.DenotTransformers._
 import core.SymDenotations._
 import core.Contexts._
 import core.Symbols._
+import core.TypeErasure._
 import core.Types._
 import core.Flags._
 import core.StdNames._
@@ -86,6 +87,42 @@ class TreeChecker extends Phase with SymTransformer {
     assert(!badDeferredAndPrivate, i"$sym is both Deferred and Private")
 
     checkCompanion(symd)
+
+    symd.info.stripPoly match {
+      case mt: MethodType =>
+        if (ctx.phaseId < ctx.elimErasedValueTypePhase.id) {
+          val cur = mt.signature
+          val after = fullErasure(mt).signature
+            // given Context = c.withPhase(c.erasurePhase.next)
+            // mt.computeSignature
+          // }
+          assert(cur.isUnderDefined || cur == after, s"cur: $cur, after: $after")
+        }
+        // val sig = mt.signature
+        // println("sig: " + sig)
+        // val firstPhase = symd.initial.validFor.firstPhaseId
+        // val c = ctx
+        // val orig = {
+        //   given Context = c.withPhase(firstPhase)
+        //   symd.initial.info.stripPoly.signature
+        // }
+        // val cur = mt.signature
+        // // println("orig: " + orig)
+        // assert(orig.isUnderDefined || orig == cur, i"orig: $orig, cur: $cur")
+      case _ =>
+    }
+    // if (symd.info.isValueType || symd.info.isInstanceOf[MethodicType]) {
+    //   val firstPhase = symd.initial.validFor.firstPhaseId
+    //   val c = ctx
+    //   val firstSigName = {
+    //     given Context = c.withPhase(firstPhase)
+    //     sigName(symd.info, isJava = symd.is(JavaDefined))
+    //   }
+    //   val cur = sigName(symd.info, isJava = symd.is(JavaDefined))
+    //   // println("symd: " + symd.show)
+    //   // println("cur: " + cur.show)
+    //   assert(firstSigName eq cur, "first: " + firstSigName.show + ", cur: " + cur.show)
+    // }
 
     symd
   }
@@ -444,6 +481,26 @@ class TreeChecker extends Phase with SymTransformer {
 
           val tpdTree = super.typedDefDef(ddef, sym)
           assert(isMethodType(sym.info), i"wrong type, expect a method type for ${sym.fullName}, but found: ${sym.info}")
+          // sym.info.stripPoly match {
+          //   case mt: MethodType =>
+          //     if (ctx.phaseId < ctx.erasurePhase.next) {
+          //       val cur = mt.signature
+          //       val 
+          //       println("sym: " + sym.show)
+          //       val c = ctx
+          //       val cur = mt.signature
+          //       val after = {
+          //         // given Context = c.withPhase(c.erasurePhase.next)
+          //         // println("f: " + fullErasure(mt))
+          //         fullErasure(mt).signature
+          //       }
+          //       // println("cur: " + cur)
+          //       // println("after: " + after)
+          //       assert(cur.isUnderDefined || cur == after, i"cur: $cur, after: $after")
+          //     }
+          //   case _ =>
+          // }
+
           tpdTree
         }
       }
