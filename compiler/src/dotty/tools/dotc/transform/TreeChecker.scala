@@ -89,14 +89,19 @@ class TreeChecker extends Phase with SymTransformer {
     checkCompanion(symd)
 
     symd.info.stripPoly match {
-      case mt: MethodType =>
-        if (ctx.phaseId < ctx.elimErasedValueTypePhase.id) {
+      case mt: MethodOrPoly => // XX: Can't use MethodicType because ExprType relies on resultSignature, which has special behavior
+        if (!sym.isAnonymousFunction && ctx.phaseId < ctx.elimErasedValueTypePhase.id) { // XX: anon fun have tvars, get wrong sig
           val cur = mt.signature
-          val after = fullErasure(mt).signature
+          // XX: Can't use transformInfo, because it does extra stuff (so .signature caching is invalid!)
+          // val after = transformInfo(sym, mt).signature
+          val after = valueErasure(mt).signature
+          // println("mt: " + mt.show)
+          // println("fmt: " + transformInfo(sym, mt).show)
+          // println("fmt: " + valueErasure(mt).show)
             // given Context = c.withPhase(c.erasurePhase.next)
             // mt.computeSignature
           // }
-          assert(cur.isUnderDefined || cur == after, s"cur: $cur, after: $after")
+          assert(cur.isUnderDefined || cur == after, s"${sym.showLocated} -- cur: $cur, after: $after")
         }
         // val sig = mt.signature
         // println("sig: " + sig)
