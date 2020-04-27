@@ -416,19 +416,19 @@ object TypeErasure {
    // *                       +- [default to false] NoType / NoPrefix / ErrorType / WildcardType
 
     // RefinedType and AndType are both represented in Scala2 by RefinedType
-    type Scala2RefinedType = RefinedType | AndType
+    type Scala2RefinedType = RefinedType | AndType // @unchecked needed until https://github.com/lampepfl/dotty/pull/8808 is in.
     // TODO: we probably only need AndType and RefinedType instead of Type,
     // everything else should go through dealiasWiden.typeSymbol
     type PseudoSymbol = Scala2RefinedType | Symbol
 
     def (psym: PseudoSymbol).isClass = psym match {
-      case tp: Scala2RefinedType =>
+      case tp: Scala2RefinedType @unchecked =>
         true
       case sym: Symbol =>
         sym.isClass
     }
     def (psym: PseudoSymbol).isTrait = psym match {
-      case tp: Scala2RefinedType =>
+      case tp: Scala2RefinedType @unchecked =>
         false
       case sym: Symbol =>
         sym.is(Trait)
@@ -437,7 +437,7 @@ object TypeErasure {
     def ps(tp: Type): PseudoSymbol = tp.widenDealias match {
       case tp: OrType =>
         ps(erasure(tp))
-      case tp: Scala2RefinedType =>
+      case tp: Scala2RefinedType @unchecked =>
         tp
       case tp =>
         tp.typeSymbol
@@ -488,7 +488,7 @@ object TypeErasure {
             // (class, abstract) ==> false (even if type T >: SomeClass)
             false
 
-        case (_, _: Scala2RefinedType) =>
+        case (_, _: Scala2RefinedType @unchecked) =>
           // In Scala 2, intersections are represented as refined types, and
           // refined types get their own unique synthetic class symbol, so they're
           // not considered a supertype of anything.
