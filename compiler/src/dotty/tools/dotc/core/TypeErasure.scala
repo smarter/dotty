@@ -374,6 +374,186 @@ object TypeErasure {
   }
 
 
+  def intersectionDominator(parents: List[Type])(using Context): Type = {
+    // symbol for refinements/intersections have isClass = true, isTrait = false
+    // type param upper-bounded by intersection and intersection will behave the same,
+    // except the former has isClass = false ==> use tp.typeSymbol.isClass for those ?
+    // singleton also have a typeSymbol, isClass/isTrait delegate
+    // type alias get dealiased (matters for isClass/isTrait) <-- done in collectParents
+    // println("parents: " + parents.map(x => (x, x.typeSymbol, x.typeSymbol.isClass, x.typeSymbol.isTrait)))
+
+    // class RefinedSymbol(syms: List[ClassSymbol]) // isClass = True, isTrait = false, ownClass = true
+    // def scala2TypeSymbol(tp: Type): RefinedSymbol = tp.widenDealias match {
+    //   case _: (RefinedType | AndType) =>
+    //     RefinedSymbol(tp.classSymbols)
+    //   case _ =>
+    // }
+
+    // def stripRefinement(tp: Type): Type = tp match {
+    //   case tp: RefinedOrRecType => stripRefinement(tp.parent)
+    //   case tp => tp
+    // }
+
+   // *  Type -+- ProxyType --+- NamedType ----+--- TypeRef
+   // *        |              |                 \
+   // *        |              +- [X] Singleton
+   // *        |              +- [ ] TypeParamRef
+   // *        |              +- [ ] RefinedOrRecType -+-- RefinedType
+   // *        |              |                   -+-- RecType
+   // *        |              +- [ ] AppliedType
+   // *        |              +- [ ] TypeBounds // not value
+   // *        |              +- [ ] ExprType // not value
+   // *        |              +- [x] AnnotatedType // stripAnnotated
+   // *        |              +- [x] TypeVar // stripTypeVar?
+   // *        |              +- [ ] HKTypeLambda // not kind-correct
+   // *        |              +- [ ] MatchType // not value
+   // *        |
+   // *        +- GroundType -+- [ ] AndType
+   // *                       +- [ ] OrType
+   // *                       +- [nv] MethodOrPoly
+   // *                       +- [nv] ClassInfo
+   // *                       |
+   // *                       +- [default to false] NoType / NoPrefix / ErrorType / WildcardType
+
+    // RefinedType and AndType are both represented in Scala2 by RefinedType
+    type Scala2RefinedType = RefinedType | AndType
+    // TODO: we probably only need AndType and RefinedType instead of Type,
+    // everything else should go through dealiasWiden.typeSymbol
+    type PseudoSymbol = Type | Symbol
+
+    def (psym: PseudoSymbol).isClass = psym match {
+      case tp: (RefinedType | AndType) =>
+        true
+      case tp: Type =>
+        tp.typeSymbol.isClass
+      case sym: Symbol =>
+        sym.isClass
+    }
+    def (psym: PseudoSymbol).isTrait = psym match {
+      case tp: (RefinedType | AndType) =>
+        false
+      case tp: Type =>
+        tp.typeSymbol.is(Trait)
+      case sym: Symbol =>
+        sym.is(Trait)
+    }
+
+    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol) = (psym1, psym2) match {
+      case (tp1: Type, tp2: Type) =>
+        tp1 =:= tp2
+      case (sym1: Symbol, sym2: Symbol) =>
+        sym1 eq sym2
+      case _ =>
+        false
+    }
+
+    def pseudoSymbol(sym: PseudoSymbol): PseudoSymbol = {
+      sym match {
+        case sym: Symbol =>
+          sym
+        case tp: Type =>
+          val tp1: PseudoSymbol = tp.dealias/*Widen.stripTypeVar.stripLazyRef.stripAnnots*/ match {
+            // case tp: AppliedType =>
+            //   tp.underlying // not supertype: type Foo[X] <: List[X] ==> Foo
+            case tp: TypeRef =>
+              tp.typeSymbol
+            // needed for TODO below, also need isnbc to handle Refined directly
+            case tp: RefinedType =>
+              tp
+            case tp: TypeProxy =>
+              tp.underlying // not .supertype: type Foo[X] <: List[X] ==> Foo
+            case tp: OrType =>
+              erasure(tp)
+            case tp =>
+              tp
+          }
+          if (tp1 ne tp)
+            pseudoSymbol(tp1)
+          else
+            tp1
+      }
+    }
+
+    def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
+      def go(tp1: PseudoSymbol, tp2: PseudoSymbol) = (tp1 eq tp2) || (tp1, tp2).match {
+        case (sym1: Symbol, sym2: Symbol) =>
+          if (sym1.isClass && sym2.isClass)
+            sym1.derivesFrom(sym2)
+          else if (!sym1.isClass) {
+            sym1.info match {
+              case info: TypeBounds =>
+                isnbc(info.hi, sym2)
+              case _ =>
+                false
+            }
+          }
+          else
+            // (class, abstract) ==> false (even if type T >: SomeClass)
+            false
+
+        case (_, _: (RefinedType | AndType)) =>
+          // In Scala 2, intersections are represented as refined types, and
+          // refined types get their own unique synthetic class symbol, so they're
+          // not considered a supertype of anything.
+          false
+        // case (_, OrType(tp21, tp22)) =>
+        //   isnbc(tp1, tp21) && isnbc(tp1, tp22)
+        case (tp1: RefinedType, _) =>
+          // isnbc((A & B) {...}, A & B) should return false,
+          // recursion is OK though because we got rid of RefinedType on the rhs
+          // in the case before, and we never recurse on the rhs
+          // TODO: remove second param from `go` to make this obvious!
+          assert(tp1.parent ne tp2)
+          isnbc(tp1.parent, tp2)
+        case (AndType(tp11, tp12), _) =>
+          isnbc(tp11, tp2) || isnbc(tp12, tp2)
+        // case (OrType(tp11, tp12), _) =>
+        //   isnbc(tp11, tp2) && isnbc(tp12, tp2)
+        case (tp1: TypeRef, tp2: TypeRef) =>
+          isnbc(tp1.typeSymbol, tp2.typeSymbol)
+        case _ =>
+          false
+      }
+
+      go(pseudoSymbol(tp1), pseudoSymbol(tp2))
+    }
+
+
+    // if (tp2.isInstanceOf[RefinedType | AndType])
+    //   return false
+    // (a, a) ==> true
+    // (_, refined or and) ==> false
+    // (refinedOrAnd, class) ==> class in refinedOrAnd.classSymbols
+    // (refinedOrAnd, abstract) ==> (and.tp1, abstract) || (and.tp2, abstract)
+    // (class, abstract) ==> false (even if type T >: SomeClass)
+    // (abstract, class) ==> class in abstract.classSymbols
+    // (abstract1, abstract2) ==> (upper of abstract1, abstract2)
+    // singletons are always dealiased
+
+    // println("parents: " + parents.map(_.show))
+    val z = {
+      val psyms: List[PseudoSymbol] = parents.map(pseudoSymbol)
+      // println("psyms: " + psyms.map(_.show))
+
+      if (psyms contains defn.ArrayClass) {
+        // treat arrays specially
+        defn.ArrayOf(
+          intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
+      } else {
+        // implement new spec for erasure of refined types.
+        def isUnshadowed(psym: PseudoSymbol) =
+          !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
+        val cs = parents.iterator.filter { p => // isUnshadowed is a bit expensive, so try classes first
+          val psym = pseudoSymbol(p)
+          psym.isClass && !psym.isTrait && isUnshadowed(psym)
+        }
+        (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
+      }
+    }
+    // println("z: " + z.show)
+    z
+  }
+
   /** Does the (possibly generic) type `tp` have the same erasure in all its
    *  possible instantiations?
    */
@@ -483,7 +663,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       if (isJava)
         this(parents.head)
       else {
-        val old = erasedGlb(this(tp1), this(tp2), isJava)
+        // val old = erasedGlb(this(tp1), this(tp2), isJava)
         // println("old: " + old.show)
 
         val s2 = intersectionDominator(parents.toList)
@@ -604,187 +784,6 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       else this(tp)
     case _ =>
       this(tp)
-  }
-
-  def intersectionDominator(parents: List[Type])(using Context): Type = {
-    // symbol for refinements/intersections have isClass = true, isTrait = false
-    // type param upper-bounded by intersection and intersection will behave the same,
-    // except the former has isClass = false ==> use tp.typeSymbol.isClass for those ?
-    // singleton also have a typeSymbol, isClass/isTrait delegate
-    // type alias get dealiased (matters for isClass/isTrait) <-- done in collectParents
-    // println("parents: " + parents.map(x => (x, x.typeSymbol, x.typeSymbol.isClass, x.typeSymbol.isTrait)))
-
-    // class RefinedSymbol(syms: List[ClassSymbol]) // isClass = True, isTrait = false, ownClass = true
-    // def scala2TypeSymbol(tp: Type): RefinedSymbol = tp.widenDealias match {
-    //   case _: (RefinedType | AndType) =>
-    //     RefinedSymbol(tp.classSymbols)
-    //   case _ =>
-    // }
-
-    // def stripRefinement(tp: Type): Type = tp match {
-    //   case tp: RefinedOrRecType => stripRefinement(tp.parent)
-    //   case tp => tp
-    // }
-
-   // *  Type -+- ProxyType --+- NamedType ----+--- TypeRef
-   // *        |              |                 \
-   // *        |              +- [X] Singleton
-   // *        |              +- [ ] TypeParamRef
-   // *        |              +- [ ] RefinedOrRecType -+-- RefinedType
-   // *        |              |                   -+-- RecType
-   // *        |              +- [ ] AppliedType
-   // *        |              +- [ ] TypeBounds // not value
-   // *        |              +- [ ] ExprType // not value
-   // *        |              +- [x] AnnotatedType // stripAnnotated
-   // *        |              +- [x] TypeVar // stripTypeVar?
-   // *        |              +- [ ] HKTypeLambda // not kind-correct
-   // *        |              +- [ ] MatchType // not value
-   // *        |
-   // *        +- GroundType -+- [ ] AndType
-   // *                       +- [ ] OrType
-   // *                       +- [nv] MethodOrPoly
-   // *                       +- [nv] ClassInfo
-   // *                       |
-   // *                       +- [default to false] NoType / NoPrefix / ErrorType / WildcardType
-
-    // RefinedType and AndType are both represented in Scala2 by RefinedType
-    type Scala2RefinedType = RefinedType | AndType
-    // TODO: we probably only need AndType and RefinedType instead of Type,
-    // everything else should go through dealiasWiden.typeSymbol
-    type PseudoSymbol = Type | Symbol
-
-    def (psym: PseudoSymbol).isClass = psym match {
-      case tp: (RefinedType | AndType) =>
-        true
-      case tp: Type =>
-        tp.typeSymbol.isClass
-      case sym: Symbol =>
-        sym.isClass
-    }
-    def (psym: PseudoSymbol).isTrait = psym match {
-      case tp: (RefinedType | AndType) =>
-        false
-      case tp: Type =>
-        tp.typeSymbol.is(Trait)
-      case sym: Symbol =>
-        sym.is(Trait)
-    }
-
-    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol) = (psym1, psym2) match {
-      case (tp1: Type, tp2: Type) =>
-        tp1 =:= tp2
-      case (sym1: Symbol, sym2: Symbol) =>
-        sym1 eq sym2
-      case _ =>
-        false
-    }
-
-    def pseudoSymbol(sym: PseudoSymbol): PseudoSymbol = {
-      sym match {
-        case sym: Symbol =>
-          sym
-        case tp: Type =>
-          val tp1: PseudoSymbol = tp.dealias/*Widen.stripTypeVar.stripLazyRef.stripAnnots*/ match {
-            // case tp: AppliedType =>
-            //   tp.underlying // not supertype: type Foo[X] <: List[X] ==> Foo
-            case tp: TypeRef =>
-              tp.typeSymbol
-            // needed for TODO below, also need isnbc to handle Refined directly
-            case tp: RefinedType =>
-              tp
-            case tp: TypeProxy =>
-              tp.underlying // not .supertype: type Foo[X] <: List[X] ==> Foo
-            case tp: OrType =>
-              // TODO: Use erasure to keep VCs around ? Need test case with class NonVC intersect (OrType(class VC and underlying trait, SomeStuff))
-              this(tp)
-            case tp =>
-              tp
-          }
-          if (tp1 ne tp)
-            pseudoSymbol(tp1)
-          else
-            tp1
-      }
-    }
-
-    def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
-      def go(tp1: PseudoSymbol, tp2: PseudoSymbol) = (tp1 eq tp2) || (tp1, tp2).match {
-        case (sym1: Symbol, sym2: Symbol) =>
-          if (sym1.isClass && sym2.isClass)
-            sym1.derivesFrom(sym2)
-          else if (!sym1.isClass) {
-            sym1.info match {
-              case info: TypeBounds =>
-                isnbc(info.hi, sym2)
-              case _ =>
-                false
-            }
-          }
-          else
-            // (class, abstract) ==> false (even if type T >: SomeClass)
-            false
-
-        case (_, _: (RefinedType | AndType)) =>
-          // In Scala 2, intersections are represented as refined types, and
-          // refined types get their own unique synthetic class symbol, so they're
-          // not considered a supertype of anything.
-          false
-        // case (_, OrType(tp21, tp22)) =>
-        //   isnbc(tp1, tp21) && isnbc(tp1, tp22)
-        case (tp1: RefinedType, _) =>
-          // isnbc((A & B) {...}, A & B) should return false,
-          // recursion is OK though because we got rid of RefinedType on the rhs
-          // in the case before, and we never recurse on the rhs
-          // TODO: remove second param from `go` to make this obvious!
-          assert(tp1.parent ne tp2)
-          isnbc(tp1.parent, tp2)
-        case (AndType(tp11, tp12), _) =>
-          isnbc(tp11, tp2) || isnbc(tp12, tp2)
-        // case (OrType(tp11, tp12), _) =>
-        //   isnbc(tp11, tp2) && isnbc(tp12, tp2)
-        case (tp1: TypeRef, tp2: TypeRef) =>
-          isnbc(tp1.typeSymbol, tp2.typeSymbol)
-        case _ =>
-          false
-      }
-
-      go(pseudoSymbol(tp1), pseudoSymbol(tp2))
-    }
-
-
-    // if (tp2.isInstanceOf[RefinedType | AndType])
-    //   return false
-    // (a, a) ==> true
-    // (_, refined or and) ==> false
-    // (refinedOrAnd, class) ==> class in refinedOrAnd.classSymbols
-    // (refinedOrAnd, abstract) ==> (and.tp1, abstract) || (and.tp2, abstract)
-    // (class, abstract) ==> false (even if type T >: SomeClass)
-    // (abstract, class) ==> class in abstract.classSymbols
-    // (abstract1, abstract2) ==> (upper of abstract1, abstract2)
-    // singletons are always dealiased
-
-    // println("parents: " + parents.map(_.show))
-    val z = {
-      val psyms: List[PseudoSymbol] = parents.map(pseudoSymbol)
-      // println("psyms: " + psyms.map(_.show))
-
-      if (psyms contains defn.ArrayClass) {
-        // treat arrays specially
-        defn.ArrayOf(
-          intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
-      } else {
-        // implement new spec for erasure of refined types.
-        def isUnshadowed(psym: PseudoSymbol) =
-          !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
-        val cs = parents.iterator.filter { p => // isUnshadowed is a bit expensive, so try classes first
-          val psym = pseudoSymbol(p)
-          psym.isClass && !psym.isTrait && isUnshadowed(psym)
-        }
-        (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
-      }
-    }
-    // println("z: " + z.show)
-    z
   }
 
   /** The name of the type as it is used in `Signature`s.
