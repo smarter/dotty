@@ -458,6 +458,13 @@ object TypeErasure {
             // even if it was declared as `type T >: C`
             false
         //XX: Symbol <:< AndType possible ?
+        // These should be different "A with B"
+        //   T <: C with A with B
+        //   T with (A with B) @foo
+        // But what about:
+        //   type X = A with B
+        //   T <: C with X
+        //   T with X @foo
         case (_, _: Scala2RefinedType @unchecked) =>
           // As mentioned above, in Scala 2 these types get their own unique
           // synthetic class symbol, so they're not considered a supertype of
