@@ -416,12 +416,15 @@ object TypeErasure {
         tp
       case tp: TypeRef if !tp.symbol.exists => // StructuralRef
         tp
+      case tp: TypeRef => // StructuralRef
+        val sym = tp.symbol
+        assert(sym.exists, tp)
+        sym
       case tp: TypeProxy =>
         pseudoSymbol(tp.underlying)
       case tp =>
-        val s = tp.typeSymbol
-        assert(s.exists, tp)
-        s
+        assert(false, tp)
+        ???
     }
 
     def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
@@ -452,6 +455,7 @@ object TypeErasure {
             // a class C is never considered a pseudo-sub of an abstract type T,
             // even if it was declared as `type T >: C`
             false
+        //XX: Symbol <:< AndType possible ?
         case (_, _: Scala2RefinedType @unchecked) =>
           // As mentioned above, in Scala 2 these types get their own unique
           // synthetic class symbol, so they're not considered a supertype of
