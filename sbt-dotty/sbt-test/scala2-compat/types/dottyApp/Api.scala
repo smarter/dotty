@@ -22,9 +22,11 @@ class Outer {
 // This is enforced by dottyApp/Main.scala
 class Z {
   def a_01(a: A with B): Unit = {}
+  def b_02X(b: B with A): Unit = {}
   def a_02(a: A with B with A): Unit = {}
   def a_03(a: A with (B with A)): Unit = {}
   def b_04(b: A with (B with A) @foo): Unit = {}
+  def b_04X(b: A with (B with C) @foo): Unit = {}
   def b_05(b: A with (B with A) @foo with (C with B with A) @foo): Unit = {}
 
   type T1 <: A with B
@@ -37,9 +39,9 @@ class Z {
   type U <: T2 with S
   def b_08(b: U): Unit = {}
 
-  val sing: B = new B {}
-  def a_09(a: A with sing.type): Unit = {}
-  def b_10(b: sing.type with A): Unit = {}
+  val singB: B = new B {}
+  def a_09(a: A with singB.type): Unit = {}
+  def b_10(b: singB.type with A): Unit = {}
 
   type V >: SubB <: B
   def b_11(b: V): Unit = {}
@@ -48,14 +50,23 @@ class Z {
   def d_13(d: D with A): Unit = {}
   def d_14(d: A with D): Unit = {}
 
+  val singD: D = new D {}
+  def d_13x(d: singD.type with A): Unit = {}
+  def d_14x(d: A with singD.type): Unit = {}
+
   type DEq = D
   def d_15(d: A with DEq): Unit = {}
   def d_16(d: A with (DEq @foo)): Unit = {}
   def d_17(d: DEq with A): Unit = {}
   def d_18(d: (DEq @foo) with A): Unit = {}
 
+  val singDEq: DEq @foo = new D {}
+  def d_15b(d: A with singDEq.type): Unit = {}
+  def d_16b(d: A with (singDEq.type @foo)): Unit = {}
+
   type DSub <: D
   def a_19(a: A with DSub): Unit = {}
+  def d_19x(d: DSub with A): Unit = {}
   def z_20(z: DSub with Z): Unit = {}
 
   type W1 <: A with Cov[Any]
@@ -83,4 +94,21 @@ class Z {
   def f_32(f: o2.F with o1.E): Unit = {}
   def f_33(f: Outer#E with Outer#F): Unit = {}
   def f_34(f: Outer#F with Outer#E): Unit = {}
+
+  val structural1: { type DSub <: D } = new { type DSub <: D }
+  def a_35(a: A with structural1.DSub): Unit = {}
+  def d_36(a: structural1.DSub with A): Unit = {}
+  def z_37(z: Z with structural1.DSub): Unit = {}
+  def z_38(z: structural1.DSub with Z): Unit = {}
+
+  val structural2: { type SubCB <: C with B } = new { type SubCB <: C with B }
+  def c_39(c: structural2.SubCB with B): Unit = {}
+  def c_40(c: B with structural2.SubCB): Unit = {}
+
+  val structural3a: { type SubB <: B; type SubCB <: C with SubB } = new { type SubB <: B; type SubCB <: C with SubB }
+  val structural3b: { type SubB <: B; type SubCB <: C with SubB } = new { type SubB <: B; type SubCB <: C with SubB }
+  def c_41(c: structural3a.SubB with structural3a.SubCB): Unit = {}
+  def c_42(c: structural3a.SubCB with structural3a.SubB): Unit = {}
+  def b_43(b: structural3a.SubB with structural3b.SubCB): Unit = {}
+  def c_44(c: structural3b.SubCB with structural3a.SubB): Unit = {}
 }

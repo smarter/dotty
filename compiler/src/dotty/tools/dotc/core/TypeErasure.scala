@@ -417,27 +417,44 @@ object TypeErasure {
 
     // RefinedType and AndType are both represented in Scala2 by RefinedType
     type Scala2RefinedType = RefinedType | AndType // @unchecked needed until https://github.com/lampepfl/dotty/pull/8808 is in.
-    // TODO: we probably only need AndType and RefinedType instead of Type,
-    // everything else should go through dealiasWiden.typeSymbol
-    type PseudoSymbol = Scala2RefinedType | Symbol
+    // Structural refs will never be TermRef since singleton types get widened by `pseudoSymbol`
+    type StructuralRef = TypeRef
+    // When matching on a PseudoSymbol, we can assume that all TypeRef are structural,
+    // because `pseudoSymbol` will map non-structural TypeRefs to Symbol
+    type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
     def (psym: PseudoSymbol).isClass = psym match {
       case tp: Scala2RefinedType @unchecked =>
         true
+      case tp: StructuralRef =>
+        false
       case sym: Symbol =>
         sym.isClass
     }
     def (psym: PseudoSymbol).isTrait = psym match {
       case tp: Scala2RefinedType @unchecked =>
         false
+      case tp: StructuralRef =>
+        false
       case sym: Symbol =>
         sym.is(Trait)
+    }
+
+    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol) = (psym1, psym2) match {
+      case (psym1: StructuralRef, psym2: StructuralRef) =>
+        // Can't rely on `eq` since the same type member reference could be represented
+        // with different prefixes
+        psym1 =:= psym2
+      case _ =>
+        psym1 eq psym2
     }
 
     def ps(tp: Type): PseudoSymbol = tp.widenDealias match {
       case tp: OrType =>
         ps(erasure(tp))
       case tp: Scala2RefinedType @unchecked =>
+        tp
+      case tp: TypeRef if !tp.symbol.exists => // StructuralRef
         tp
       case tp =>
         tp.typeSymbol
@@ -488,6 +505,17 @@ object TypeErasure {
             // (class, abstract) ==> false (even if type T >: SomeClass)
             false
 
+        case (tp1: StructuralRef, tp2: StructuralRef) =>
+          tp1 <:< tp2
+        case (_, tp2: StructuralRef) =>
+          false
+        case (tp1: StructuralRef, _) =>
+          tp1.info match {
+            case info: TypeBounds =>
+              go(ps(info.hi))
+            case _ =>
+              false
+          }
         case (_, _: Scala2RefinedType @unchecked) =>
           // In Scala 2, intersections are represented as refined types, and
           // refined types get their own unique synthetic class symbol, so they're
@@ -532,7 +560,7 @@ object TypeErasure {
       } else {
         // implement new spec for erasure of refined types.
         def isUnshadowed(psym: PseudoSymbol) =
-          !(psyms exists (qsym => (psym ne qsym) && isnbc(qsym, psym)))
+          !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
         val cs = parents.iterator.filter { p => // isUnshadowed is a bit expensive, so try classes first
           val psym = pseudoSymbol(p)
           psym.isClass && !psym.isTrait && isUnshadowed(psym)

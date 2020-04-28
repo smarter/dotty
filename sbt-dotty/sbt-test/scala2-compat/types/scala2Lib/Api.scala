@@ -66,6 +66,7 @@ class Z {
 
   type DSub <: D
   def a_19(a: A with DSub): Unit = {}
+  def d_19x(d: DSub with A): Unit = {}
   def z_20(z: DSub with Z): Unit = {}
 
   type W1 <: A with Cov[Any]
@@ -93,4 +94,21 @@ class Z {
   def f_32(f: o2.F with o1.E): Unit = {}
   def f_33(f: Outer#E with Outer#F): Unit = {}
   def f_34(f: Outer#F with Outer#E): Unit = {}
+
+  val structural1: { type DSub <: D } = new { type DSub <: D }
+  def a_35(a: A with structural1.DSub): Unit = {}
+  def d_36(a: structural1.DSub with A): Unit = {}
+  def z_37(z: Z with structural1.DSub): Unit = {}
+  def z_38(z: structural1.DSub with Z): Unit = {}
+
+  val structural2: { type SubCB <: C with B } = new { type SubCB <: C with B }
+  def c_39(c: structural2.SubCB with B): Unit = {}
+  def c_40(c: B with structural2.SubCB): Unit = {}
+
+  val structural3a: { type SubB <: B; type SubCB <: C with SubB } = new { type SubB <: B; type SubCB <: C with SubB }
+  val structural3b: { type SubB <: B; type SubCB <: C with SubB } = new { type SubB <: B; type SubCB <: C with SubB }
+  def c_41(c: structural3a.SubB with structural3a.SubCB): Unit = {}
+  def c_42(c: structural3a.SubCB with structural3a.SubB): Unit = {}
+  def b_43(b: structural3a.SubB with structural3b.SubCB): Unit = {}
+  def c_44(c: structural3b.SubCB with structural3a.SubB): Unit = {}
 }
