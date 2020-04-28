@@ -409,6 +409,9 @@ object TypeErasure {
         psym1 eq psym2
     }
 
+    // refined/compound types get their own symbol
+    // type aliases symbol is the symbol of the dealiased type
+    // singleton types get the symbol of their underlying type
     def pseudoSymbol(tp: Type): PseudoSymbol = tp.widenDealias match {
       case tpw: OrType =>
         pseudoSymbol(erasure(tpw))
