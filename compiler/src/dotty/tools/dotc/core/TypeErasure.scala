@@ -375,46 +375,6 @@ object TypeErasure {
 
 
   def intersectionDominator(parents: List[Type])(using Context): Type = {
-    // symbol for refinements/intersections have isClass = true, isTrait = false
-    // type param upper-bounded by intersection and intersection will behave the same,
-    // except the former has isClass = false ==> use tp.typeSymbol.isClass for those ?
-    // singleton also have a typeSymbol, isClass/isTrait delegate
-    // type alias get dealiased (matters for isClass/isTrait) <-- done in collectParents
-    // println("parents: " + parents.map(x => (x, x.typeSymbol, x.typeSymbol.isClass, x.typeSymbol.isTrait)))
-
-    // class RefinedSymbol(syms: List[ClassSymbol]) // isClass = True, isTrait = false, ownClass = true
-    // def scala2TypeSymbol(tp: Type): RefinedSymbol = tp.widenDealias match {
-    //   case _: (RefinedType | AndType) =>
-    //     RefinedSymbol(tp.classSymbols)
-    //   case _ =>
-    // }
-
-    // def stripRefinement(tp: Type): Type = tp match {
-    //   case tp: RefinedOrRecType => stripRefinement(tp.parent)
-    //   case tp => tp
-    // }
-
-   // *  Type -+- ProxyType --+- NamedType ----+--- TypeRef
-   // *        |              |                 \
-   // *        |              +- [X] Singleton
-   // *        |              +- [ ] TypeParamRef
-   // *        |              +- [ ] RefinedOrRecType -+-- RefinedType
-   // *        |              |                   -+-- RecType
-   // *        |              +- [ ] AppliedType
-   // *        |              +- [ ] TypeBounds // not value
-   // *        |              +- [ ] ExprType // not value
-   // *        |              +- [x] AnnotatedType // stripAnnotated
-   // *        |              +- [x] TypeVar // stripTypeVar?
-   // *        |              +- [ ] HKTypeLambda // not kind-correct
-   // *        |              +- [ ] MatchType // not value
-   // *        |
-   // *        +- GroundType -+- [ ] AndType
-   // *                       +- [ ] OrType
-   // *                       +- [nv] MethodOrPoly
-   // *                       +- [nv] ClassInfo
-   // *                       |
-   // *                       +- [default to false] NoType / NoPrefix / ErrorType / WildcardType
-
     // RefinedType and AndType are both represented in Scala2 by RefinedType
     type Scala2RefinedType = RefinedType | AndType // @unchecked needed until https://github.com/lampepfl/dotty/pull/8808 is in.
     // Structural refs will never be TermRef since singleton types get widened by `pseudoSymbol`
@@ -462,6 +422,19 @@ object TypeErasure {
 
     def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
       // xx: bottom handling
+      def goUpperBound(psym: Symbol | StructuralRef): Boolean = {
+        val info = psym match {
+          case sym: Symbol => sym.info
+          case tp: StructuralRef => tp.info
+        }
+        info match {
+          case info: TypeBounds =>
+            go(pseudoSymbol(info.hi))
+          case _ =>
+            false
+        }
+      }
+
       def go(tp1: PseudoSymbol): Boolean = (tp1 eq tp2) || (tp1, tp2).match {
         case (sym1: Symbol, sym2: Symbol) =>
           if (sym1.isClass && sym2.isClass)
@@ -469,12 +442,7 @@ object TypeErasure {
           else if (!sym1.isClass) {
             // an abstract type is a pseudo-sub of a pseudo-symbol, if its
             // upper-bound is a pseudo-sub of that pseudo-symbol.
-            sym1.info match {
-              case info: TypeBounds =>
-                go(pseudoSymbol(info.hi))
-              case _ =>
-                false
-            }
+            goUpperBound(sym1)
           }
           else
             // a class C is never considered a pseudo-sub of an abstract type T,
@@ -486,42 +454,22 @@ object TypeErasure {
           // anything.
           false
         case (sym1: Symbol, tp: StructuralRef) =>
-          sym1.info match {
-            case info: TypeBounds =>
-              go(pseudoSymbol(info.hi))
-            case _ =>
-              false
-          }
+          goUpperBound(sym1)
         case (tp1: StructuralRef, tp2: StructuralRef) =>
+          // XX: wrong with tycons: A <: F[Int] ==> A <: F should return true
+          // (tp1.prefix =:= tp2.prefix && tp1.name == tp2.name) || goUpperBound(tp1)
           tp1 <:< tp2
         case (tp1: StructuralRef, _) =>
-          tp1.info match {
-            case info: TypeBounds =>
-              go(pseudoSymbol(info.hi))
-            case _ =>
-              false
-          }
+          goUpperBound(tp1)
         case (tp1: RefinedType, _) =>
           go(pseudoSymbol(tp1.parent))
         case (AndType(tp11, tp12), _) =>
           go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
       }
 
-      // go(pseudoSymbol(tp1), pseudoSymbol(tp2))
       go(tp1)
     }
 
-
-    // if (tp2.isInstanceOf[RefinedType | AndType])
-    //   return false
-    // (a, a) ==> true
-    // (_, refined or and) ==> false
-    // (refinedOrAnd, class) ==> class in refinedOrAnd.classSymbols
-    // (refinedOrAnd, abstract) ==> (and.tp1, abstract) || (and.tp2, abstract)
-    // (class, abstract) ==> false (even if type T >: SomeClass)
-    // (abstract, class) ==> class in abstract.classSymbols
-    // (abstract1, abstract2) ==> (upper of abstract1, abstract2)
-    // singletons are always dealiased
 
     // println("parents: " + parents.map(_.show))
     val z = {
