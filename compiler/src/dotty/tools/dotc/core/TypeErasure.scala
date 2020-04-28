@@ -422,6 +422,8 @@ object TypeErasure {
         sym
       case tp: TypeProxy =>
         pseudoSymbol(tp.underlying)
+      case tp: ErrorType =>
+        defn.ObjectClass
       case tp =>
         assert(false, tp)
         ???
