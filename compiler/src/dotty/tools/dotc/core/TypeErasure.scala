@@ -416,8 +416,12 @@ object TypeErasure {
         tp
       case tp: TypeRef if !tp.symbol.exists => // StructuralRef
         tp
+      case tp: TypeProxy =>
+        pseudoSymbol(tp.underlying)
       case tp =>
-        tp.typeSymbol
+        val s = tp.typeSymbol
+        assert(s.exists, tp)
+        s
     }
 
     def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {

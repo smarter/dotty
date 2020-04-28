@@ -115,4 +115,9 @@ class Z {
   type SubStructural <: C with structural3a.SubB
   def c_45(x: structural3a.SubB with SubStructural): Unit = {}
   def b_46(x: structural3b.SubB with SubStructural): Unit = {}
+
+  // TODO:
+  // val structural4a: { type M[X] <: A } = new { type M[X] <: A }
+  // val structural4b: { type N <: B with structural4a.M[Int] } = new { type N <: B with structural4a.M[Int] }
+  // def foo(x: structural4a.M[Any] with structural4b.N): Unit = {}
 }
