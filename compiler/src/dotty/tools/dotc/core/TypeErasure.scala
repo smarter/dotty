@@ -485,10 +485,15 @@ object TypeErasure {
           // synthetic class symbol, so they're not considered a supertype of
           // anything.
           false
+        case (sym1: Symbol, tp: StructuralRef) =>
+          sym1.info match {
+            case info: TypeBounds =>
+              go(pseudoSymbol(info.hi))
+            case _ =>
+              false
+          }
         case (tp1: StructuralRef, tp2: StructuralRef) =>
           tp1 <:< tp2
-        case (_, tp2: StructuralRef) =>
-          false // XX: but sym can be subtype of structural ref
         case (tp1: StructuralRef, _) =>
           tp1.info match {
             case info: TypeBounds =>

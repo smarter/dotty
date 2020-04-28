@@ -111,4 +111,8 @@ class Z {
   def c_42(c: structural3a.SubCB with structural3a.SubB): Unit = {}
   def b_43(b: structural3a.SubB with structural3b.SubCB): Unit = {}
   def c_44(c: structural3b.SubCB with structural3a.SubB): Unit = {}
+
+  type SubStructural <: C with structural3a.SubB
+  def c_45(x: structural3a.SubB with SubStructural): Unit = {}
+  def b_46(x: structural3b.SubB with SubStructural): Unit = {}
 }
