@@ -410,22 +410,22 @@ object TypeErasure {
     }
 
     def pseudoSymbol(tp: Type): PseudoSymbol = tp.widenDealias match {
-      case tp: OrType =>
-        pseudoSymbol(erasure(tp))
-      case tp: Scala2RefinedType @unchecked =>
-        tp
-      case tp: TypeRef if !tp.symbol.exists => // StructuralRef
-        tp
-      case tp: TypeRef => // StructuralRef
-        val sym = tp.symbol
-        assert(sym.exists, tp)
+      case tpw: OrType =>
+        pseudoSymbol(erasure(tpw))
+      case tpw: Scala2RefinedType @unchecked =>
+        tpw
+      case tpw: TypeRef if !tpw.symbol.exists => // StructuralRef
+        tpw
+      case tpw: TypeRef => // StructuralRef
+        val sym = tpw.symbol
+        assert(sym.exists, tpw)
         sym
-      case tp: TypeProxy =>
-        pseudoSymbol(tp.underlying)
-      case tp: ErrorType =>
+      case tpw: TypeProxy =>
+        pseudoSymbol(tpw.underlying)
+      case tpw: ErrorType =>
         defn.ObjectClass
-      case tp =>
-        assert(false, tp)
+      case tpw =>
+        assert(false, tpw)
         ???
     }
 
