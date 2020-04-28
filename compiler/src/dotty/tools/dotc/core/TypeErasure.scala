@@ -423,7 +423,7 @@ object TypeErasure {
     // because `pseudoSymbol` will map non-structural TypeRefs to Symbol
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
-    def (psym: PseudoSymbol).isClass = psym match {
+    def isPseudoClass(psym: PseudoSymbol) = psym match {
       case tp: Scala2RefinedType @unchecked =>
         true
       case tp: StructuralRef =>
@@ -431,7 +431,7 @@ object TypeErasure {
       case sym: Symbol =>
         sym.isClass
     }
-    def (psym: PseudoSymbol).isTrait = psym match {
+    def isTrait(psym: PseudoSymbol) = psym match {
       case tp: Scala2RefinedType @unchecked =>
         false
       case tp: StructuralRef =>
@@ -449,9 +449,9 @@ object TypeErasure {
         psym1 eq psym2
     }
 
-    def ps(tp: Type): PseudoSymbol = tp.widenDealias match {
+    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widenDealias match {
       case tp: OrType =>
-        ps(erasure(tp))
+        pseudoSymbol(erasure(tp))
       case tp: Scala2RefinedType @unchecked =>
         tp
       case tp: TypeRef if !tp.symbol.exists => // StructuralRef
@@ -459,77 +459,47 @@ object TypeErasure {
       case tp =>
         tp.typeSymbol
     }
-    def pseudoSymbol(tp: Type): PseudoSymbol = ps(tp)
-
-    // def pseudoSymbol(sym: PseudoSymbol): PseudoSymbol = {
-    //   sym match {
-    //     case sym: Symbol =>
-    //       sym
-    //     case tp: Type =>
-    //       val tp1: PseudoSymbol = tp.dealias/*Widen.stripTypeVar.stripLazyRef.stripAnnots*/ match {
-    //         // case tp: AppliedType =>
-    //         //   tp.underlying // not supertype: type Foo[X] <: List[X] ==> Foo
-    //         case tp: TypeRef =>
-    //           tp.typeSymbol
-    //         // needed for TODO below, also need isnbc to handle Refined directly
-    //         case tp: RefinedType =>
-    //           tp
-    //         case tp: TypeProxy =>
-    //           tp.underlying // not .supertype: type Foo[X] <: List[X] ==> Foo
-    //         case tp: OrType =>
-    //           erasure(tp)
-    //         case tp =>
-    //           tp
-    //       }
-    //       if (tp1 ne tp)
-    //         pseudoSymbol(tp1)
-    //       else
-    //         tp1
-    //   }
-    // }
 
     def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
+      // xx: bottom handling
       def go(tp1: PseudoSymbol): Boolean = (tp1 eq tp2) || (tp1, tp2).match {
         case (sym1: Symbol, sym2: Symbol) =>
           if (sym1.isClass && sym2.isClass)
             sym1.derivesFrom(sym2)
           else if (!sym1.isClass) {
+            // an abstract type is a pseudo-sub of a pseudo-symbol, if its
+            // upper-bound is a pseudo-sub of that pseudo-symbol.
             sym1.info match {
               case info: TypeBounds =>
-                go(ps(info.hi))
+                go(pseudoSymbol(info.hi))
               case _ =>
                 false
             }
           }
           else
-            // (class, abstract) ==> false (even if type T >: SomeClass)
+            // a class C is never considered a pseudo-sub of an abstract type T,
+            // even if it was declared as `type T >: C`
             false
-
+        case (_, _: Scala2RefinedType @unchecked) =>
+          // As mentioned above, in Scala 2 these types get their own unique
+          // synthetic class symbol, so they're not considered a supertype of
+          // anything.
+          false
         case (tp1: StructuralRef, tp2: StructuralRef) =>
           tp1 <:< tp2
         case (_, tp2: StructuralRef) =>
-          false
+          false // XX: but sym can be subtype of structural ref
         case (tp1: StructuralRef, _) =>
           tp1.info match {
             case info: TypeBounds =>
-              go(ps(info.hi))
+              go(pseudoSymbol(info.hi))
             case _ =>
               false
           }
-        case (_, _: Scala2RefinedType @unchecked) =>
-          // In Scala 2, intersections are represented as refined types, and
-          // refined types get their own unique synthetic class symbol, so they're
-          // not considered a supertype of anything.
-          false
         case (tp1: RefinedType, _) =>
-          // isnbc((A & B) {...}, A & B) should return false,
-          // recursion is OK though because we got rid of RefinedType on the rhs
-          // in the case before, and we never recurse on the rhs
-          // TODO: remove second param from `go` to make this obvious!
-          assert(tp1.parent ne tp2)
-          go(ps(tp1.parent))
+          go(pseudoSymbol(tp1.parent))
         case (AndType(tp11, tp12), _) =>
-          go(ps(tp11)) || go(ps(tp12))
+          go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
       }
 
       // go(pseudoSymbol(tp1), pseudoSymbol(tp2))
@@ -554,16 +524,14 @@ object TypeErasure {
       // println("psyms: " + psyms.map(_.show))
 
       if (psyms contains defn.ArrayClass) {
-        // treat arrays specially
         defn.ArrayOf(
           intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
       } else {
-        // implement new spec for erasure of refined types.
         def isUnshadowed(psym: PseudoSymbol) =
           !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
-        val cs = parents.iterator.filter { p => // isUnshadowed is a bit expensive, so try classes first
+        val cs = parents.iterator.filter { p =>
           val psym = pseudoSymbol(p)
-          psym.isClass && !psym.isTrait && isUnshadowed(psym)
+          isPseudoClass(psym) && !isTrait(psym) && isUnshadowed(psym)
         }
         (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
       }
