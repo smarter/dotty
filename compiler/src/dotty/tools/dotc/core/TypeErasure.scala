@@ -414,14 +414,21 @@ object TypeErasure {
         pseudoSymbol(erasure(tpw))
       case tpw: Scala2RefinedType @unchecked =>
         tpw
-      case tpw: TypeRef if !tpw.symbol.exists => // StructuralRef
-        tpw
       case tpw: TypeRef => // StructuralRef
         val sym = tpw.symbol
-        assert(sym.exists, tpw)
-        sym
+        if !sym.exists then
+          tpw // StructuralRef
+        else
+          sym
       case tpw: TypeProxy =>
         pseudoSymbol(tpw.underlying)
+
+      // XX: maybe replace below with
+      // case tpw =>
+      //   tpw.typeSymbol.orElse(defn.ObjectClass)
+
+      case tpw: JavaArrayType =>
+        defn.ArrayClass
       case tpw: ErrorType =>
         defn.ObjectClass
       case tpw =>
