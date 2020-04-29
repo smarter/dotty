@@ -376,7 +376,7 @@ object TypeErasure {
 
   def intersectionDominator(parents: List[Type])(using Context): Type = {
     // RefinedType and AndType are both represented in Scala2 by RefinedType
-    type Scala2RefinedType = RefinedType | AndType // @unchecked needed until https://github.com/lampepfl/dotty/pull/8808 is in.
+    type Scala2RefinedType = RefinedType | AndType
     // Structural refs will never be TermRef since singleton types get widened by `pseudoSymbol`
     type StructuralRef = TypeRef
     // When matching on a PseudoSymbol, we can assume that all TypeRef are structural,
@@ -384,7 +384,7 @@ object TypeErasure {
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
     def isPseudoClass(psym: PseudoSymbol) = psym match {
-      case tp: Scala2RefinedType @unchecked =>
+      case tp: Scala2RefinedType =>
         true
       case tp: StructuralRef =>
         false
@@ -392,7 +392,7 @@ object TypeErasure {
         sym.isClass
     }
     def isTrait(psym: PseudoSymbol) = psym match {
-      case tp: Scala2RefinedType @unchecked =>
+      case tp: Scala2RefinedType =>
         false
       case tp: StructuralRef =>
         false
@@ -415,7 +415,7 @@ object TypeErasure {
     def pseudoSymbol(tp: Type): PseudoSymbol = tp.widenDealias match {
       case tpw: OrType =>
         pseudoSymbol(erasure(tpw))
-      case tpw: Scala2RefinedType @unchecked =>
+      case tpw: Scala2RefinedType =>
         tpw
       case tpw: TypeRef => // StructuralRef
         val sym = tpw.symbol
