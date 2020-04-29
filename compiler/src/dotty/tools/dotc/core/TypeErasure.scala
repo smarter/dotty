@@ -393,7 +393,7 @@ object TypeErasure {
             sym
         }
       case _ =>
-        psym // also dealias structural refs?
+        psym // XX: also dealias structural refs?
     }
 
     def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
@@ -495,20 +495,10 @@ object TypeErasure {
             // a class C is never considered a pseudo-sub of an abstract type T,
             // even if it was declared as `type T >: C`
             false
-        //XX: Symbol <:< AndType possible ?
-        // These should be different "A with B"
-        //   T <: C with A with B
-        //   T with (A with B) @foo
-        // But what about:
-        //   type X = A with B
-        //   T <: C with X
-        //   T with X @foo
-        // case (sym1: Symbol, tp: Scala2RefinedType) =>
-        //   goUpperBound(sym1)
         case (_, _: Scala2RefinedType @unchecked) =>
           // As mentioned above, in Scala 2 these types get their own unique
           // synthetic class symbol, and are not considered a pseudo-sub of
-          // anything, even an abstract type upper-bounded by them
+          // anything, XX: comment on aliases handled via sym
           false
         case (sym1: Symbol, tp: StructuralRef) =>
           goUpperBound(sym1)
