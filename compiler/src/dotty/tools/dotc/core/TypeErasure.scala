@@ -449,7 +449,6 @@ object TypeErasure {
             case _ =>
               sym
           }
-          sym
       case tpw: TypeProxy =>
         pseudoSymbol(tpw.underlying)
 
