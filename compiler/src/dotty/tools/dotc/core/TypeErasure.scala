@@ -435,11 +435,20 @@ object TypeErasure {
         pseudoSymbol(erasure(tpw))
       case tpw: Scala2RefinedType @unchecked =>
         tpw
-      case tpw: TypeRef if !tpw.dealias.isInstanceOf[MatchType | OrType] => // if tpw.dealias.isInstanceOf[Scala2RefinedType]
+      case tpw: TypeRef =>
         val sym = tpw.symbol
         if !sym.exists then
           tpw // StructuralRef
         else
+          sym.info match {
+            case info: AliasingBounds =>
+              if (info.alias.isInstanceOf[Scala2RefinedType @unchecked])
+                sym
+              else
+                pseudoSymbol(info.alias)
+            case _ =>
+              sym
+          }
           sym
       case tpw: TypeProxy =>
         pseudoSymbol(tpw.underlying)
@@ -485,6 +494,7 @@ object TypeErasure {
           else if (sym2.isAliasType) {
 
             // ONE LEVEL OF DEALIAS // XX: test with intermediate alias
+            // XXX: no difference if we only preserve one level of alias to intersection
             sym2.info match {
               case TypeAlias(ref2) =>
                 isnbc(tp1, pseudoSymbol(ref2))
