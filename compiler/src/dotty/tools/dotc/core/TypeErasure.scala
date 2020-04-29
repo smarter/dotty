@@ -496,7 +496,12 @@ object TypeErasure {
             // XXX: no difference if we only preserve one level of alias to intersection
             sym2.info match {
               case TypeAlias(ref2) =>
-                isnbc(tp1, pseudoSymbol(ref2))
+                // underlying is always refined so check should always fail
+                val z = isnbc(tp1, pseudoSymbol(ref2))
+                assert(z == false, s"nbc($tp1, $tp2)")
+                z
+              case _ =>
+                false
             }
 
           }
