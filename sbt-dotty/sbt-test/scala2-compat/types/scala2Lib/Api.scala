@@ -35,6 +35,9 @@ class Z {
   type S <: B with T1
   def a_07(a: S): Unit = {}
 
+  // type T3 <: C with T1
+  // def a_06(a: (A with B) @foo with Rec2): Unit = {}
+
   type T2 <: B with A
   type U <: T2 with S
   def b_08(b: U): Unit = {}
@@ -115,6 +118,20 @@ class Z {
   type SubStructural <: C with structural3a.SubB
   def c_45(x: structural3a.SubB with SubStructural): Unit = {}
   def b_46(x: structural3b.SubB with SubStructural): Unit = {}
+
+  type Rec1 <: A with B
+  type Rec2 <: C with Rec1
+  def c_x1(a: A with B with Rec2): Unit = {}
+  def a_x2(a: (A with B) @foo with Rec2): Unit = {}
+
+  type F1 = A with B
+  type F2 = A with B
+  type Rec3 <: F1
+  type Rec4 <: C with Rec3
+  def c_x3(a: F1 @foo with Rec4): Unit = {}
+  def c_x4(a: F1 with Rec4): Unit = {}
+  def a_x5(a: F2 @foo with Rec4): Unit = {}
+  def c_x6(a: F2 with Rec4): Unit = {}
 
   // TODO:
   // val structural4a: { type M[X] <: A } = new { type M[X] <: A }

@@ -111,4 +111,22 @@ class Z {
   def c_42(c: structural3a.SubCB with structural3a.SubB): Unit = {}
   def b_43(b: structural3a.SubB with structural3b.SubCB): Unit = {}
   def c_44(c: structural3b.SubCB with structural3a.SubB): Unit = {}
+
+  type SubStructural <: C with structural3a.SubB
+  def c_45(x: structural3a.SubB with SubStructural): Unit = {}
+  def b_46(x: structural3b.SubB with SubStructural): Unit = {}
+
+  type Rec1 <: A with B
+  type Rec2 <: C with Rec1
+  def c_x1(a: A with B with Rec2): Unit = {}
+  def a_x2(a: (A with B) @foo with Rec2): Unit = {}
+
+  type F1 = A with B
+  type F2 = A with B
+  type Rec3 <: F1
+  type Rec4 <: C with Rec3
+  def c_x3(a: F1 @foo with Rec4): Unit = {}
+  def c_x4(a: F1 with Rec4): Unit = {}
+  def a_x5(a: F2 @foo with Rec4): Unit = {}
+  def c_x6(a: F2 with Rec4): Unit = {}
 }

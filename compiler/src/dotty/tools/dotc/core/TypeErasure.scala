@@ -383,21 +383,39 @@ object TypeErasure {
     // because `pseudoSymbol` will map non-structural TypeRefs to Symbol
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
-    def isPseudoClass(psym: PseudoSymbol) = psym match {
+    // ALL LEVEL OF DEALIAS
+    def dealiasSym(psym: PseudoSymbol): PseudoSymbol = psym match {
+      case sym: Symbol =>
+        sym.info match {
+          case TypeAlias(ref) =>
+            pseudoSymbol(ref.dealias)
+          case _ =>
+            sym
+        }
+      case _ =>
+        psym // also dealias structural refs?
+    }
+
+    def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
       case tp: Scala2RefinedType =>
         true
       case tp: StructuralRef =>
         false
       case sym: Symbol =>
-        sym.isClass
+        val sym1 = dealiasSym(sym)
+        if (sym1 ne sym) isPseudoClass(sym1)
+        else sym.isClass
     }
-    def isTrait(psym: PseudoSymbol) = psym match {
+
+    def isTrait(psym: PseudoSymbol): Boolean = psym match {
       case tp: Scala2RefinedType =>
         false
       case tp: StructuralRef =>
         false
       case sym: Symbol =>
-        sym.is(Trait)
+        val sym1 = dealiasSym(sym)
+        if (sym1 ne sym) isTrait(sym1)
+        else sym.is(Trait)
     }
 
     def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol) = (psym1, psym2) match {
@@ -406,18 +424,18 @@ object TypeErasure {
         // with different prefixes
         psym1 =:= psym2
       case _ =>
-        psym1 eq psym2
+        dealiasSym(psym1) eq dealiasSym(psym2)
     }
 
     // refined/compound types get their own symbol
     // type aliases symbol is the symbol of the dealiased type
     // singleton types get the symbol of their underlying type
-    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widenDealias match {
+    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen/*Dealias*/ match {
       case tpw: OrType =>
         pseudoSymbol(erasure(tpw))
       case tpw: Scala2RefinedType =>
         tpw
-      case tpw: TypeRef => // StructuralRef
+      case tpw: TypeRef =>
         val sym = tpw.symbol
         if !sym.exists then
           tpw // StructuralRef
@@ -454,7 +472,8 @@ object TypeErasure {
         }
       }
 
-      def go(tp1: PseudoSymbol): Boolean = (tp1 eq tp2) || (tp1, tp2).match {
+      def go(tp1: PseudoSymbol): Boolean =
+        val z = (tp1 eq tp2) || (tp1, tp2).match {
         case (sym1: Symbol, sym2: Symbol) =>
           if (sym1.isClass && sym2.isClass)
             sym1.derivesFrom(sym2)
@@ -462,6 +481,15 @@ object TypeErasure {
             // an abstract type is a pseudo-sub of a pseudo-symbol, if its
             // upper-bound is a pseudo-sub of that pseudo-symbol.
             goUpperBound(sym1)
+          }
+          else if (sym2.isAliasType) {
+
+            // ONE LEVEL OF DEALIAS // XX: test with intermediate alias
+            sym2.info match {
+              case TypeAlias(ref2) =>
+                isnbc(tp1, pseudoSymbol(ref2))
+            }
+
           }
           else
             // a class C is never considered a pseudo-sub of an abstract type T,
@@ -475,10 +503,12 @@ object TypeErasure {
         //   type X = A with B
         //   T <: C with X
         //   T with X @foo
-        case (_, _: Scala2RefinedType @unchecked) =>
+        // case (sym1: Symbol, tp: Scala2RefinedType) =>
+        //   goUpperBound(sym1)
+        case (_, _: Scala2RefinedType) =>
           // As mentioned above, in Scala 2 these types get their own unique
-          // synthetic class symbol, so they're not considered a supertype of
-          // anything.
+          // synthetic class symbol, and are not considered a pseudo-sub of
+          // anything, even an abstract type upper-bounded by them
           false
         case (sym1: Symbol, tp: StructuralRef) =>
           goUpperBound(sym1)
@@ -492,7 +522,10 @@ object TypeErasure {
           go(pseudoSymbol(tp1.parent))
         case (AndType(tp11, tp12), _) =>
           go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
-      }
+        }
+        // println(i"nbc($tp1, $tp2): " + z)
+        z
+
 
       go(tp1)
     }
@@ -615,13 +648,13 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       this(tp.underlying)
     case AndType(tp1, tp2) =>
       val parents = ListBuffer[Type]()
-      def collectParents(tp: Type, parents: ListBuffer[Type]): Unit = tp match {
+      def collectParents(tp: Type, parents: ListBuffer[Type]): Unit = tp.dealiasKeepAnnots match {
         case AndType(tp1, tp2) =>
           collectParents(tp1, parents)
           collectParents(tp2, parents)
         case _ =>
-          // Experimentally matches what Scala 2 does
-          parents += tp.dealiasKeepAnnots
+          // We intentionally do not dealias the type here, this can impact the result of intersectionDominator
+          parents += tp//.dealiasKeepAnnots
       }
       collectParents(tp1, parents)
       collectParents(tp2, parents)
