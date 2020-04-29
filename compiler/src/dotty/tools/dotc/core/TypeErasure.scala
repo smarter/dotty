@@ -397,7 +397,7 @@ object TypeErasure {
     }
 
     def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
-      case tp: Scala2RefinedType =>
+      case tp: Scala2RefinedType @unchecked =>
         true
       case tp: StructuralRef =>
         false
@@ -408,7 +408,7 @@ object TypeErasure {
     }
 
     def isTrait(psym: PseudoSymbol): Boolean = psym match {
-      case tp: Scala2RefinedType =>
+      case tp: Scala2RefinedType @unchecked =>
         false
       case tp: StructuralRef =>
         false
@@ -433,7 +433,7 @@ object TypeErasure {
     def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen/*Dealias*/ match {
       case tpw: OrType =>
         pseudoSymbol(erasure(tpw))
-      case tpw: Scala2RefinedType =>
+      case tpw: Scala2RefinedType @unchecked =>
         tpw
       case tpw: TypeRef =>
         val sym = tpw.symbol
@@ -505,7 +505,7 @@ object TypeErasure {
         //   T with X @foo
         // case (sym1: Symbol, tp: Scala2RefinedType) =>
         //   goUpperBound(sym1)
-        case (_, _: Scala2RefinedType) =>
+        case (_, _: Scala2RefinedType @unchecked) =>
           // As mentioned above, in Scala 2 these types get their own unique
           // synthetic class symbol, and are not considered a pseudo-sub of
           // anything, even an abstract type upper-bounded by them
