@@ -435,7 +435,7 @@ object TypeErasure {
         pseudoSymbol(erasure(tpw))
       case tpw: Scala2RefinedType @unchecked =>
         tpw
-      case tpw: TypeRef =>
+      case tpw: TypeRef if !tpw.dealias.isInstanceOf[MatchType | OrType] => // if tpw.dealias.isInstanceOf[Scala2RefinedType]
         val sym = tpw.symbol
         if !sym.exists then
           tpw // StructuralRef
