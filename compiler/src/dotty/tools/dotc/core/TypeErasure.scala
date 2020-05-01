@@ -393,7 +393,7 @@ object TypeErasure {
             sym
         }
       case _ =>
-        psym // XX: also dealias structural refs?
+        psym
     }
 
     def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
@@ -418,13 +418,17 @@ object TypeErasure {
         else sym.is(Trait)
     }
 
-    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol) = (psym1, psym2) match {
+    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = (psym1, psym2) match {
       case (psym1: StructuralRef, psym2: StructuralRef) =>
-        // Can't rely on `eq` since the same type member reference could be represented
-        // with different prefixes
-        psym1 =:= psym2
+        // Can't rely on `eq` since the same type member reference can be represented
+        // with different but equivalent prefixes
+
+        (psym1.name eq psym2.name) && sameSymbol(pseudoSymbol(psym1.prefix), pseudoSymbol(psym2.prefix))
       case _ =>
-        dealiasSym(psym1) eq dealiasSym(psym2)
+        // dealiasSym(psym1) eq dealiasSym(psym2)
+        // one dealiasing to another not enough for same sym, for the same reason nbc returns fale
+        // instead of dealiasing
+        psym1 eq psym2
     }
 
     // refined/compound types get their own symbol
@@ -442,7 +446,20 @@ object TypeErasure {
         else
           sym.info match {
             case info: AliasingBounds =>
-              if (info.alias.isInstanceOf[Scala2RefinedType @unchecked])
+              // S2RefinedType are not supertype
+              // ... unless behind an alias
+              //     ... unless behind that alias is not normalized (parent is alias or intersection containing alias),
+              //         because uncurry will normalize it
+              def isNormal(tp: Type): Boolean = tp match {
+                case RefinedType(parent, _, _) =>
+                  isNormal(parent)
+                case AndType(tp1, tp2) =>
+                  isNormal(tp1) && isNormal(tp2)
+                case _ =>
+                  tp.dealias eq tp
+              }
+              val keepAlias = info.alias.isInstanceOf[Scala2RefinedType @unchecked] && isNormal(info.alias)
+              if (keepAlias)
                 sym
               else
                 pseudoSymbol(info.alias)
@@ -481,7 +498,7 @@ object TypeErasure {
       }
 
       def go(tp1: PseudoSymbol): Boolean =
-        val z = (tp1 eq tp2) || (tp1, tp2).match {
+        val z = sameSymbol(tp1, tp2) || (tp1, tp2).match {
         case (sym1: Symbol, sym2: Symbol) =>
           if (sym1.isClass && sym2.isClass)
             sym1.derivesFrom(sym2)
@@ -492,8 +509,6 @@ object TypeErasure {
           }
           else if (sym2.isAliasType) {
 
-            // ONE LEVEL OF DEALIAS // XX: test with intermediate alias
-            // XXX: no difference if we only preserve one level of alias to intersection
             sym2.info match {
               case TypeAlias(ref2) =>
                 // underlying is always refined so check should always fail
@@ -516,10 +531,6 @@ object TypeErasure {
           false
         case (sym1: Symbol, tp: StructuralRef) =>
           goUpperBound(sym1)
-        case (tp1: StructuralRef, tp2: StructuralRef) =>
-          // XX: wrong with tycons: A <: F[Int] ==> A <: F should return true
-          // (tp1.prefix =:= tp2.prefix && tp1.name == tp2.name) || goUpperBound(tp1)
-          tp1 <:< tp2
         case (tp1: StructuralRef, _) =>
           goUpperBound(tp1)
         case (tp1: RefinedType, _) =>

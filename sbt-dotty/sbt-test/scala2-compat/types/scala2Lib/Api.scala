@@ -133,8 +133,20 @@ class Z {
   def a_x5(a: F2 @foo with Rec4): Unit = {}
   def c_x6(a: F2 with Rec4): Unit = {}
 
-  // TODO:
-  // val structural4a: { type M[X] <: A } = new { type M[X] <: A }
-  // val structural4b: { type N <: B with structural4a.M[Int] } = new { type N <: B with structural4a.M[Int] }
-  // def foo(x: structural4a.M[Any] with structural4b.N): Unit = {}
+  type AA = A
+  type F3 = AA with B
+  type Rec5 <: F3
+  type Rec6 <: C with Rec5
+  def a_y3(a: F3 @foo with Rec6): Unit = {}
+  def c_y4(a: F3 with Rec6): Unit = {}
+
+  val structural4a: { type M[X] <: A } = new { type M[X] <: A }
+  val structural4b: { type N <: B with structural4a.M[Int] } = new { type N <: B with structural4a.M[Int] }
+  def b_100(x: structural4a.M[Any] with structural4b.N): Unit = {}
+
+  type Bla = A { type M[X] <: A }
+  def b_101(x: Bla#M[Any] with ({ type N <: B with Bla#M[Int] })#N): Unit = {}
+  type AEq = A
+  type Bla2 = AEq { type M[X] <: A }
+  def a_102(x: Bla2#M[Any] with ({ type N <: B with Bla2#M[Int] })#N): Unit = {}
 }
