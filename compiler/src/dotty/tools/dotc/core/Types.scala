@@ -3079,7 +3079,7 @@ object Types {
     override def resultType(implicit ctx: Context): Type = resType
     override def underlying(implicit ctx: Context): Type = resType
 
-    def computeSignature(implicit ctx: Context): Signature = resultSignature
+    def computeSignature(implicit ctx: Context): Signature = Signature.NotAMethod
 
     def derivedExprType(resType: Type)(implicit ctx: Context): ExprType =
       if (resType eq this.resType) this else ExprType(resType)
