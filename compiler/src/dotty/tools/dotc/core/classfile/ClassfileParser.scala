@@ -677,7 +677,7 @@ class ClassfileParser(
       val attrs = classInfo.decls.toList.filter(sym => sym.isTerm && sym != denot.symbol)
       val paramNames = attrs.map(_.name.asTermName)
       val paramTypes = attrs.map(_.info.resultType)
-      denot.info = MethodType(paramNames, paramTypes, classRoot.typeRef)
+      denot.info = JavaMethodType(paramNames, paramTypes, classRoot.typeRef)
     }
   }
 
