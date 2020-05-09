@@ -110,7 +110,7 @@ case class Signature(paramsSig: List[ParamSig], resSig: TypeName) {
    *  Like Signature#apply, the result is only cacheable if `isUnderDefined == false`.
    */
   def prependTermParams(params: List[Type], isJava: Boolean)(using Context): Signature =
-    Signature(params.map(p => sigName(p, isJava)) ::: paramsSig, resSig)
+    Signature(params.map(p => sigName(p, if isJava then SourceLanguage.Java else SourceLanguage.Scala3)) ::: paramsSig, resSig) // XX
 
   /** Construct a signature by prepending the length of a type parameter section
    *  to the parameter part of this signature.
@@ -166,7 +166,7 @@ object Signature {
    */
   def apply(resultType: Type, isJava: Boolean)(using Context): Signature = {
     assert(!resultType.isInstanceOf[ExprType])
-    apply(Nil, sigName(resultType, isJava))
+    apply(Nil, sigName(resultType, if isJava then SourceLanguage.Java else SourceLanguage.Scala3)) // XX
   }
 
   val lexicographicOrdering: Ordering[Signature] = new Ordering[Signature] {
