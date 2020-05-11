@@ -72,6 +72,10 @@ object TypeOps:
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
           case _ =>
             if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists)
+              // println("pre: " + pre)
+              // println("cls: " + cls)
+              // println("thiscls: " + thiscls)
+              // Thread.dumpStack
               if (variance <= 0 && !isLegalPrefix(pre))
                 if (variance < 0) {
                   approximated = true

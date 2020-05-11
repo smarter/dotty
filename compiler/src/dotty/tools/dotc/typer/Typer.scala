@@ -523,6 +523,20 @@ class Typer extends Namer
         case _ => app
       }
     case qual =>
+      if (qual.isTypeVar) {
+        if (qual.upperbound.findMember(name)) {
+          if (upperbound has wildcards) {
+            qual <:< upperboundWithTypeVars
+          }
+        } else if (qual.lowerbound.findMember(name)) {
+          val base = mbr.overridenSymbols.last.owner
+          qual <:< baseWithTypeVars
+        }
+        qual.findMember(name)
+        // find member in upper bound of qual, asSeenFrom(qual, upperboundClass)
+        // qual.baseType(upperBoundClass) ==> upperBoundWithTypeVars
+        // type params get replaced by typevars
+      }
       val select = assignType(cpy.Select(tree)(qual, tree.name), qual)
       val select1 = toNotNullTermRef(select, pt)
 

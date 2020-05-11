@@ -137,9 +137,14 @@ trait TypeAssigner {
     else if (!qualType.isInstanceOf[TermType])
       qualType = errorType(em"$qualType is illegal as a selection prefix", qual1.sourcePos)
 
+    // println("#BEFORE: " + tree.name)
     val name = tree.name
     val pre = maybeSkolemizePrefix(qualType, name)
     val mbr = qualType.findMember(name, pre)
+    // println("qualType: " + qualType)
+    // println("pre: " + pre)
+    // println("mbr: " + mbr)
+    // println("#AFTER: " + tree.name)
     if (reallyExists(mbr))
       qualType.select(name, mbr)
     else if (qualType.derivesFrom(defn.DynamicClass) && name.isTermName && !Dynamic.isDynamicMethod(name))
