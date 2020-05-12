@@ -924,19 +924,19 @@ trait Applications extends Compatibility {
                 errorTree(tree, em"argument to summonFrom must be a pattern matching closure")
             }
           else
-            tryEither {
+            // tryEither {
               simpleApply(fun1, proto)
-            } {
-              (failedVal, failedState) =>
-                def fail = { failedState.commit(); failedVal }
-                // Try once with original prototype and once (if different) with tupled one.
-                // The reason we need to try both is that the decision whether to use tupled
-                // or not was already taken but might have to be revised when an implicit
-                // is inserted on the qualifier.
-                tryWithImplicitOnQualifier(fun1, originalProto).getOrElse(
-                  if (proto eq originalProto) fail
-                  else tryWithImplicitOnQualifier(fun1, proto).getOrElse(fail))
-            }
+            // } {
+            //   (failedVal, failedState) =>
+            //     def fail = { failedState.commit(); failedVal }
+            //     // Try once with original prototype and once (if different) with tupled one.
+            //     // The reason we need to try both is that the decision whether to use tupled
+            //     // or not was already taken but might have to be revised when an implicit
+            //     // is inserted on the qualifier.
+            //     tryWithImplicitOnQualifier(fun1, originalProto).getOrElse(
+            //       if (proto eq originalProto) fail
+            //       else tryWithImplicitOnQualifier(fun1, proto).getOrElse(fail))
+            // }
       }
     }
 
@@ -998,6 +998,11 @@ trait Applications extends Compatibility {
     if (proto.allArgTypesAreCurrent())
       typer.ApplyToTyped(app, fun, methRef, proto.typedArgs(), resultType).result
     else
+      println("fun: " + fun.show + " " + fun)
+      println("methRef: " + methRef + " " + methRef.show)
+      println("methRef.u: " + methRef.widen + " " + methRef.widen.show)
+      println("proto: " + proto.show + " " + proto)
+      println("res: " + resultType.show + " " + resultType)
       typer.ApplyToUntyped(app, fun, methRef, proto, resultType)(
         using fun.nullableInArgContext(using argCtx(app))).result
 

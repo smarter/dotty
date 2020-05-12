@@ -525,16 +525,21 @@ class Typer extends Namer
     case qual =>
       qual.tpe.widen.stripTypeVar match {
         case tp: TypeParamRef =>
-          def replaceBounds = new TypeMap {
+          def addVariables = new TypeMap {
             def apply(t: Type): Type = t match {
+              case tp: TypeLambda =>
+                tp
               case tp @ AppliedType(tycon, args) =>
-                tp.derivedAppliedType(tycon, args.map {
-                  case arg: TypeBounds =>
-                    // TODO: deal with bounds referring to other bounds
-                    newTypeVar(arg)
-                  case arg =>
-                    mapOver(arg)
-                })
+                println("tp: " + tp)
+                val tp2 = tp.derivedAppliedType(tycon,
+                  args.zipWithConserve(tp.tyconTypeParams) { (arg, tparam) =>
+                    val arg2 = this(arg)
+                    if arg2.isInstanceOf[TypeBounds] || tparam.paramVarianceSign != 0
+                    then newTypeVar(TypeBounds(defn.NothingType, defn.AnyKindType))
+                    else arg2
+                  })
+                if tp2 ne tp then tp2 <:< tp
+                tp2
               case _ =>
                 mapOver(t)
             }
@@ -549,13 +554,15 @@ class Typer extends Namer
             val base = tp.baseType(owner)
             println("base: " + base.show)
 
-            val ibase = replaceBounds(base)
+            val ibase = addVariables(base)
             println("ibase: " + ibase.show)
             if (ibase ne base) {
-              qual.tpe <:< ibase
+              tp <:< ibase
               val base2 = tp.baseType(owner)
               println("base2: " + base2.show)
             }
+          } else {
+            val loMember = bounds.lo.member(tree.name)
           }
           
           // println(s"tp.${tree.name}: " + tp.member(tree.name))
