@@ -4952,7 +4952,7 @@ object Types {
             val restpe = tp.resultType
             val saved = variance
             variance = if (defn.MatchCase.isInstance(restpe)) 0 else -variance
-            val ptypes1 = tp.paramInfos.mapConserve(this).asInstanceOf[List[tp.PInfo]]
+            val ptypes1 = tp.paramInfos.mapConserve(mapOver).asInstanceOf[List[tp.PInfo]]
             variance = saved
             derivedLambdaType(tp)(ptypes1, this(restpe))
           }
