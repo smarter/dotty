@@ -546,11 +546,9 @@ class Typer extends Namer
           }
 
           val bounds = ctx.typeComparer.bounds(tp)
-          // println("qual: " + qual.show)
-          // println("tp: " + tp.show)
           val hiMember = bounds.hi.member(tree.name)
           if (hiMember.exists) {
-            val owner = hiMember.symbol.owner
+            val owner = hiMember.alternatives.head.symbol.owner
             val base = tp.baseType(owner)
             // println("base: " + base.show)
 
@@ -564,7 +562,7 @@ class Typer extends Namer
           } else {
             val loMember = bounds.lo.member(tree.name)
             if (loMember.exists) {
-              val owner = loMember.symbol.owner.asClass
+              val owner = loMember.alternatives.head.symbol.owner.asClass
               val base = owner.typeRef.appliedTo(owner.typeParams.map(tparam =>
                 // FIXME: handle bounds referring to other bounds
                 newTypeVar(tparam.paramInfo.bounds)))
