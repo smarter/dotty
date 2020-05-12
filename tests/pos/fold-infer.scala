@@ -12,7 +12,9 @@ class A {
   // def foldLeft1[B <: List[_]](op: (B, Int) => B): B = ???
   // val l = foldLeft1((acc, i) => acc.::(i))
 
-  def foldLeft2[B >: Nil.type](op: (B, Int) => B): B = ???
+  // def foldLeft2[B >: Nil.type](op: (B, Int) => B): B = ???
 
-  val l = foldLeft2((acc, i) => acc.::(i))
+  // val l = foldLeft2((acc, i) => acc.::(i))
+
+  List(1, 2, 3).foldLeft(Nil)((acc, i) => acc.::(i))
 }
