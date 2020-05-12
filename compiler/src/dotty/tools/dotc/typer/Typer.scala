@@ -563,8 +563,18 @@ class Typer extends Namer
             }
           } else {
             val loMember = bounds.lo.member(tree.name)
+            if (loMember.exists) {
+              val owner = loMember.symbol.owner.asClass
+              val base = owner.typeRef.appliedTo(owner.typeParams.map(tparam =>
+                // FIXME: handle bounds referring to other bounds
+                newTypeVar(tparam.paramInfo.bounds)))
+              println("base: " + base.show)
+              tp <:< base
+              val base2 = tp.baseType(owner)
+              println("base2: " + base2.show)
+            }
           }
-          
+
           // println(s"tp.${tree.name}: " + tp.member(tree.name))
         // val hi = ctx.typeComparer.bounds(tp).hi
           // println("hi: " + hi.show)
