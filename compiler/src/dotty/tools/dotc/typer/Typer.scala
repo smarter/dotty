@@ -1202,9 +1202,14 @@ class Typer extends Namer
         case _ => NoType
       if target.exists then formal <:< target
       if isFullyDefined(formal, ForceDegree.none) then formal
+      // if isFullyDefined(formal, ForceDegree.flipBottom) then formal
       else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
       else formal
-      // else errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
+      // else {
+      //   println("formal: " + formal.show)
+      //   println("ctx: " + ctx.typerState.constraint.show)
+      //   errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
+      // }
 
     def protoFormal(i: Int): Type =
       if (protoFormals.length == params.length) protoFormals(i)
@@ -2802,6 +2807,13 @@ class Typer extends Namer
       case Select(qual, name) if name != nme.CONSTRUCTOR =>
         val qualProto = SelectionProto(name, pt, NoViewsAllowed, privateOK = false)
         tryEither {
+          // qual.tpe.widen match {
+          //   case tvar: TypeVar if !tvar.isInstantiated =>
+          //     tvar.instantiate(fromBelow = tvar.hasLowerBound)
+          //   case _ =>
+          // }
+          // println("qual.tpe: " + qual.tpe + " " + qual.tpe.widen)
+
           val qual1 = adapt(qual, qualProto, locked)
           if ((qual eq qual1) || summon[Context].reporter.hasErrors) None
           else Some(typed(cpy.Select(tree)(untpd.TypedSplice(qual1), name), pt, locked))
@@ -3196,6 +3208,9 @@ class Typer extends Namer
           tree
         }
       else if (tree.tpe.widenExpr <:< pt) {
+        // println("tree: " + tree.show)
+        // println("tree.tpe: " + tree.tpe.show)
+        // println("pt: " + pt.show)
         if (ctx.typeComparer.GADTused && pt.isValueType)
           // Insert an explicit cast, so that -Ycheck in later phases succeeds.
           // I suspect, but am not 100% sure that this might affect inferred types,

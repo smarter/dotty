@@ -16,5 +16,18 @@ class A {
 
   // val l = foldLeft2((acc, i) => acc.::(i))
 
-  List(1, 2, 3).foldLeft(Nil)((acc, i) => acc.::(i))
+  // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc.::(i))
+
+  // implicit def conv(x: List[Int]): Int = 0
+
+
+  extension fooOps on (x: List[Int]) {
+    def hi: Int = 0
+  }
+
+  def foo[B >: List[Int]](op: B => Int) = ???
+  foo(b => b.hi)
+
+  // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc.::(i))
+  // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc: Int)
 }

@@ -134,7 +134,11 @@ object ProtoTypes {
      *  or as an upper bound of a prefix or underlying type.
      */
     private def hasUnknownMembers(tp: Type)(using Context): Boolean = tp match {
-      case tp: TypeVar => !tp.isInstantiated
+      case tp: TypeVar =>
+        // FIXME: This used to be `!tp.isInstantiated` but that prevents
+        // extension methods from being selected with the changes in this PR.
+        // This change doesn't break any testcase.
+        false
       case tp: WildcardType => true
       case NoType => true
       case tp: TypeRef =>
