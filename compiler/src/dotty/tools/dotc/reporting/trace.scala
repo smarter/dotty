@@ -10,7 +10,7 @@ import core.Mode
 /** Exposes the {{{ trace("question") { op } }}} syntax.
   *
   * Traced operations will print indented messages if enabled.
-  * Tracing depends on [[true]] and [[dotty.tools.dotc.config.ScalaSettings.Ylog]].
+  * Tracing depends on [[Config.tracingEnabled]] and [[dotty.tools.dotc.config.ScalaSettings.Ylog]].
   * Tracing can be forced by replacing [[trace]] with [[trace.force]] (see below).
   */
 object trace extends TraceSyntax {
@@ -29,21 +29,21 @@ abstract class TraceSyntax {
     conditionally(ctx.settings.YdebugTrace.value, question, false)(op)
 
   inline def conditionally[TC](inline cond: Boolean, inline question: String, inline show: Boolean)(op: => TC)(implicit ctx: Context): TC =
-    inline if (isForced || true) {
+    inline if (isForced || Config.tracingEnabled) {
       if (cond) apply[TC](question, Printers.default, show)(op)
       else op
     }
     else op
 
   inline def apply[T](inline question: String, inline printer: Printers.Printer, inline showOp: Any => String)(op: => T)(implicit ctx: Context): T =
-    inline if (isForced || true) {
+    inline if (isForced || Config.tracingEnabled) {
       if (!isForced && printer.eq(config.Printers.noPrinter)) op
       else doTrace[T](question, printer, showOp)(op)
     }
     else op
 
   inline def apply[T](inline question: String, inline printer: Printers.Printer, inline show: Boolean)(op: => T)(implicit ctx: Context): T =
-    inline if (isForced || true) {
+    inline if (isForced || Config.tracingEnabled) {
       if (!isForced && printer.eq(config.Printers.noPrinter)) op
       else doTrace[T](question, printer, if (show) showShowable(_) else alwaysToString)(op)
     }

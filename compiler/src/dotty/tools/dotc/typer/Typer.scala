@@ -530,7 +530,7 @@ class Typer extends Namer
               case tp: TypeLambda =>
                 tp
               case tp @ AppliedType(tycon, args) =>
-                println("tp: " + tp)
+                // println("tp: " + tp)
                 val tp2 = tp.derivedAppliedType(tycon,
                   args.zipWithConserve(tp.tyconTypeParams) { (arg, tparam) =>
                     val arg2 = this(arg)
@@ -546,20 +546,20 @@ class Typer extends Namer
           }
 
           val bounds = ctx.typeComparer.bounds(tp)
-          println("qual: " + qual.show)
-          println("tp: " + tp.show)
+          // println("qual: " + qual.show)
+          // println("tp: " + tp.show)
           val hiMember = bounds.hi.member(tree.name)
           if (hiMember.exists) {
             val owner = hiMember.symbol.owner
             val base = tp.baseType(owner)
-            println("base: " + base.show)
+            // println("base: " + base.show)
 
             val ibase = addVariables(base)
-            println("ibase: " + ibase.show)
+            // println("ibase: " + ibase.show)
             if (ibase ne base) {
               tp <:< ibase
               val base2 = tp.baseType(owner)
-              println("base2: " + base2.show)
+              // println("base2: " + base2.show)
             }
           } else {
             val loMember = bounds.lo.member(tree.name)
@@ -568,10 +568,10 @@ class Typer extends Namer
               val base = owner.typeRef.appliedTo(owner.typeParams.map(tparam =>
                 // FIXME: handle bounds referring to other bounds
                 newTypeVar(tparam.paramInfo.bounds)))
-              println("base: " + base.show)
+              // println("base: " + base.show)
               tp <:< base
               val base2 = tp.baseType(owner)
-              println("base2: " + base2.show)
+              // println("base2: " + base2.show)
             }
           }
 
