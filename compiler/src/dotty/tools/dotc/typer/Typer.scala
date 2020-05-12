@@ -523,20 +523,62 @@ class Typer extends Namer
         case _ => app
       }
     case qual =>
-      if (qual.isTypeVar) {
-        if (qual.upperbound.findMember(name)) {
-          if (upperbound has wildcards) {
-            qual <:< upperboundWithTypeVars
+      qual.tpe.widen.stripTypeVar match {
+        case tp: TypeParamRef =>
+          def replaceBounds = new TypeMap {
+            def apply(t: Type): Type = t match {
+              case tp @ AppliedType(tycon, args) =>
+                tp.derivedAppliedType(tycon, args.map {
+                  case arg: TypeBounds =>
+                    // TODO: deal with bounds referring to other bounds
+                    newTypeVar(arg)
+                  case arg =>
+                    mapOver(arg)
+                })
+              case _ =>
+                mapOver(t)
+            }
           }
-        } else if (qual.lowerbound.findMember(name)) {
-          val base = mbr.overridenSymbols.last.owner
-          qual <:< baseWithTypeVars
-        }
-        qual.findMember(name)
-        // find member in upper bound of qual, asSeenFrom(qual, upperboundClass)
-        // qual.baseType(upperBoundClass) ==> upperBoundWithTypeVars
-        // type params get replaced by typevars
+
+          val bounds = ctx.typeComparer.bounds(tp)
+          println("qual: " + qual.show)
+          println("tp: " + tp.show)
+          val hiMember = bounds.hi.member(tree.name)
+          if (hiMember.exists) {
+            val owner = hiMember.symbol.owner
+            val base = tp.baseType(owner)
+            println("base: " + base.show)
+
+            val ibase = replaceBounds(base)
+            println("ibase: " + ibase.show)
+            if (ibase ne base) {
+              qual.tpe <:< ibase
+              val base2 = tp.baseType(owner)
+              println("base2: " + base2.show)
+            }
+          }
+          
+          // println(s"tp.${tree.name}: " + tp.member(tree.name))
+        // val hi = ctx.typeComparer.bounds(tp).hi
+          // println("hi: " + hi.show)
+          // println(s"hi.${tree.name}: " + hi.findMember(tree.name, hi))
+          // println(s"hi.${tree.name}: " + hi.findMember(tree.name, hi))
+        case _ =>
       }
+      // if (qual.isTypeVar) {
+      //   if (qual.upperbound.findMember(name)) {
+      //     if (upperbound has wildcards) {
+      //       qual <:< upperboundWithTypeVars
+      //     }
+      //   } else if (qual.lowerbound.findMember(name)) {
+      //     val base = mbr.overridenSymbols.last.owner
+      //     qual <:< baseWithTypeVars
+      //   }
+      //   qual.findMember(name)
+      //   // find member in upper bound of qual, asSeenFrom(qual, upperboundClass)
+      //   // qual.baseType(upperBoundClass) ==> upperBoundWithTypeVars
+      //   // type params get replaced by typevars
+      // }
       val select = assignType(cpy.Select(tree)(qual, tree.name), qual)
       val select1 = toNotNullTermRef(select, pt)
 
@@ -1132,7 +1174,7 @@ class Typer extends Namer
      *  If all attempts fail, issue a "missing parameter type" error.
      */
     def inferredParamType(param: untpd.ValDef, formal: Type): Type =
-      if isFullyDefined(formal, ForceDegree.failBottom) then return formal
+      if isFullyDefined(formal, ForceDegree.none) then return formal
       val target = calleeType.widen match
         case mtpe: MethodType =>
           val pos = paramIndex(param.name)
@@ -1142,9 +1184,10 @@ class Typer extends Namer
           else NoType
         case _ => NoType
       if target.exists then formal <:< target
-      if isFullyDefined(formal, ForceDegree.flipBottom) then formal
+      if isFullyDefined(formal, ForceDegree.none) then formal
       else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
-      else errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
+      else formal
+      // else errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
 
     def protoFormal(i: Int): Type =
       if (protoFormals.length == params.length) protoFormals(i)
