@@ -1206,15 +1206,14 @@ class Typer extends Namer
       if isFullyDefined(formal, ForceDegree.none) then formal
       // if isFullyDefined(formal, ForceDegree.flipBottom) then formal
       else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
-      else {
+      else if (!formal.isInstanceOf[WildcardType]) {
         instantiateSelected(formal, vs.toList.filter(_._2 != 0).map(_._1))
         formal
+      } else {
+          // println("formal: " + formal.show)
+          // println("ctx: " + ctx.typerState.constraint.show)
+          errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
       }
-      // else {
-      //   println("formal: " + formal.show)
-      //   println("ctx: " + ctx.typerState.constraint.show)
-      //   errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
-      // }
 
     def protoFormal(i: Int): Type =
       if (protoFormals.length == params.length) protoFormals(i)
