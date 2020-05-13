@@ -564,8 +564,7 @@ class Typer extends Namer
             if (loMember.exists) {
               val owner = loMember.alternatives.head.symbol.owner.asClass
               val base = owner.typeRef.appliedTo(owner.typeParams.map(tparam =>
-                // FIXME: handle bounds referring to other bounds
-                newTypeVar(tparam.paramInfo.bounds)))
+                newTypeVar(TypeBounds(defn.NothingType, defn.AnyKindType))))
               // println("base: " + base.show)
               tp <:< base
               val base2 = tp.baseType(owner)

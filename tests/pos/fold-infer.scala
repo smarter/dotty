@@ -1,6 +1,7 @@
-// class Foo[A] {
-//   def get: A = ???
-// }
+class Foo[A, B <: A] {
+  // def get: A = ???
+  def hi: Foo[A, B] = this
+}
 class A {
   // def foo[T <: Foo[_]]: T = ???
   // foo.get // OK
@@ -21,13 +22,17 @@ class A {
   // implicit def conv(x: List[Int]): Int = 0
 
 
-  extension fooOps on (x: List[Int]) {
-    def hi: Int = 0
-  }
+  // extension fooOps on (x: List[Int]) {
+  //   def hi: Int = 0
+  // }
 
-  def foo[B >: List[Int]](op: B => Int) = ???
+  def foo[B >: Foo[Int, Int]](op: B => B) = ???
   foo(b => b.hi)
 
+  // def foo[B >: List[Int]](op: B => Int) = ???
+  // foo(b => b.hi)
+
   // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc.::(i))
-  // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc: Int)
+  Seq(1, 2, 3).foldLeft(Set(0))((acc, i) => acc + i)
+  // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc)
 }
