@@ -158,15 +158,24 @@ object ProtoTypes {
     override def isMatchedBy(tp1: Type, keepConstraint: Boolean)(using Context): Boolean =
       name == nme.WILDCARD || hasUnknownMembers(tp1) ||
       {
-        val mbr = if (privateOK) tp1.member(name) else tp1.nonPrivateMember(name)
-        def qualifies(m: SingleDenotation) =
-          memberProto.isRef(defn.UnitClass) ||
-          tp1.isValueType && compat.normalizedCompatible(NamedType(tp1, name, m), memberProto, keepConstraint)
-            // Note: can't use `m.info` here because if `m` is a method, `m.info`
-            //       loses knowledge about `m`'s default arguments.
-        mbr match { // hasAltWith inlined for performance
-          case mbr: SingleDenotation => mbr.exists && qualifies(mbr)
-          case _ => mbr hasAltWith qualifies
+        def go(pre: Type): Boolean = {
+          val mbr = if (privateOK) pre.member(name) else pre.nonPrivateMember(name)
+          def qualifies(m: SingleDenotation) =
+            memberProto.isRef(defn.UnitClass) ||
+            pre.isValueType && compat.normalizedCompatible(NamedType(pre, name, m), memberProto, keepConstraint)
+          // Note: can't use `m.info` here because if `m` is a method, `m.info`
+          //       loses knowledge about `m`'s default arguments.
+          mbr match { // hasAltWith inlined for performance
+            case mbr: SingleDenotation => mbr.exists && qualifies(mbr)
+            case _ => mbr hasAltWith qualifies
+          }
+        }
+        tp1.widenDealias.stripTypeVar match {
+          case tp: TypeParamRef =>
+            val bounds = ctx.typeComparer.bounds(tp)
+            go(bounds.hi) || go(bounds.lo)
+          case _ =>
+            go(tp1)
         }
       }
 

@@ -523,7 +523,7 @@ class Typer extends Namer
         case _ => app
       }
     case qual =>
-      qual.tpe.widen.stripTypeVar match {
+      qual.tpe.widenDealias.stripTypeVar match {
         case tp: TypeParamRef =>
           def addVariables = new TypeMap {
             def apply(t: Type): Type = t match {
