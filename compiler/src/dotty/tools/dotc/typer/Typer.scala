@@ -1167,6 +1167,8 @@ class Typer extends Namer
       case _ =>
     }
 
+    val vs = variances(pt)
+
     val (protoFormals, resultTpt) = decomposeProtoFunction(pt, params.length)
 
     /** The inferred parameter type for a parameter in a lambda that does
@@ -1189,6 +1191,9 @@ class Typer extends Namer
      *  If all attempts fail, issue a "missing parameter type" error.
      */
     def inferredParamType(param: untpd.ValDef, formal: Type): Type =
+      // OK to fully define var in param if that doesn't restrict result type:
+      // - bad: minimize when var appears in covariant position in result
+      // - bad: maximize when var appears in contravariant position in result
       if isFullyDefined(formal, ForceDegree.none) then return formal
       val target = calleeType.widen match
         case mtpe: MethodType =>
@@ -1202,7 +1207,10 @@ class Typer extends Namer
       if isFullyDefined(formal, ForceDegree.none) then formal
       // if isFullyDefined(formal, ForceDegree.flipBottom) then formal
       else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
-      else formal
+      else {
+        instantiateSelected(formal, vs.toList.filter(_._2 != 0).map(_._1))
+        formal
+      }
       // else {
       //   println("formal: " + formal.show)
       //   println("ctx: " + ctx.typerState.constraint.show)
