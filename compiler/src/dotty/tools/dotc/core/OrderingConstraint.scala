@@ -232,7 +232,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *  @param isUpper   If true, `bound` is an upper bound, else a lower bound.
    */
   private def stripParams(tp: Type, paramBuf: mutable.ListBuffer[TypeParamRef],
-      isUpper: Boolean)(implicit ctx: Context): Type = tp match {
+      isUpper: Boolean)(implicit ctx: Context): Type = tp.stripTypeVar match {
     case param: TypeParamRef if contains(param) =>
       if (!paramBuf.contains(param)) paramBuf += param
       NoType
@@ -285,8 +285,12 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     while (i < poly.paramNames.length) {
       val param = poly.paramRefs(i)
       val bounds = nonParamBounds(param)
+      // println("#param: " + param.show)
+      // println("#bounds: " + bounds.show)
       val lo = normalizedType(bounds.lo, loBuf, isUpper = false)
+      // println("#lo: " + lo.show)
       val hi = normalizedType(bounds.hi, hiBuf, isUpper = true)
+      // println("#hi: " + hi.show)
       current = updateEntry(current, param, bounds.derivedTypeBounds(lo, hi))
       current = loBuf.foldLeft(current)(order(_, _, param))
       current = hiBuf.foldLeft(current)(order(_, param, _))
@@ -369,7 +373,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *    Q <: tp  implies  Q <: P      and isUpper = true, or
    *    tp <: Q  implies  P <: Q      and isUpper = false
    */
-  private def dependentParams(tp: Type, isUpper: Boolean): List[TypeParamRef] = tp match
+  def dependentParams(tp: Type, isUpper: Boolean)(using Context): List[TypeParamRef] = tp.stripTypeVar match
     case param: TypeParamRef if contains(param) =>
       param :: (if (isUpper) upper(param) else lower(param))
     case tp: AndType if isUpper  =>
@@ -601,6 +605,12 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     if Config.checkConstraintsNonCyclic then domainParams.foreach(checkNonCyclic)
     this
 
+  private def fullLowerBound(param: TypeParamRef)(implicit ctx: Context): Type =
+    minLower(param).foldLeft(nonParamBounds(param).lo)(_ | _)
+
+  private def fullUpperBound(param: TypeParamRef)(implicit ctx: Context): Type =
+    minUpper(param).foldLeft(nonParamBounds(param).hi)(_ & _)
+
   /*private*/ def checkNonCyclic(param: TypeParamRef)(implicit ctx: Context): Unit =
     assert(!isLess(param, param), i"cyclic ordering involving $param in $this, upper = ${upper(param)}")
 
@@ -613,12 +623,17 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         recur(tp.tp2)
       case tp: TypeParamRef =>
         assert(tp ne param, i"cyclic bound for $param: ${entry(param)} in $this")
+        // println(s"E($tp): " + entry(tp))
         entry(tp) match
           case NoType =>
-          case TypeBounds(lo, hi) => if lo eq hi then recur(lo)
-          case inst => recur(inst)
+          case TypeBounds(lo, hi) => if lo eq hi then recur(lo) else { recur(lo); recur(hi) }
+          case inst =>
+           recur(inst)
+           recur(fullLowerBound(tp))
+           recur(fullUpperBound(tp))
       case tp: TypeVar =>
-        recur(tp.underlying)
+        // recur(tp.underlying)
+        recur(tp.origin)
       case TypeBounds(lo, hi) =>
         recur(lo)
         recur(hi)
@@ -627,7 +642,13 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         if tp1 ne tp then recur(tp1)
     }
 
+    // println("###param: " + param + " " + entry(param))
+    // println("###np: " + nonParamBounds(param))
+    // println("###flb: " + fullLowerBound(param))
     recur(entry(param))
+    // println("###param.fulb: " + ctx.typeComparer.fullLowerBound(param))
+    recur(fullLowerBound(param))
+    recur(fullUpperBound(param))
   end checkNonCyclic
 
   override def checkClosed()(using Context): Unit =

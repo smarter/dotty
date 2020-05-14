@@ -36,7 +36,10 @@ class A {
   // Seq(1, 2, 3).foldLeft(Set(0))((acc, i) => acc + i)
   // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc)
 
-  val s: Seq[Int] = Seq()
-  val s2: Set[String]= Set()
-  val z = s.foldLeft(s2) { (acc, stat) => acc ++ s2 }
+  // val s: Seq[Int] = Seq()
+  // val s2: Set[String]= Set()
+  // val z = s.foldLeft(s2) { (acc, stat) => acc ++ s2 }
+
+  def foo(xs: Seq[Option[List[Int]]]) =
+    xs.map(_.getOrElse(Nil)).reduceLeft(_ ++ _)
 }

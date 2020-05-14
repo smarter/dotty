@@ -376,8 +376,12 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
         def compareTypeParamRef =
           assumedTrue(tp1) ||
           isSubTypeWhenFrozen(bounds(tp1).hi, tp2) || {
-            if (canConstrain(tp1) && !approx.high)
+            if (canConstrain(tp1) && !approx.high) {
+              // println("tp1: " + tp1)
+              // println("tp2: " + tp2)
+              // println("ctx: " + ctx.typeComparer.constraint.show)
               addConstraint(tp1, tp2, fromBelow = false) && flagNothingBound
+            }
             else thirdTry
           }
         compareTypeParamRef

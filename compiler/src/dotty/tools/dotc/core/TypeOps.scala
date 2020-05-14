@@ -421,6 +421,26 @@ object TypeOps:
         case tp: TypeVar if mapCtx.typerState.constraint.contains(tp) =>
           val lo = mapCtx.typeComparer.instanceType(
             tp.origin, fromBelow = variance > 0 || variance == 0 && tp.hasLowerBound)
+          // lo match {
+          //   case lo: TypeVar =>
+          //     ctx.typerState.constraint.checkNonCyclic(tp.origin)
+          //     ctx.typerState.constraint.checkNonCyclic(lo.origin)
+          //     // println("tp: " + tp + " " + ctx.typerState.constraint.entry(tp.origin))
+          //     // println("lo: " + lo + " " + ctx.typerState.constraint.entry(lo.origin))
+
+          //     val lo2a = ctx.typeComparer.fullLowerBound(lo.origin)
+          //     // println("lo2a: " + lo2a)
+          //     lo2a match {
+          //       case lo2a: TypeParamRef =>
+          //         // println("lo2aO: " + ctx.typerState.constraint.entry(lo2a))
+          //       case _ =>
+          //     }
+          //     val lo2b = ctx.typeComparer.instanceType(
+          //       lo.origin, fromBelow = variance > 0 || variance == 0 && tp.hasLowerBound)
+          //     // println("lo2b: " + lo2b)
+          //     ???
+          //   case _ =>
+          // }
           val lo1 = apply(lo)
           if (lo1 ne lo) lo1 else tp
         case _ =>
