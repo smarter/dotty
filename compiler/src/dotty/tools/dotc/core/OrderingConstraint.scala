@@ -232,7 +232,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *  @param isUpper   If true, `bound` is an upper bound, else a lower bound.
    */
   private def stripParams(tp: Type, paramBuf: mutable.ListBuffer[TypeParamRef],
-      isUpper: Boolean)(implicit ctx: Context): Type = tp.stripTypeVar match {
+      isUpper: Boolean)(implicit ctx: Context): Type = tp/*.stripTypeVar*/ match {
     case param: TypeParamRef if contains(param) =>
       if (!paramBuf.contains(param)) paramBuf += param
       NoType
@@ -319,8 +319,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         // println(s"${tp.show} - $underlying1")
         if underlying1 ne tp.underlying then underlying1 else tp
       case tp: AndOrType =>
-        val r1 = recur(tp.tp1, fromBelow)
-        val r2 = recur(tp.tp2, fromBelow)
+        val r1 = recur(tp.tp1, fromBelow = !tp.isAnd)
+        val r2 = recur(tp.tp2, fromBelow = !tp.isAnd)
         if (r1 eq tp.tp1) && (r2 eq tp.tp2) then tp
         else if tp.isAnd then r1 & r2
         else r1 | r2
@@ -403,9 +403,33 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
   def addLess(param1: TypeParamRef, param2: TypeParamRef)(implicit ctx: Context): This =
     order(this, param1, param2).checkNonCyclic()
 
-  def unify(p1: TypeParamRef, p2: TypeParamRef)(implicit ctx: Context): This =
-    val p1Bounds = (nonParamBounds(p1) & nonParamBounds(p2)).substParam(p2, p1)
-    updateEntry(p1, p1Bounds).replace(p2, p1)
+  def unify(p1: TypeParamRef, p2: TypeParamRef)(implicit ctx: Context): This = {
+    // p1 >: Int <: Any
+    // p2 >: p1 <: Any
+
+    // p1Bounds: Int & p1 <: Any
+    // If we use `&`, that gets simplified to p1
+    // If we don't, that gets simplified by cycle check:
+    //           Int & Nothing <: Any
+    // ==> fix the cycle check to do Int & Any instead
+
+    // Alternative: use stripTypeVar in stripParams
+
+    // val and = (nonParamBounds(p1) & nonParamBounds(p2))
+    val and = {
+      val p1b = nonParamBounds(p1)
+      val p2b = nonParamBounds(p2)
+      TypeBounds(AndType(p1b.lo, p2b.lo), OrType(p1b.hi, p2b.hi))
+    }
+    // println("and: " + and)
+    val p1Bounds = and.substParam(p2, p1)
+    // println("p1Bounds: " + p1Bounds)
+    // println("p1Bounds.s: " + p1Bounds.show)
+    val z = updateEntry(p1, p1Bounds)
+    // println("z: " + z.show)
+    // println("z.e: " + z.entry(p1))
+    z.replace(p2, p1)
+  }
 
 // ---------- Replacements and Removals -------------------------------------
 
@@ -614,7 +638,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
   /*private*/ def checkNonCyclic(param: TypeParamRef)(implicit ctx: Context): Unit =
     assert(!isLess(param, param), i"cyclic ordering involving $param in $this, upper = ${upper(param)}")
 
-    def recur(tp: Type)(using Context): Unit = { /*println(tp);*/ tp match
+    def recur(tp: Type, isUpper: Option[Boolean] = None)(using Context): Unit = { /*println(tp);*/ tp match
       case tp: NamedType =>
         // println(s"$tp ---- ${tp.underlying}")
         recur(tp.underlying)
@@ -626,11 +650,18 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         // println(s"E($tp): " + entry(tp))
         entry(tp) match
           case NoType =>
-          case TypeBounds(lo, hi) => if lo eq hi then recur(lo) else { recur(lo); recur(hi) }
+          case TypeBounds(lo, hi) => if lo eq hi then recur(lo) else
+            isUpper match {
+              case None =>
+              case Some(false) =>
+                recur(lo)
+              case Some(true) =>
+                recur(hi)
+            }
           case inst =>
            recur(inst)
-           recur(fullLowerBound(tp))
-           recur(fullUpperBound(tp))
+           if (isUpper == Some(false)) recur(fullLowerBound(tp))
+           if (isUpper == Some(true)) recur(fullUpperBound(tp))
       case tp: TypeVar =>
         // recur(tp.underlying)
         recur(tp.origin)
@@ -647,8 +678,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     // println("###flb: " + fullLowerBound(param))
     recur(entry(param))
     // println("###param.fulb: " + ctx.typeComparer.fullLowerBound(param))
-    recur(fullLowerBound(param))
-    recur(fullUpperBound(param))
+    recur(fullLowerBound(param), isUpper = Some(false))
+    recur(fullUpperBound(param), isUpper = Some(true))
   end checkNonCyclic
 
   override def checkClosed()(using Context): Unit =
