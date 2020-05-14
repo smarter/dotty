@@ -1,7 +1,7 @@
-class Foo[A, B <: A] {
-  // def get: A = ???
-  def hi: Foo[A, B] = this
-}
+// class Foo[A, B <: A] {
+//   // def get: A = ???
+//   def hi: Foo[A, B] = this
+// }
 class A {
   // def foo[T <: Foo[_]]: T = ???
   // foo.get // OK
@@ -26,13 +26,17 @@ class A {
   //   def hi: Int = 0
   // }
 
-  def foo[B >: Foo[Int, Int]](op: B => B) = ???
-  foo(b => b.hi)
+  // def foo[B >: Foo[Int, Int]](op: B => B) = ???
+  // foo(b => b.hi)
 
   // def foo[B >: List[Int]](op: B => Int) = ???
   // foo(b => b.hi)
 
   // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc.::(i))
-  Seq(1, 2, 3).foldLeft(Set(0))((acc, i) => acc + i)
+  // Seq(1, 2, 3).foldLeft(Set(0))((acc, i) => acc + i)
   // List(1, 2, 3).foldLeft(Nil)((acc, i) => acc)
+
+  val s: Seq[Int] = Seq()
+  val s2: Set[String]= Set()
+  val z = s.foldLeft(s2) { (acc, stat) => acc ++ s2 }
 }

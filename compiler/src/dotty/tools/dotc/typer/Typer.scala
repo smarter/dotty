@@ -525,19 +525,24 @@ class Typer extends Namer
     case qual =>
       qual.tpe.widenDealias.stripTypeVar match {
         case tp: TypeParamRef =>
+          def appliedWithVars(tycon: Type, tparams: List[ParamInfo]) = {
+            // FIXME: Do we need to care about kinds and F-bounds here? See also
+            // `typedAppliedTypeTree#typedArg#tparamBounds` which uses
+            // `TypeBounds.empty` which seems dodgy.
+            val wildApplied = tycon.appliedTo(tparams.map(_ => WildcardType(TypeBounds(defn.NothingType, defn.AnyKindType))))
+            tycon.appliedTo(tparams.map { tparam =>
+              val bounds = tparam.paramInfoAsSeenFrom(wildApplied).bounds
+              newTypeVar(TypeBounds(bounds.lo, bounds.hi))
+            })
+          }
+
           def addVariables = new TypeMap {
             def apply(t: Type): Type = t match {
               case tp: TypeLambda =>
                 tp
               case tp @ AppliedType(tycon, args) =>
                 // println("tp: " + tp)
-                val tp2 = tp.derivedAppliedType(tycon,
-                  args.zipWithConserve(tp.tyconTypeParams) { (arg, tparam) =>
-                    val arg2 = this(arg)
-                    if arg2.isInstanceOf[TypeBounds] || tparam.paramVarianceSign != 0
-                    then newTypeVar(TypeBounds(defn.NothingType, defn.AnyKindType))
-                    else arg2
-                  })
+                val tp2 = appliedWithVars(tycon, tp.tyconTypeParams)
                 if tp2 ne tp then tp2 <:< tp
                 tp2
               case _ =>
@@ -550,25 +555,27 @@ class Typer extends Namer
           if (hiMember.exists) {
             val owner = hiMember.alternatives.head.symbol.owner
             val base = tp.baseType(owner)
-            // println("base: " + base.show)
+            // println("Hbase: " + base.show)
 
             val ibase = addVariables(base)
-            // println("ibase: " + ibase.show)
+            // println("Hibase: " + ibase.show)
             if (ibase ne base) {
               tp <:< ibase
               val base2 = tp.baseType(owner)
-              // println("base2: " + base2.show)
+              // println("Hbase2: " + base2.show)
             }
           } else {
             val loMember = bounds.lo.member(tree.name)
             if (loMember.exists) {
               val owner = loMember.alternatives.head.symbol.owner.asClass
-              val base = owner.typeRef.appliedTo(owner.typeParams.map(tparam =>
-                newTypeVar(TypeBounds(defn.NothingType, defn.AnyKindType))))
+              val ref = owner.typeRef
+              val tparams = owner.typeParams
+              val base = appliedWithVars(owner.typeRef, owner.typeParams)
               // println("base: " + base.show)
               tp <:< base
               val base2 = tp.baseType(owner)
               // println("base2: " + base2.show)
+              // println("ctx: " + ctx.typerState.constraint.show)
             }
           }
 
