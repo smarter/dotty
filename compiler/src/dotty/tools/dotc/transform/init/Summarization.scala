@@ -128,7 +128,7 @@ object Summarization {
         Summary.empty + Fun(pots, effs)(expr)
 
       case Block(stats, expr) =>
-        val effs = stats.foldLeft(Effects.empty) { (acc, stat) => acc ++ analyze(stat)._2 }
+        val effs: Set[Effects.Effect] = stats.foldLeft(Effects.empty) { (acc, stat) => acc ++ analyze(stat)._2 }
         val (pots2, effs2) = analyze(expr)
         (pots2, effs ++ effs2)
 
@@ -181,7 +181,7 @@ object Summarization {
         (Potentials.empty, effsAll)
 
       case Inlined(call, bindings, expansion) =>
-        val effs = bindings.foldLeft(Effects.empty) { (acc, mdef) => acc ++ analyze(mdef)._2 }
+        val effs: Set[Effects.Effect] = bindings.foldLeft(Effects.empty) { (acc, mdef) => acc ++ analyze(mdef)._2 }
         analyze(expansion).withEffs(effs)
 
       case vdef : ValDef =>
@@ -279,7 +279,7 @@ object Summarization {
           acc ++ effs
         }
 
-      val effsAll = tpl.parents.foldLeft(effs) { (effs, parent) =>
+      val effsAll: Set[Effects.Effect] = tpl.parents.foldLeft(effs) { (effs, parent) =>
         effs ++ (parent match {
           case tree @ Block(stats, parent) =>
             val (ctor @ Select(qual, _), _, argss) = decomposeCall(parent)
