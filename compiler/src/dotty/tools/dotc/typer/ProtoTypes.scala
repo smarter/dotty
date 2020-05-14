@@ -314,7 +314,7 @@ object ProtoTypes {
 
         try
           inContext(protoCtx) {
-            val args1 = args.mapWithIndexConserve((arg, idx) =>
+            val args1 = args.mapWithIndexConserve[tpd.Tree]((arg, idx) =>
               cacheTypedArg(arg, arg => typer.typed(norm(arg, idx)), force = false))
             if !args1.exists(arg => isUndefined(arg.tpe)) then state.typedArgs = args1
             args1
