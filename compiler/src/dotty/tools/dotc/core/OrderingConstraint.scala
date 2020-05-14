@@ -310,6 +310,10 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
   private def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
 
     def recur(tp: Type, fromBelow: Boolean): Type = tp match
+      case tp: NamedType =>
+        val underlying1 = recur(tp.underlying, fromBelow)
+        // println(s"${tp.show} - $underlying1")
+        if underlying1 ne tp.underlying then underlying1 else tp
       case tp: AndOrType =>
         val r1 = recur(tp.tp1, fromBelow)
         val r2 = recur(tp.tp2, fromBelow)
@@ -597,10 +601,13 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     if Config.checkConstraintsNonCyclic then domainParams.foreach(checkNonCyclic)
     this
 
-  private def checkNonCyclic(param: TypeParamRef)(implicit ctx: Context): Unit =
+  /*private*/ def checkNonCyclic(param: TypeParamRef)(implicit ctx: Context): Unit =
     assert(!isLess(param, param), i"cyclic ordering involving $param in $this, upper = ${upper(param)}")
 
-    def recur(tp: Type)(using Context): Unit = tp match
+    def recur(tp: Type)(using Context): Unit = { /*println(tp);*/ tp match
+      case tp: NamedType =>
+        // println(s"$tp ---- ${tp.underlying}")
+        recur(tp.underlying)
       case tp: AndOrType =>
         recur(tp.tp1)
         recur(tp.tp2)
@@ -618,6 +625,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       case _ =>
         val tp1 = tp.dealias
         if tp1 ne tp then recur(tp1)
+    }
 
     recur(entry(param))
   end checkNonCyclic
