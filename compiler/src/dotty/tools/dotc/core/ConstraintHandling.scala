@@ -330,29 +330,6 @@ trait ConstraintHandling[AbstractContext] {
         wideInst.dropRepeatedAnnot
   }
 
-  def widenInferredX(inst: Type, bound: TypeParamRef)(implicit actx: AbstractContext): Type = {
-    val bb = constraint.entry(bound).bounds
-    def widenOr(tp: Type) = {
-      val tpw = tp.widenUnion
-      // No need to check the lower bound, we assume bb.lo <:< inst, and inst <:< inst.widenUnion
-      if (tpw ne tp) && (tpw frozen_<:< bb.hi) then tpw else tp
-    }
-    def widenSingle(tp: Type) = {
-      val tpw = tp.widenSingletons
-      if (tpw ne tp) && (tpw frozen_<:< bb.hi) then tpw else tp
-    }
-    def isSingleton(tp: Type): Boolean = tp match
-      case WildcardType(optBounds) => optBounds.exists && isSingleton(optBounds.bounds.hi)
-      case _ => isSubTypeWhenFrozen(tp, defn.SingletonType)
-    val wideInst =
-      if isSingleton(bound) then inst else widenOr(widenSingle(inst))
-    wideInst match
-      case wideInst: TypeRef if wideInst.symbol.is(Module) =>
-        TermRef(wideInst.prefix, wideInst.symbol.sourceModule)
-      case _ =>
-        wideInst.dropRepeatedAnnot
-  }
-
   /** The instance type of `param` in the current constraint (which contains `param`).
    *  If `fromBelow` is true, the instance type is the lub of the parameter's
    *  lower bounds; otherwise it is the glb of its upper bounds. However,
@@ -361,7 +338,10 @@ trait ConstraintHandling[AbstractContext] {
    */
   def instanceType(param: TypeParamRef, fromBelow: Boolean)(implicit actx: AbstractContext): Type = {
     val inst = approximation(param, fromBelow).simplified
-    if (fromBelow) widenInferredX(inst, param) else inst
+    if (fromBelow)
+      widenInferred(inst, constraint.entry(param).bounds.hi)
+    else
+      inst
   }
 
   /** Constraint `c1` subsumes constraint `c2`, if under `c2` as constraint we have
