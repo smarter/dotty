@@ -393,13 +393,24 @@ trait ConstraintHandling[AbstractContext] {
       tl.paramRefs.forall { param =>
         constraint.entry(param) match {
           case bounds: TypeBounds =>
+            // println("param: " + param)
             val lower = constraint.lower(param)
+            // println("lower: " + lower)
             val upper = constraint.upper(param)
+            // println("upper: " + upper)
             if lower.nonEmpty && !bounds.lo.isRef(defn.NothingClass)
                || upper.nonEmpty && !bounds.hi.isAny
             then constr.println(i"INIT*** $tl")
-            lower.forall(addOneBound(_, bounds.hi, isUpper = true)) &&
-              upper.forall(addOneBound(_, bounds.lo, isUpper = false))
+            // println("#BEF: " + constraint.show)
+
+            val z = lower.forall(addOneBound(_, bounds.hi, isUpper = true)) &&
+            upper.forall(addOneBound(_, bounds.lo, isUpper = false))
+
+            val z2 = z && constraint.lower(param).forall(lp => addOneBound(param, constraint.nonParamBounds(lp).lo, isUpper = false)) &&
+              constraint.upper(param).forall(up => addOneBound(param, constraint.nonParamBounds(up).hi, isUpper = true))
+
+            // println(s"#AFT($z2): " + constraint.show)
+            z2
           case _ =>
             // Happens if param was already solved while processing earlier params of the same TypeLambda.
             // See #4720.
