@@ -104,6 +104,8 @@ object TypeOps:
             toPrefix(pre, cls, tp.cls)
           case _: BoundType =>
             tp
+          case AnnotatedType(tp, annot) if annot.symbol eq defn.UncheckedVarianceAnnot =>
+            mapOver(tp)
           case _ =>
             mapOver(tp)
         }
