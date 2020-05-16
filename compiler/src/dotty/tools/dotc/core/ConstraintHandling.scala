@@ -425,33 +425,6 @@ trait ConstraintHandling[AbstractContext] {
    */
   protected def addConstraint(param: TypeParamRef, bound: Type, fromBelow: Boolean)(implicit actx: AbstractContext): Boolean =
 
-    /** When comparing lambdas we might get constraints such as
-     *  `A <: X0` or `A = List[X0]` where `A` is a constrained parameter
-     *  and `X0` is a lambda parameter. The constraint for `A` is not allowed
-     *  to refer to such a lambda parameter because the lambda parameter is
-     *  not visible where `A` is defined. Consequently, we need to
-     *  approximate the bound so that the lambda parameter does not appear in it.
-     *  If `tp` is an upper bound, we need to approximate with something smaller,
-     *  otherwise something larger.
-     *  Test case in pos/i94-nada.scala. This test crashes with an illegal instance
-     *  error in Test2 when the rest of the SI-2712 fix is applied but `pruneLambdaParams` is
-     *  missing.
-     */
-    def avoidLambdaParams(tp: Type) =
-      if comparedTypeLambdas.nonEmpty then
-        val approx = new ApproximatingTypeMap {
-          if (!fromBelow) variance = -1
-          def apply(t: Type): Type = t match {
-            case t @ TypeParamRef(tl: TypeLambda, n) if comparedTypeLambdas contains tl =>
-              val bounds = tl.paramInfos(n)
-              range(bounds.lo, bounds.hi)
-            case _ =>
-              mapOver(t)
-          }
-        }
-        approx(tp)
-      else tp
-
     def addParamBound(bound: TypeParamRef) =
       constraint.entry(param) match {
         case _: TypeBounds =>
@@ -477,7 +450,7 @@ trait ConstraintHandling[AbstractContext] {
         case bound: TypeParamRef if constraint contains bound =>
           addParamBound(bound)
         case _ =>
-          val pbound = avoidLambdaParams(bound)
+          val pbound = bound
           kindCompatible(param, pbound) && addBoundTransitively(param, pbound, !fromBelow)
       finally addConstraintInvocations -= 1
     }
