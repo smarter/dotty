@@ -550,9 +550,21 @@ class Typer extends Namer
             }
           }
 
+          // Needed for tests/pos/fold-infer-uncheckedVariance.scala to pass -Ytest-pickler
+          def hasUncheckedVariance(d: Denotation) = d.hasAltWith(_.info.widen.existsPart {
+            case tp @ AnnotatedType(_, annot) =>
+              annot.symbol eq defn.UncheckedVarianceAnnot
+            case tp =>
+              false
+          })
+
           val bounds = ctx.typeComparer.bounds(tp)
           val hiMember = bounds.hi.member(tree.name)
-          if (hiMember.exists) {
+          if (hasUncheckedVariance(hiMember)) {
+            val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
+            tvar.instantiate(fromBelow = false)
+          }
+          else if (hiMember.exists) {
             val owner = hiMember.alternatives.head.symbol.owner
             val base = tp.baseType(owner)
             // println("Hbase: " + base.show)
@@ -566,7 +578,12 @@ class Typer extends Namer
             }
           } else {
             val loMember = bounds.lo.member(tree.name)
-            if (loMember.exists) {
+
+            if (hasUncheckedVariance(loMember)) {
+              val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
+              tvar.instantiate(fromBelow = true)
+            }
+            else if (loMember.exists) {
               val owner = loMember.alternatives.head.symbol.owner.asClass
               val ref = owner.typeRef
               val tparams = owner.typeParams
