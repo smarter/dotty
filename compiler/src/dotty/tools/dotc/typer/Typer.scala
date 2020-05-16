@@ -1173,7 +1173,7 @@ class Typer extends Namer
       case _ =>
     }
 
-    val vs = variances(pt)
+    lazy val vs = variances(pt)
 
     val (protoFormals, resultTpt) = decomposeProtoFunction(pt, params.length)
 
