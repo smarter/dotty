@@ -351,7 +351,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           } else {
             val above = recur(arg, fromBelow = false)
             val below = recur(arg, fromBelow = true)
-            if (above eq below) above
+            if (above eq below) arg
             else TypeBounds(defn.NothingType, defn.AnyKindType)
           }
         })
