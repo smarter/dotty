@@ -206,65 +206,6 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 
 // ---------- Adding TypeLambdas --------------------------------------------------
 
-  /** The bound type `tp` without constrained parameters which are clearly
-   *  dependent. A parameter in an upper bound is clearly dependent if it appears
-   *  in a hole of a context H given by:
-   *
-   *      H = []
-   *          H & T
-   *          T & H
-   *
-   *  (the idea is that a parameter P in a H context is guaranteed to be a supertype of the
-   *   bounded parameter.)
-   *  Analogously, a parameter in a lower bound is clearly dependent if it appears
-   *  in a hole of a context H given by:
-   *
-   *      L = []
-   *          L | T
-   *          T | L
-   *
-   *  "Clearly dependent" is not synonymous with "dependent" in the sense
-   *  it is defined in `dependentParams`. Dependent parameters are handled
-   *  in `updateEntry`. The idea of stripping off clearly dependent parameters
-   *  and to handle them separately is for efficiency, so that type expressions
-   *  used as bounds become smaller.
-   *
-   *  @param isUpper   If true, `bound` is an upper bound, else a lower bound.
-   */
-  private def stripParams(tp: Type, paramBuf: mutable.ListBuffer[TypeParamRef],
-      isUpper: Boolean)(implicit ctx: Context): Type = tp match {
-    case param: TypeParamRef if contains(param) =>
-      if (!paramBuf.contains(param)) paramBuf += param
-      NoType
-    case tp: AndType if isUpper =>
-      val tp1 = stripParams(tp.tp1, paramBuf, isUpper)
-      val tp2 = stripParams(tp.tp2, paramBuf, isUpper)
-      if (tp1.exists)
-        if (tp2.exists) tp.derivedAndType(tp1, tp2)
-        else tp1
-      else tp2
-    case tp: OrType if !isUpper =>
-      val tp1 = stripParams(tp.tp1, paramBuf, isUpper)
-      val tp2 = stripParams(tp.tp2, paramBuf, isUpper)
-      if (tp1.exists)
-        if (tp2.exists) tp.derivedOrType(tp1, tp2)
-        else tp1
-      else tp2
-    case _ =>
-      tp
-  }
-
-  /** The bound type `tp` without clearly dependent parameters.
-   *  A top or bottom type if type consists only of dependent parameters.
-   *  TODO: try to do without normalization? It would mean it is more efficient
-   *  to pull out full bounds from a constraint.
-   *  @param isUpper   If true, `bound` is an upper bound, else a lower bound.
-   */
-  private def normalizedType(tp: Type, paramBuf: mutable.ListBuffer[TypeParamRef],
-      isUpper: Boolean)(implicit ctx: Context): Type =
-    stripParams(tp, paramBuf, isUpper)
-      .orElse(if (isUpper) defn.AnyKindType else defn.NothingType)
-
   def add(poly: TypeLambda, tvars: List[TypeVar])(implicit ctx: Context): This = {
     assert(!contains(poly))
     val nparams = poly.paramNames.length
@@ -285,8 +226,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     while (i < poly.paramNames.length) {
       val param = poly.paramRefs(i)
       val bounds = nonParamBounds(param)
-      val lo = normalizedType(bounds.lo, loBuf, isUpper = false)
-      val hi = normalizedType(bounds.hi, hiBuf, isUpper = true)
+      val lo = bounds.lo
+      val hi = bounds.hi
       current = updateEntry(current, param, bounds.derivedTypeBounds(lo, hi))
       current = loBuf.foldLeft(current)(order(_, _, param))
       current = hiBuf.foldLeft(current)(order(_, param, _))
