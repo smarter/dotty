@@ -337,11 +337,19 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       case tp: AnnotatedType =>
         val parent1 = recur(tp.parent, fromBelow)
         if parent1 ne tp.parent then tp.derivedAnnotatedType(parent1, tp.annot) else tp
-      case AppliedType(tycon: TypeRef, args) if tycon.info.isInstanceOf[MatchAlias] || fromBelow =>
+      case AppliedType(tycon: TypeRef, args) if tycon.info.isInstanceOf[MatchAlias] =>
         if args.exists(arg => recur(arg, fromBelow) ne arg) then
           if fromBelow then defn.NothingType else defn.AnyType
         else
           tp
+      case tp @ AppliedType(tycon: TypeRef, args) if fromBelow =>
+        // FIXME: This is probably incomplete and makes me thing we really
+        // should reimplement ensureNonCyclic using an ApproximatingTypeMap.
+        tp.derivedAppliedType(tycon, args.zipWithConserve(tp.tyconTypeParams) { (arg, tparam) =>
+          val arg1 = recur(arg, fromBelow = tparam.paramVarianceSign >= 0) // keep fromBelow as above unless we're in contravariant position
+          if ((arg1 ne arg) && tparam.paramVarianceSign == 0) TypeBounds(defn.NothingType, defn.AnyKindType)
+          else arg1
+        })
       case _ =>
         val tp1 = tp.dealiasKeepAnnots
         if tp1 ne tp then
