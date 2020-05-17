@@ -346,10 +346,16 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         // FIXME: This is probably incomplete and makes me thing we really
         // should reimplement ensureNonCyclic using an ApproximatingTypeMap.
         tp.derivedAppliedType(tycon, args.zipWithConserve(tp.tyconTypeParams) { (arg, tparam) =>
-          val arg1 = recur(arg, fromBelow = tparam.paramVarianceSign >= 0) // keep fromBelow as above unless we're in contravariant position
-          if ((arg1 ne arg) && tparam.paramVarianceSign == 0) TypeBounds(defn.NothingType, defn.AnyKindType)
-          else arg1
+          if (tparam.paramVarianceSign != 0) {
+            recur(arg, fromBelow = tparam.paramVarianceSign > 0) // Flip fromBelow if we're in contravariant position
+          } else {
+            val above = recur(arg, fromBelow = false)
+            val below = recur(arg, fromBelow = true)
+            if (above eq below) above
+            else TypeBounds(defn.NothingType, defn.AnyKindType)
+          }
         })
+
       case _ =>
         val tp1 = tp.dealiasKeepAnnots
         if tp1 ne tp then
