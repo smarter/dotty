@@ -99,7 +99,9 @@ trait ConstraintHandling[AbstractContext] {
         // bound to choose here, this is handled in `ConstraintHandling#approximation`)
         constraint = constraint.replace(param, bound)
         true
-      else
+      else {
+        if (!isUpper && bound.existsPart(_ eq param))
+          return false
         // Narrow one of the bounds of type parameter `param`
         // If `isUpper` is true, ensure that `param <: `bound`, otherwise ensure
         // that `param >: bound`.
@@ -117,6 +119,7 @@ trait ConstraintHandling[AbstractContext] {
           val TypeBounds(lo, hi) = constraint.entry(param)
           isSubType(lo, hi)
         }
+      }
   end addOneBound
 
   protected def addBoundTransitively(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(implicit actx: AbstractContext): Boolean =
