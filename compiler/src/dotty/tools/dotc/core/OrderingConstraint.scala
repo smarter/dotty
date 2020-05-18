@@ -337,11 +337,6 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       case tp: AnnotatedType =>
         val parent1 = recur(tp.parent, fromBelow)
         if parent1 ne tp.parent then tp.derivedAnnotatedType(parent1, tp.annot) else tp
-      case AppliedType(tycon: TypeRef, args) if tycon.info.isInstanceOf[MatchAlias] =>
-        if args.exists(arg => recur(arg, fromBelow) ne arg) then
-          if fromBelow then defn.NothingType else defn.AnyType
-        else
-          tp
       case _ =>
         val tp1 = tp.dealiasKeepAnnots
         if tp1 ne tp then
