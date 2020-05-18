@@ -100,7 +100,16 @@ trait ConstraintHandling[AbstractContext] {
         constraint = constraint.replace(param, bound)
         true
       else {
-        if (!isUpper && bound.existsPart(_ eq param))
+        if (bound.existsPart {
+          case `param` => !isUpper
+          case AppliedType(tycon: TypeRef, args) if tycon.info.isInstanceOf[MatchAlias] =>
+            args.exists {
+              case `param` => true
+              case tp: TypeVar => tp.origin eq param
+              case _ => false
+            }
+          case _ => false
+        })
           return false
         // Narrow one of the bounds of type parameter `param`
         // If `isUpper` is true, ensure that `param <: `bound`, otherwise ensure
