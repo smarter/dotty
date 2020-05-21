@@ -681,7 +681,7 @@ object desugar {
               if (restrictedAccess) mods.withPrivateWithin(constr1.mods.privateWithin)
               else mods
             }
-            val appParamss =
+            val appParamss: List[List[ValDef]] =
               derivedVparamss.nestedZipWithConserve(constrVparamss)((ap, cp) =>
                 ap.withMods(ap.mods | (cp.mods.flags & HasDefault)))
             val app = DefDef(nme.apply, derivedTparams, appParamss, applyResultTpt, widenedCreatorExpr)
