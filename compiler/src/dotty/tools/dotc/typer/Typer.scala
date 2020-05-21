@@ -523,6 +523,85 @@ class Typer extends Namer
         case _ => app
       }
     case qual =>
+      qual.tpe.widenDealias.stripTypeVar match {
+        case tp: TypeParamRef =>
+          def appliedWithVars(tycon: Type, tparams: List[TypeApplications.TypeParamInfo]): Type = {
+            if (tparams.isEmpty)
+              return tycon
+
+            val tl = tycon.EtaExpand(tparams).asInstanceOf[HKTypeLambda]
+            val tvars = constrained(tl, untpd.EmptyTree, alwaysAddTypeVars = true)._2.map(_.tpe)
+            tycon.appliedTo(tvars)
+          }
+
+          def addVariables = new TypeMap {
+            def apply(t: Type): Type = t match {
+              case tp: TypeLambda =>
+                tp
+              case tp @ AppliedType(tycon, args) =>
+                // println("tp: " + tp)
+                val tp2 = appliedWithVars(tycon, tp.tyconTypeParams)
+                if tp2 ne tp then tp2 <:< tp
+                tp2
+              case _ =>
+                mapOver(t)
+            }
+          }
+
+          // Needed for tests/pos/fold-infer-uncheckedVariance.scala to pass -Ytest-pickler
+          def hasUncheckedVariance(d: Denotation) = d.hasAltWith(_.info.widen.existsPart {
+            case tp @ AnnotatedType(_, annot) =>
+              annot.symbol eq defn.UncheckedVarianceAnnot
+            case tp =>
+              false
+          })
+
+          val bounds = ctx.typeComparer.bounds(tp)
+          val hiMember = bounds.hi.member(tree.name)
+          if (hasUncheckedVariance(hiMember)) {
+            val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
+            tvar.instantiate(fromBelow = false)
+          }
+          else if (hiMember.exists) {
+            val owner = hiMember.alternatives.head.symbol.owner
+            val base = tp.baseType(owner)
+            // println("Hbase: " + base.show)
+
+            val ibase = addVariables(base)
+            // println("Hibase: " + ibase.show)
+            if (ibase ne base) {
+              tp <:< ibase
+              val base2 = tp.baseType(owner)
+              // println("Hbase2: " + base2.show)
+            }
+          } else {
+            val loMember = bounds.lo.member(tree.name)
+
+            if (hasUncheckedVariance(loMember)) {
+              val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
+              tvar.instantiate(fromBelow = true)
+            }
+            else if (loMember.exists) {
+              val owner = loMember.alternatives.head.symbol.owner.asClass
+              val ref = owner.typeRef
+              val tparams = owner.typeParams
+              val base = appliedWithVars(owner.typeRef, owner.typeParams)
+              // println("base: " + base.show)
+              tp <:< base
+              val base2 = tp.baseType(owner)
+              // println("base2: " + base2.show)
+              // println("ctx: " + ctx.typerState.constraint.show)
+            }
+          }
+
+          // println(s"tp.${tree.name}: " + tp.member(tree.name))
+        // val hi = ctx.typeComparer.bounds(tp).hi
+          // println("hi: " + hi.show)
+          // println(s"hi.${tree.name}: " + hi.findMember(tree.name, hi))
+          // println(s"hi.${tree.name}: " + hi.findMember(tree.name, hi))
+        case _ =>
+      }
+
       val select = assignType(cpy.Select(tree)(qual, tree.name), qual)
       val select1 = toNotNullTermRef(select, pt)
 
@@ -1096,6 +1175,21 @@ class Typer extends Namer
       case _ =>
     }
 
+    // type variables in the prototype which appear only in covariant or
+    // contravariant positions. These should be instantiatable without
+    // preventing the body of the lambda from typechecking (...except in situations
+    // like `def foo[T, U <: T](x: T => U)`, where instantiating `T` to a specific
+    // type might overconstrain `U`).
+    //
+    // This doesn't exclude type variables which appear with a different
+    // variance at a later point in the same method call, or a subsequent chained
+    // call.
+    //
+    // TODO: try to replace this by an empty list and see how that affects
+    // inference and performance (we would end up creating a lot more type
+    // variables in `typedSelect`).
+    lazy val protoVariantVars = variances(pt).toList.filter(_._2 != 0).map(_._1)
+
     val (protoFormals, resultTpt) = decomposeProtoFunction(pt, params.length)
 
     /** The inferred parameter type for a parameter in a lambda that does
@@ -1118,7 +1212,7 @@ class Typer extends Namer
      *  If all attempts fail, issue a "missing parameter type" error.
      */
     def inferredParamType(param: untpd.ValDef, formal: Type): Type =
-      if isFullyDefined(formal, ForceDegree.failBottom) then return formal
+      if isFullyDefined(formal, ForceDegree.none) then return formal
       val target = calleeType.widen match
         case mtpe: MethodType =>
           val pos = paramIndex(param.name)
@@ -1128,9 +1222,14 @@ class Typer extends Namer
           else NoType
         case _ => NoType
       if target.exists then formal <:< target
-      if isFullyDefined(formal, ForceDegree.flipBottom) then formal
+      // if isFullyDefined(formal, ForceDegree.flipBottom) then formal
+      if isFullyDefined(formal, ForceDegree.none) then formal
       else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
-      else errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
+      else if !formal.isInstanceOf[WildcardType] then
+        instantiateSelected(formal, protoVariantVars)
+        formal
+      else
+        errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
 
     def protoFormal(i: Int): Type =
       if (protoFormals.length == params.length) protoFormals(i)
