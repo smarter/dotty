@@ -273,10 +273,10 @@ trait ConstraintHandling[AbstractContext] {
             //
             //  variance    | -1  0   1
             //  ------------------------
-            //  from below  | lo  lo  hi
-            //  from above  | hi  lo  lo
+            //  from below  | hi  lo lo
+            //  from above  | lo  lo hi
             //
-            if (variance == 0 || fromBelow == (variance < 0)) bounds.hi else bounds.lo
+            if (variance == 0 || fromBelow == (variance > 0)) bounds.lo else bounds.hi
           case _ => tp
         }
       }
