@@ -445,8 +445,11 @@ trait ConstraintHandling[AbstractContext] {
             if lower.nonEmpty && !bounds.lo.isRef(defn.NothingClass)
                || upper.nonEmpty && !bounds.hi.isAny
             then constr.println(i"INIT*** $tl")
-            lower.forall(addOneBound(_, bounds.hi, isUpper = true)) &&
-              upper.forall(addOneBound(_, bounds.lo, isUpper = false))
+
+            lower.forall(addOneBound(_, bounds.hi, isUpper = true))
+            && upper.forall(addOneBound(_, bounds.lo, isUpper = false))
+            && constraint.lower(param).forall(lp => addOneBound(param, constraint.nonParamBounds(lp).lo, isUpper = false))
+            && constraint.upper(param).forall(up => addOneBound(param, constraint.nonParamBounds(up).hi, isUpper = true))
           case _ =>
             // Happens if param was already solved while processing earlier params of the same TypeLambda.
             // See #4720.
