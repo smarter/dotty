@@ -276,6 +276,7 @@ trait ConstraintHandling[AbstractContext] {
             //  from below  | lo  lo  hi
             //  from above  | hi  lo  lo
             //
+            assert(false, s"param: $param\ne: ${constraint.entry(param).show}\ntp: ${tp.show}\nvariance: $variance\nfromBelow: $fromBelow\nconstraint: ${constraint.show}")
             if (variance == 0 || fromBelow == (variance < 0)) bounds.lo else bounds.hi
           case _ => tp
         }
