@@ -594,14 +594,14 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 // ---------- Checking -----------------------------------------------
 
   def checkNonCyclic()(implicit ctx: Context): this.type =
-    if Config.checkConstraintsNonCyclic then
-      domainParams.foreach { param =>
-        val inst = entry(param)
-        assert(!isLess(param, param),
-          s"cyclic ordering involving $param in ${this.show}, upper = $inst")
-        assert(!occursAtToplevel(param, inst),
-          s"cyclic bound for $param: ${inst.show} in ${this.show}")
-      }
+    // if Config.checkConstraintsNonCyclic then
+    domainParams.foreach { param =>
+      val inst = entry(param)
+      assert(!isLess(param, param),
+        s"cyclic ordering involving $param in ${this.show}, upper = $inst")
+      assert(!occursAtToplevel(param, inst),
+        s"cyclic bound for $param: ${inst.show} in ${this.show}")
+    }
     this
 
   def occursAtToplevel(param: TypeParamRef, inst: Type)(implicit ctx: Context): Boolean =
