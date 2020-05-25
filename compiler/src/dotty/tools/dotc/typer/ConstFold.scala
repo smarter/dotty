@@ -12,6 +12,7 @@ import Constants._
 import Names._
 import StdNames._
 import Contexts._
+import transform.TypeUtils._
 
 object ConstFold {
 
@@ -20,6 +21,8 @@ object ConstFold {
   /** If tree is a constant operation, replace with result. */
   def apply[T <: Tree](tree: T)(implicit ctx: Context): T = finish(tree) {
     tree match {
+      case Apply(Select(qual, nme.getClass_), Nil) if qual.tpe.widen.isPrimitiveValueType =>
+        Constant(qual.tpe.widen)
       case Apply(Select(xt, op), yt :: Nil) =>
         xt.tpe.widenTermRefExpr.normalized match
           case ConstantType(x) =>
