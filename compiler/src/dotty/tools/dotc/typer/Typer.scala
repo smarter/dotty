@@ -573,79 +573,66 @@ class Typer extends Namer
            *  which matches ...
            *  If `fromBelow` is true, do the same but look in the lower bound of `tp`.
            */
-          def matchingMember(fromBelow: Boolean): SingleDenotation =
+          def candidates(fromBelow: Boolean): List[SingleDenotation] =
             // TODO: Should we use `fullBounds` instead ?
             val bounds = ctx.typeComparer.bounds(tp).bounds
             val bound = if (fromBelow) bounds.lo else bounds.hi
             val d = bound.member(tree.name)
-            d.alternatives match {
-              case Nil =>
-                NoDenotation
-              case alts =>
-                // TODO: figure out how to deal with overloads.
-                // Maybe we have no choice but to  try every alternative to see
-                // which constraint method bla they impose on `tp` and filter out
-                // those that prevent the resulting selection from matching
-                // the expected type.
-                // We also need to figure out what to do if we still have
-                // multiple possible alternatives after the filtering:
-                // can we take the intersection of the constraints they
-                // impose on `tp`?
-                alts.head
-            }
+            d.alternatives
 
-          // XX: move this stuff that adds constraint into a method bla
-          val hiMember = matchingMember(fromBelow = false)
-          if (hasUncheckedVariance(hiMember)) {
-            val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
-            tvar.instantiate(fromBelow = false)
-          }
-          else if (hiMember.exists) {
-            val owner = hiMember.symbol.owner
-            val base = tp.baseType(owner)
-
-            // If we have `qual: ?T` where `?T <: List[AnyVal]`,
-            // then `qual.head` will have type `qual.A` where `A`
-            // is an abstract type >: Nothing <: AnyVal.
-            // Therefore, when typechecking `qual.head: Int`, we get:
-            //
-            //   qual.A <:< Int
-            //   AnyVal <:< Int
-            //         false
-            //
-            // The problem is that subtype checks on `qual.A` do
-            // not allow us to constraint `?T` further.
-            // 
-            // To fix this, we need a more precise upper-bound for `?T`:
-            // we can safely rewrite the constraint:
-            //
-            //   ?T <: List[AnyVal]
-            //
-            // as:
-            //
-            //   ?T <: List[?X]
-            //   ?X <: AnyVal
-            //
-            // Now, if we try to typecheck `qual.head: Int`, we get:
-            //
-            //   qual.A <:< Int
-            //       ?X <:< Int
-            //         true, with extra constraint `?X <: Int`
-
-            // FIXME: this is wasteful: if we have multiple selections with the
-            // same qualifier, we'll create fresh type variables every time.
-            val newUpperBound = replaceArgsByVariables(base)
-            // println("Hibase: " + ibase.show)
-            if newUpperBound ne base then
-              tp <:< newUpperBound
-          } else {
-            val loMember = matchingMember(fromBelow = true)
-
-            if (hasUncheckedVariance(loMember)) {
+          /** Try `candidate` which comes either from the upper bound or lower bound.
+           *  If true, adds additional constraints on `tp`.
+           */
+          def constr(candidate: SingleDenotation, fromBelow: Boolean): Boolean = {
+            if (hasUncheckedVariance(candidate)) {
               val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
-              tvar.instantiate(fromBelow = true)
+              tvar.instantiate(fromBelow)
+              return true
             }
-            else if (loMember.exists) {
+            val owner = candidate.symbol.maybeOwner
+            if (!owner.exists || !owner.isClass)
+              return false
+
+            if (!fromBelow) {
+              // XX: The candidate ...
+              // If we have `qual: ?T` where `?T <: List[AnyVal]`,
+              // then `qual.head` will have type `qual.A` where `A`
+              // is an abstract type >: Nothing <: AnyVal.
+              // Therefore, when typechecking `qual.head: Int`, we get:
+              //
+              //   qual.A <:< Int
+              //   AnyVal <:< Int
+              //         false
+              //
+              // The problem is that subtype checks on `qual.A` do
+              // not allow us to constraint `?T` further.
+              //
+              // To fix this, we need a more precise upper-bound for `?T`:
+              // we can safely rewrite the constraint:
+              //
+              //   ?T <: List[AnyVal]
+              //
+              // as:
+              //
+              //   ?T <: List[?X]
+              //   ?X <: AnyVal
+              //
+              // Now, if we try to typecheck `qual.head: Int`, we get:
+              //
+              //   qual.A <:< Int
+              //       ?X <:< Int
+              //         true, with extra constraint `?X <: Int`
+
+              val base = tp.baseType(owner)
+              // FIXME: this is wasteful: if we have multiple selections with the
+              // same qualifier, we'll create fresh type variables every time.
+              val newUpperBound = replaceArgsByVariables(base)
+
+              // FIXME: filter candidates based on the expected type
+              if newUpperBound ne base then
+                tp <:< newUpperBound
+            } else {
+              // XX: The candidate ...
               // If we have `qual: ?T` where `?T >: Nil`, then
               // `qual.::` will fail as there is no member named `::`
               // defined on `Any`, so we need to further constrain the upper
@@ -662,11 +649,27 @@ class Typer extends Namer
               // TODO: better handling of overrides: `loMember` might be an
               // override of some member defined in a parent class, in which
               // case we're overconstraining the upper bound.
-              val owner = loMember.symbol.owner.asClass
               val newUpperBound = appliedWithVars(owner.typeRef, owner.typeParams)
               tp <:< newUpperBound
             }
+            // FIXME: it would be nice if we could use the expected type
+            // to filter out some candidates, but it's hard to rule out
+            // anything since some implicit conversion might kick in
+            // adaptation
+            true
           }
+
+          /** If true, found matching candidate in bound */
+          def memberInBound(fromBelow: Boolean): Boolean = {
+            // FIXME: we just stop after finding a matching candidate, should we
+            // take the union of the constraints they add instead?
+            candidates(fromBelow).exists(constr(_, fromBelow))
+          }
+
+          // FIXME: We currently only look at the lower bound if we don't find a
+          // matching member in the upper bound, but that could exclude
+          // the right candidate.
+          memberInBound(fromBelow = false) || memberInBound(fromBelow = true)
         case _ =>
       }
 
