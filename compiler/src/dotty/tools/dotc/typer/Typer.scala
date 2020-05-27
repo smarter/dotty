@@ -556,14 +556,26 @@ class Typer extends Namer
               false
           })
 
+          def member(bound: Type): Symbol =
+            val d = bound.member(tree.name)
+            d.alternatives match {
+              case Nil =>
+                NoSymbol
+              case List(alt) =>
+                alt.symbol
+              case alts =>
+                // TODO: better handling of multiple candidate overloads
+                alts.filter(alt => ctx.test(qual.tpe.select(tree.name, alt) <:< pt)).head.symbol
+            }
+
           val bounds = ctx.typeComparer.bounds(tp)
-          val hiMember = bounds.hi.member(tree.name)
+          val hiMember = member(bounds.hi)
           if (hasUncheckedVariance(hiMember)) {
             val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
             tvar.instantiate(fromBelow = false)
           }
           else if (hiMember.exists) {
-            val owner = hiMember.alternatives.head.symbol.owner
+            val owner = hiMember.owner
             val base = tp.baseType(owner)
             // println("Hbase: " + base.show)
 
@@ -575,16 +587,14 @@ class Typer extends Namer
               // println("Hbase2: " + base2.show)
             }
           } else {
-            val loMember = bounds.lo.member(tree.name)
+            val loMember = member(bounds.lo)
 
             if (hasUncheckedVariance(loMember)) {
               val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
               tvar.instantiate(fromBelow = true)
             }
             else if (loMember.exists) {
-              val owner = loMember.alternatives.head.symbol.owner.asClass
-              val ref = owner.typeRef
-              val tparams = owner.typeParams
+              val owner = loMember.owner.asClass
               val base = appliedWithVars(owner.typeRef, owner.typeParams)
               // println("base: " + base.show)
               tp <:< base
