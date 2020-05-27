@@ -580,14 +580,21 @@ class Typer extends Namer
             val d = bound.member(tree.name)
             d.alternatives match {
               case Nil =>
-                NoSymbol
-              case List(alt) =>
-                alt
+                NoDenotation
               case alts =>
-                // TODO: better handling of multiple candidate overloads
-                alts.filter(alt => ctx.test(qual.tpe.select(tree.name, alt) <:< pt)).head
+                // TODO: figure out how to deal with overloads.
+                // Maybe we have no choice but to  try every alternative to see
+                // which constraint method bla they impose on `tp` and filter out
+                // those that prevent the resulting selection from matching
+                // the expected type.
+                // We also need to figure out what to do if we still have
+                // multiple possible alternatives after the filtering:
+                // can we take the intersection of the constraints they
+                // impose on `tp`?
+                alts.head
             }
 
+          // XX: move this stuff that adds constraint into a method bla
           val hiMember = matchingMember(fromBelow = false)
           if (hasUncheckedVariance(hiMember)) {
             val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
@@ -624,6 +631,9 @@ class Typer extends Namer
             //   qual.A <:< Int
             //       ?X <:< Int
             //         true, with extra constraint `?X <: Int`
+
+            // FIXME: this is wasteful: if we have multiple selections with the
+            // same qualifier, we'll create fresh type variables every time.
             val newUpperBound = replaceArgsByVariables(base)
             // println("Hibase: " + ibase.show)
             if newUpperBound ne base then
