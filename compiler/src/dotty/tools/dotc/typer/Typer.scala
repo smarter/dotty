@@ -523,39 +523,49 @@ class Typer extends Namer
         case _ => app
       }
     case qual =>
+      // Try to handle selections where the qualifier is a type variable.
+      // Currently, this should only happen with lambdas.
+      // def foo[T <: List[Any]](x: T => T)
+      // foo(x => x.head: Int) // T := List[Int]
       qual.tpe.widenDealias.stripTypeVar match {
         case tp: TypeParamRef =>
+          /** Return `tycon[?A, ?B, ...]` where `?A`, `?B`, ... are fresh type variables
+           *  conforming to the corresponding type parameter in `tparams`.
+           */
           def appliedWithVars(tycon: Type, tparams: List[TypeApplications.TypeParamInfo]): Type = {
             if (tparams.isEmpty)
-              return tycon
-
-            val tl = tycon.EtaExpand(tparams).asInstanceOf[HKTypeLambda]
-            val tvars = constrained(tl, untpd.EmptyTree, alwaysAddTypeVars = true)._2.map(_.tpe)
-            tycon.appliedTo(tvars)
+              tycon
+            else {
+              val tl = tycon.EtaExpand(tparams).asInstanceOf[HKTypeLambda]
+              val tvars = constrained(tl, untpd.EmptyTree, alwaysAddTypeVars = true)._2.map(_.tpe)
+              tycon.appliedTo(tvars)
+            }
           }
 
-          def addVariables = new TypeMap {
+          /** In `tp`, replace all applied types `tycon[T, S, ...]` by `tycon[?A,
+           *  ?B, ...]` where `?A`, `?B`, ... are fresh type variables.
+           */
+          def replaceArgsByVariables = new TypeMap {
             def apply(t: Type): Type = t match {
               case tp: TypeLambda =>
                 tp
               case tp @ AppliedType(tycon, args) =>
-                // println("tp: " + tp)
-                val tp2 = appliedWithVars(tycon, tp.tyconTypeParams)
-                // XX: still needed?
-                // if tp2 ne tp then tp2 <:< tp
-                tp2
+                // Note that we don't constrain the fresh type variables
+                // such that the mapped type is a subtype of `tp`, we let
+                // the caller deal with that.
+                appliedWithVars(tycon, tp.tyconTypeParams)
               case _ =>
                 mapOver(t)
             }
           }
 
           // Needed for tests/pos/fold-infer-uncheckedVariance.scala to pass -Ytest-pickler
-          def hasUncheckedVariance(d: Denotation) = d.hasAltWith(_.info.widen.existsPart {
+          def hasUncheckedVariance(d: SingleDenotation) = d.info.widen.existsPart {
             case tp @ AnnotatedType(_, annot) =>
               annot.symbol eq defn.UncheckedVarianceAnnot
             case tp =>
               false
-          })
+          }
 
           /** We're in a selection `qual`.`name` and the underlying type of `qual`
            *  is an uninstantiated type variable `tp`
@@ -614,9 +624,10 @@ class Typer extends Namer
             //   qual.A <:< Int
             //       ?X <:< Int
             //         true, with extra constraint `?X <: Int`
-            val newUpperBound = addVariables(base)
+            val newUpperBound = replaceArgsByVariables(base)
             // println("Hibase: " + ibase.show)
-            tp <:< newUpperBound
+            if newUpperBound ne base then
+              tp <:< newUpperBound
           } else {
             val loMember = matchingMember(fromBelow = true)
 
