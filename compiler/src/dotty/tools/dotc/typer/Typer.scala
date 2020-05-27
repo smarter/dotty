@@ -541,6 +541,7 @@ class Typer extends Namer
               case tp @ AppliedType(tycon, args) =>
                 // println("tp: " + tp)
                 val tp2 = appliedWithVars(tycon, tp.tyconTypeParams)
+                // XX: still needed?
                 if tp2 ne tp then tp2 <:< tp
                 tp2
               case _ =>
@@ -556,59 +557,95 @@ class Typer extends Namer
               false
           })
 
-          def member(bound: Type): Symbol =
+          /** We're in a selection `qual`.`name` and the underlying type of `qual`
+           *  is an uninstantiated type variable `tp`
+           *  If `fromBelow` is false, find a member of the upper bound of `tp`
+           *  which matches ...
+           *  If `fromBelow` is true, do the same but look in the lower bound of `tp`.
+           */
+          def matchingMember(fromBelow: Boolean): SingleDenotation =
+            // TODO: Should we use `fullBounds` instead ?
+            val bounds = ctx.typeComparer.bounds(tp).bounds
+            val bound = if (fromBelow) bounds.lo else bounds.hi
             val d = bound.member(tree.name)
             d.alternatives match {
               case Nil =>
                 NoSymbol
               case List(alt) =>
-                alt.symbol
+                alt
               case alts =>
                 // TODO: better handling of multiple candidate overloads
-                alts.filter(alt => ctx.test(qual.tpe.select(tree.name, alt) <:< pt)).head.symbol
+                alts.filter(alt => ctx.test(qual.tpe.select(tree.name, alt) <:< pt)).head
             }
 
-          val bounds = ctx.typeComparer.bounds(tp)
-          val hiMember = member(bounds.hi)
+          val hiMember = matchingMember(fromBelow = false)
           if (hasUncheckedVariance(hiMember)) {
             val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
             tvar.instantiate(fromBelow = false)
           }
           else if (hiMember.exists) {
-            val owner = hiMember.owner
+            val owner = hiMember.symbol.owner
             val base = tp.baseType(owner)
-            // println("Hbase: " + base.show)
 
-            val ibase = addVariables(base)
+            // If we have `qual: ?T` where `?T <: List[AnyVal]`,
+            // then `qual.head` will have type `qual.A` where `A`
+            // is an abstract type >: Nothing <: AnyVal.
+            // Therefore, when typechecking `qual.head: Int`, we get:
+            //
+            //   qual.A <:< Int
+            //   AnyVal <:< Int
+            //         false
+            //
+            // The problem is that subtype checks on `qual.A` do
+            // not allow us to constraint `?T` further.
+            // 
+            // To fix this, we need a more precise upper-bound for `?T`:
+            // we can safely rewrite the constraint:
+            //
+            //   ?T <: List[AnyVal]
+            //
+            // as:
+            //
+            //   ?T <: List[?X]
+            //   ?X <: AnyVal
+            //
+            // Now, if we try to typecheck `qual.head: Int`, we get:
+            //
+            //   qual.A <:< Int
+            //       ?X <:< Int
+            //         true, with extra constraint `?X <: Int`
+            val newUpperBound = addVariables(base)
             // println("Hibase: " + ibase.show)
-            if (ibase ne base) {
-              tp <:< ibase
-              val base2 = tp.baseType(owner)
-              // println("Hbase2: " + base2.show)
-            }
+            tp <:< newUpperBound
           } else {
-            val loMember = member(bounds.lo)
+            val loMember = matchingMember(fromBelow = true)
 
             if (hasUncheckedVariance(loMember)) {
               val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
               tvar.instantiate(fromBelow = true)
             }
             else if (loMember.exists) {
-              val owner = loMember.owner.asClass
-              val base = appliedWithVars(owner.typeRef, owner.typeParams)
-              // println("base: " + base.show)
-              tp <:< base
-              val base2 = tp.baseType(owner)
-              // println("base2: " + base2.show)
-              // println("ctx: " + ctx.typerState.constraint.show)
+              // If we have `qual: ?T` where `?T >: Nil`, then
+              // `qual.::` will fail as there is no member named `::`
+              // defined on `Any`, so we need to further constrain the upper
+              // bound. We know that `::` is defined on `List`, so we can add
+              // a constraint:
+              //
+              //   ?T <: List[?X]
+              //   ?X
+              //
+              // We need a fresh type variable ?X for the same reason we needed
+              // one in the upper bound case above (`?X` can stay unconstrained
+              // here since `Nil <:< List[?X]` is true for all `?X`).
+
+              // TODO: better handling of overrides: `loMember` might be an
+              // override of some member defined in a parent class, in which
+              // case we're overconstraining the upper bound.
+              val owner = loMember.symbol.owner.asClass
+              val newUpperBound = appliedWithVars(owner.typeRef, owner.typeParams)
+              tp <:< newUpperBound
             }
           }
-
-          // println(s"tp.${tree.name}: " + tp.member(tree.name))
-        // val hi = ctx.typeComparer.bounds(tp).hi
-          // println("hi: " + hi.show)
-          // println(s"hi.${tree.name}: " + hi.findMember(tree.name, hi))
-          // println(s"hi.${tree.name}: " + hi.findMember(tree.name, hi))
         case _ =>
       }
 
