@@ -542,7 +542,7 @@ class Typer extends Namer
                 // println("tp: " + tp)
                 val tp2 = appliedWithVars(tycon, tp.tyconTypeParams)
                 // XX: still needed?
-                if tp2 ne tp then tp2 <:< tp
+                // if tp2 ne tp then tp2 <:< tp
                 tp2
               case _ =>
                 mapOver(t)
