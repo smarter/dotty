@@ -554,7 +554,7 @@ class Typer extends Namer
           /** In `tp`, replace all applied types `tycon[T, S, ...]` by `tycon[?A,
            *  ?B, ...]` where `?A`, `?B`, ... are fresh type variables.
            */
-          def replaceArgsByVas = new TypeMap {
+          def replaceArgsByVars = new TypeMap {
             def apply(t: Type): Type = t match {
               case tp: TypeLambda =>
                 tp
@@ -576,34 +576,36 @@ class Typer extends Namer
               false
           }
 
-          /** We're in a selection `qual`.`name` and the underlying type of `qual`
-           *  is an uninstantiated type variable `tp`
-           *  If `fromBelow` is false, find a member of the upper bound of `tp`
-           *  which matches ...
-           *  If `fromBelow` is true, do the same but look in the lower bound of `tp`.
+          /** The members of one of the bound of `tp` which the selection
+           *  could resolve to.
+           *  
+           *  @param isUpper  If true, the members come from the upper bound,
+           *                  otherwise they come from the lower bound.
            */
-          def candidates(fromBelow: Boolean): List[SingleDenotation] =
-            // TODO: Should we use `fullBounds` instead ?
+          def candidatesInBound(isUpper: Boolean): List[SingleDenotation] =
             val bounds = ctx.typeComparer.bounds(tp).bounds
-            val bound = if (fromBelow) bounds.lo else bounds.hi
+            val bound = if (isUpper) bounds.hi else bounds.lo
             val d = bound.member(tree.name)
             d.alternatives
 
-          /** Try `candidate` which comes either from the upper bound or lower bound.
-           *  If true, adds additional constraints on `tp`.
+          /** Try to add additional constraints on the selection qualifier
+           *  to allow a selection of `candidate` to typecheck.
+           *
+           *  @param  isUpper  Does `candidate` come from the upper bound
+           *                   of the qualifier type?
            */
-          def constr(candidate: SingleDenotation, fromBelow: Boolean): Boolean = {
+          def constrainQualifierTo(candidate: SingleDenotation, isUpper: Boolean): Boolean = {
             // Needed for tests/pos/fold-infer-uncheckedVariance.scala to pass -Ytest-pickler
             if (hasUncheckedVariance(candidate)) {
               val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
-              tvar.instantiate(fromBelow)
+              tvar.instantiate(fromBelow = !isUpper)
               return true
             }
             val owner = candidate.symbol.maybeOwner
             if (!owner.exists || !owner.isClass)
               return false
 
-            if (!fromBelow) {
+            if (isUpper) {
               // XX: The candidate ...
               // If we have `qual: ?T` where `?T <: List[AnyVal]`,
               // then `qual.head` will have type `qual.A` where `A`
@@ -662,6 +664,7 @@ class Typer extends Namer
               val newUpperBound = appliedWithVars(owner.typeRef, owner.typeParams)
               tp <:< newUpperBound
             }
+
             // FIXME: it would be nice if we could use the expected type
             // to filter out some candidates, but it's hard to rule out
             // anything since some implicit conversion might kick in
@@ -670,16 +673,16 @@ class Typer extends Namer
           }
 
           /** If true, found matching candidate in bound */
-          def memberInBound(fromBelow: Boolean): Boolean = {
+          def memberInBound(isUpper: Boolean): Boolean = {
             // FIXME: we just stop after finding a matching candidate, should we
             // take the union of the constraints they add instead?
-            candidates(fromBelow).exists(constr(_, fromBelow))
+            candidatesInBound(isUpper).exists(constrainQualifierTo(_, isUpper))
           }
 
           // FIXME: We currently only look at the lower bound if we don't find a
           // matching member in the upper bound, but that could exclude
           // the right candidate.
-          memberInBound(fromBelow = false) || memberInBound(fromBelow = true)
+          memberInBound(isUpper = true) || memberInBound(isUpper = false)
         case _ =>
       }
 
