@@ -602,13 +602,17 @@ class Typer extends Namer
               return true
             }
             val owner = candidate.symbol.maybeOwner
+            // TODO: Deal with methods in structural types?
             if (!owner.exists || !owner.isClass)
               return false
 
             if (isUpper) {
-              // XX: The candidate ...
-              // If we have `qual: ?T` where `?T <: List[AnyVal]`,
-              // then `qual.head` will have type `qual.A` where `A`
+              // The candidate comes from the upper bound of the qualifier.
+              // In that case we replace type arguments in the upper bound
+              // by fresh type variables to make it more flexible.
+              //
+              // For example, we might have `qual: ?T` where `?T <: List[AnyVal]`.
+              // in which case `qual.head` will have type `qual.A` where `A`
               // is an abstract type >: Nothing <: AnyVal.
               // Therefore, when typechecking `qual.head: Int`, we get:
               //
@@ -634,18 +638,25 @@ class Typer extends Namer
               //   qual.A <:< Int
               //       ?X <:< Int
               //         true, with extra constraint `?X <: Int`
+              //
+              // Ant at a later point, `?T` will be instantiated to a
+              // subtype of `List[Int]` as expected.
 
               val base = tp.baseType(owner)
               // FIXME: this is wasteful: if we have multiple selections with the
               // same qualifier, we'll create fresh type variables every time.
               val newUpperBound = replaceArgsByVars(base)
 
-              // FIXME: filter candidates based on the expected type
               if newUpperBound ne base then
                 tp <:< newUpperBound
             } else {
-              // XX: The candidate ...
-              // If we have `qual: ?T` where `?T >: Nil`, then
+              // The candidate comes from the lower bound of the qualifier.
+              // In that case, we need to constrain the upper bound of the
+              // qualifier to be able to typecheck the selection at all,
+              // and like in the isUpper case, we want type variables in
+              // the arguments of that upper bound for flexibility.
+              //
+              // For example, if we have `qual: ?T` where `?T >: Nil`, then
               // `qual.::` will fail as there is no member named `::`
               // defined on `Any`, so we need to further constrain the upper
               // bound. We know that `::` is defined on `List`, so we can add
@@ -654,11 +665,10 @@ class Typer extends Namer
               //   ?T <: List[?X]
               //   ?X
               //
-              // We need a fresh type variable ?X for the same reason we needed
-              // one in the upper bound case above (`?X` can stay unconstrained
-              // here since `Nil <:< List[?X]` is true for all `?X`).
+              // (in this example, the fresh type variable `?X` can stay
+              // unconstrained since `Nil <:< List[?X]` is true for all `?X`)
 
-              // TODO: better handling of overrides: `loMember` might be an
+              // FIXME: better handling of overrides: `candidate` might be an
               // override of some member defined in a parent class, in which
               // case we're overconstraining the upper bound.
               val newUpperBound = appliedWithVars(owner.typeRef, owner.typeParams)
@@ -668,7 +678,7 @@ class Typer extends Namer
             // FIXME: it would be nice if we could use the expected type
             // to filter out some candidates, but it's hard to rule out
             // anything since some implicit conversion might kick in
-            // adaptation
+            // during adaptation.
             true
           }
 
