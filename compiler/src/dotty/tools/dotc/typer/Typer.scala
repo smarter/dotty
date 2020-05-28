@@ -524,9 +524,18 @@ class Typer extends Namer
       }
     case qual =>
       // Try to handle selections where the qualifier is a type variable.
-      // Currently, this should only happen with lambdas.
-      // def foo[T <: List[Any]](x: T => T)
-      // foo(x => x.head: Int) // T := List[Int]
+      // Currently, this should only happen with lambdas, for example when typechecking:
+      //
+      //   def foo[T <: List[Any]](x: T => T)
+      //   foo(x => x.head: Int)
+      //
+      // In the past, `typedFunctionValue` would have instantiated `?T` to
+      // `List[Any]`, before typing the lambda, which would then fail because
+      // `x.head` has type `Any`. But we now leave such type variables
+      // uninstantiated, which means we need to figure out how to type a
+      // selection where the prefix is an uninstantiated type variable, and
+      // in particular how to propagate constraints from typing this selection
+      // back to that type variable.
       qual.tpe.widenDealias.stripTypeVar match {
         case tp: TypeParamRef =>
           /** Return `tycon[?A, ?B, ...]` where `?A`, `?B`, ... are fresh type variables
@@ -545,7 +554,7 @@ class Typer extends Namer
           /** In `tp`, replace all applied types `tycon[T, S, ...]` by `tycon[?A,
            *  ?B, ...]` where `?A`, `?B`, ... are fresh type variables.
            */
-          def replaceArgsByVariables = new TypeMap {
+          def replaceArgsByVas = new TypeMap {
             def apply(t: Type): Type = t match {
               case tp: TypeLambda =>
                 tp
@@ -559,7 +568,7 @@ class Typer extends Namer
             }
           }
 
-          // Needed for tests/pos/fold-infer-uncheckedVariance.scala to pass -Ytest-pickler
+          /** Does `@uncheckedVariance` appears somewhere in the type of `d` ? */
           def hasUncheckedVariance(d: SingleDenotation) = d.info.widen.existsPart {
             case tp @ AnnotatedType(_, annot) =>
               annot.symbol eq defn.UncheckedVarianceAnnot
@@ -584,6 +593,7 @@ class Typer extends Namer
            *  If true, adds additional constraints on `tp`.
            */
           def constr(candidate: SingleDenotation, fromBelow: Boolean): Boolean = {
+            // Needed for tests/pos/fold-infer-uncheckedVariance.scala to pass -Ytest-pickler
             if (hasUncheckedVariance(candidate)) {
               val tvar = ctx.typerState.constraint.typeVarOfParam(tp).asInstanceOf[TypeVar]
               tvar.instantiate(fromBelow)
@@ -626,7 +636,7 @@ class Typer extends Namer
               val base = tp.baseType(owner)
               // FIXME: this is wasteful: if we have multiple selections with the
               // same qualifier, we'll create fresh type variables every time.
-              val newUpperBound = replaceArgsByVariables(base)
+              val newUpperBound = replaceArgsByVars(base)
 
               // FIXME: filter candidates based on the expected type
               if newUpperBound ne base then
@@ -1246,7 +1256,7 @@ class Typer extends Namer
       case _ =>
     }
 
-    // type variables in the prototype which appear only in covariant or
+    // The set of type variables in the prototype which appear only in covariant or
     // contravariant positions. These should be instantiatable without
     // preventing the body of the lambda from typechecking (...except in situations
     // like `def foo[T, U <: T](x: T => U)`, where instantiating `T` to a specific
@@ -1298,6 +1308,9 @@ class Typer extends Namer
       else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
       else if !formal.isInstanceOf[WildcardType] then
         instantiateSelected(formal, protoVariantVars)
+        // Intentionally leave uninstantiated type variables in the types of parameters,
+        // this works because `typedSelect` special cases the handling of qualifiers
+        // whose type is a type variable.
         formal
       else
         errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.sourcePos)
