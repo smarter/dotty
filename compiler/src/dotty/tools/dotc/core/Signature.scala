@@ -60,13 +60,17 @@ case class Signature(paramsSig: List[ParamSig], resSig: TypeName) {
     @tailrec def loop(names1: List[ParamSig], names2: List[ParamSig]): Boolean =
       if (names1.isEmpty) names2.isEmpty
       else !names2.isEmpty && consistent(names1.head, names2.head) && loop(names1.tail, names2.tail)
-    if (ctx.erasedTypes && (this == NotAMethod) != (that == NotAMethod))
+    if (ctx.erasedTypes && !this.sameMethodness(that))
       false // After erasure, we allow fields and parameterless methods with the same name.
             // This is needed to allow both a module field and a bridge method for an abstract val.
             // Test case is patmatch-classtag.scala
     else
       loop(this.paramsSig, that.paramsSig)
   }
+
+  /** True if the signatures either both represent methods or both do not. */
+  final def sameMethodness(that: Signature)(using Context): Boolean =
+    (this == NotAMethod) == (that == NotAMethod)
 
   /** `that` signature, but keeping all corresponding parts of `this` signature. */
   final def updateWith(that: Signature): Signature = {

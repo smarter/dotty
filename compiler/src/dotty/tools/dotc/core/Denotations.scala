@@ -615,11 +615,11 @@ object Denotations {
     def atSignature(sig: Signature, site: Type, relaxed: Boolean)(implicit ctx: Context): SingleDenotation = {
       val situated = if (site == NoPrefix) this else asSeenFrom(site)
       val thisSig = situated.signature
-      val matches = sig.matchDegree(thisSig).ordinal >=
-        (if (relaxed) Signature.ParamMatch else Signature.FullMatch).ordinal
-      if (matches && (thisSig == Signature.NotAMethod) != (sig == Signature.NotAMethod) && this.symbol.is(JavaDefined))
-        return NoDenotation
-      if (matches) this else NoDenotation
+      val matches =
+        sig.matchDegree(thisSig).ordinal >=
+          (if (relaxed) Signature.ParamMatch else Signature.FullMatch).ordinal
+
+      if (matches && (thisSig.sameMethodness(sig) || symbol.is(JavaDefined))) this else NoDenotation
     }
 
     def matchesImportBound(bound: Type)(implicit ctx: Context): Boolean =
@@ -976,7 +976,8 @@ object Denotations {
           if infoOrCompleter.isInstanceOf[PolyType] || other.infoOrCompleter.isInstanceOf[PolyType] then
             slowCheck
           // example: ...
-          else if (signature == Signature.NotAMethod) != (other.signature == Signature.NotAMethod) then
+          else if !signature.sameMethodness(other.signature) then
+            // Java fields and parameterless methods can have the same name
             !symbol.is(JavaDefined) || !other.symbol.is(JavaDefined)
           else
             true
