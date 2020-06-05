@@ -614,8 +614,11 @@ object Denotations {
 
     def atSignature(sig: Signature, site: Type, relaxed: Boolean)(implicit ctx: Context): SingleDenotation = {
       val situated = if (site == NoPrefix) this else asSeenFrom(site)
-      val matches = sig.matchDegree(situated.signature).ordinal >=
+      val thisSig = situated.signature
+      val matches = sig.matchDegree(thisSig).ordinal >=
         (if (relaxed) Signature.ParamMatch else Signature.FullMatch).ordinal
+      if (matches && (thisSig == Signature.NotAMethod) != (sig == Signature.NotAMethod) && this.symbol.is(JavaDefined))
+        return NoDenotation
       if (matches) this else NoDenotation
     }
 
@@ -963,12 +966,25 @@ object Denotations {
 
     final def matches(other: SingleDenotation)(implicit ctx: Context): Boolean = {
       val d = signature.matchDegree(other.signature)
-      (// fast path: signatures are the same and neither denotation is a PolyType
-       // For polytypes, signatures alone do not tell us enough to be sure about matching.
-       d == Signature.FullMatch &&
-       !infoOrCompleter.isInstanceOf[PolyType] && !other.infoOrCompleter.isInstanceOf[PolyType]
-       ||
-       d != Signature.NoMatch && info.matches(other.info))
+
+      /** Slower check used if the signatures alone do not tell us enough to be sure about matching */
+      def slowCheck = info.matches(other.info)
+
+      d match {
+        case Signature.FullMatch =>
+          // example: def a[T] / val a
+          if infoOrCompleter.isInstanceOf[PolyType] || other.infoOrCompleter.isInstanceOf[PolyType] then
+            slowCheck
+          // example: ...
+          else if (signature == Signature.NotAMethod) != (other.signature == Signature.NotAMethod) then
+            !symbol.is(JavaDefined) || !other.symbol.is(JavaDefined)
+          else
+            true
+        case Signature.ParamMatch =>
+          slowCheck
+        case _ =>
+          false
+      }
     }
 
     def mapInherited(ownDenots: PreDenotation, prevDenots: PreDenotation, pre: Type)(implicit ctx: Context): SingleDenotation =
