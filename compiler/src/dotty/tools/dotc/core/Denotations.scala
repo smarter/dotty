@@ -14,6 +14,7 @@ import Periods._
 import Flags._
 import DenotTransformers._
 import Decorators._
+import Signature.MatchDegree._
 import printing.Texts._
 import printing.Printer
 import io.AbstractFile
@@ -612,27 +613,18 @@ object Denotations {
     def accessibleFrom(pre: Type, superAccess: Boolean)(implicit ctx: Context): Denotation =
       if (!symbol.exists || symbol.isAccessibleFrom(pre, superAccess)) this else NoDenotation
 
-    def atSignature(sig: Signature, site: Type, relaxed: Boolean)(implicit ctx: Context): SingleDenotation = {
-      val situated = if (site == NoPrefix) this else asSeenFrom(site)
-      val thisSig = situated.signature
-      val matches =
-        sig.matchDegree(thisSig).ordinal >=
-          (if (relaxed) Signature.ParamMatch else Signature.FullMatch).ordinal
-
-      val matches = sig.matchDegree(thisSig) match {
+    def atSignature(sig: Signature, site: Type, relaxed: Boolean)(implicit ctx: Context): SingleDenotation =
+      val situated = if site == NoPrefix then this else asSeenFrom(site)
+      val matches = sig.matchDegree(situated.signature) match
         case FullMatch =>
           true
         case ParamMatch =>
           relaxed
-        case MethodNoMethodMatch => // relaxed = !ctx.erasedTypes ?
+        case MethodNoMethodMatch =>
           relaxed && !symbol.is(JavaDefined)
         case _ =>
           false
-      }
-
-
-      if (matches && (thisSig.sameMethodness(sig) || symbol.is(JavaDefined))) this else NoDenotation
-    }
+      if matches then this else NoDenotation
 
     def matchesImportBound(bound: Type)(implicit ctx: Context): Boolean =
       if bound.isRef(defn.NothingClass) then false
@@ -976,31 +968,26 @@ object Denotations {
     final def first: SingleDenotation = this
     final def last: SingleDenotation = this
 
-    final def matches(other: SingleDenotation)(implicit ctx: Context): Boolean = {
+    final def matches(other: SingleDenotation)(implicit ctx: Context): Boolean =
       val d = signature.matchDegree(other.signature)
 
       /** Slower check used if the signatures alone do not tell us enough to be sure about matching */
       def slowCheck = info.matches(other.info)
 
-      d match {
-        case Signature.FullMatch =>
+      d match
+        case FullMatch =>
           // example: def a[T] / val a
           if infoOrCompleter.isInstanceOf[PolyType] || other.infoOrCompleter.isInstanceOf[PolyType] then
             slowCheck
-          // example: ...
-          else if !signature.sameMethodness(other.signature) then
-            // Java fields and parameterless methods can have the same name
-            !symbol.is(JavaDefined) || !other.symbol.is(JavaDefined)
           else
             true
-        case Signature.ParamMatch =>
-          slowCheck
+        case ParamMatch =>
+          !ctx.erasedTypes && slowCheck
         case MethodNoMethodMatch =>
-          !ctx.erasedTypes && (!symbol.is(JavaDefined) || !other.symbol.is(JavaDefined))
+          !ctx.erasedTypes && !(symbol.is(JavaDefined) && other.symbol.is(JavaDefined))
         case _ =>
           false
-      }
-    }
+    end matches
 
     def mapInherited(ownDenots: PreDenotation, prevDenots: PreDenotation, pre: Type)(implicit ctx: Context): SingleDenotation =
       if (hasUniqueSym && prevDenots.containsSym(symbol)) NoDenotation
