@@ -619,6 +619,18 @@ object Denotations {
         sig.matchDegree(thisSig).ordinal >=
           (if (relaxed) Signature.ParamMatch else Signature.FullMatch).ordinal
 
+      val matches = sig.matchDegree(thisSig) match {
+        case FullMatch =>
+          true
+        case ParamMatch =>
+          relaxed
+        case MethodNoMethodMatch => // relaxed = !ctx.erasedTypes ?
+          relaxed && !symbol.is(JavaDefined)
+        case _ =>
+          false
+      }
+
+
       if (matches && (thisSig.sameMethodness(sig) || symbol.is(JavaDefined))) this else NoDenotation
     }
 
@@ -983,6 +995,8 @@ object Denotations {
             true
         case Signature.ParamMatch =>
           slowCheck
+        case MethodNoMethodMatch =>
+          !ctx.erasedTypes && (!symbol.is(JavaDefined) || !other.symbol.is(JavaDefined))
         case _ =>
           false
       }
