@@ -133,7 +133,14 @@ object Signature {
     // small values, so the performance hit should be minimal.
 
   enum MatchDegree {
-    case NoMatch, MethodNoMethodMatch, ParamMatch, FullMatch
+    /** The signatures are unrelated. */
+    case NoMatch
+    /** The parameter signatures are equivalent. */
+    case ParamMatch
+    /** A match between a method with an empty parameter list and a non-method. */
+    case MethodNoMethodMatch
+    /** The parameter and result type signatures are equivalent. */
+    case FullMatch
   }
   export MatchDegree._
 

@@ -618,11 +618,11 @@ object Denotations {
       val matches = sig.matchDegree(situated.signature) match
         case FullMatch =>
           true
-        case ParamMatch =>
-          relaxed
         case MethodNoMethodMatch =>
           relaxed && !symbol.is(JavaDefined)
-        case _ =>
+        case ParamMatch =>
+          relaxed
+        case noMatch =>
           false
       if matches then this else NoDenotation
 
@@ -981,11 +981,11 @@ object Denotations {
             slowCheck
           else
             true
-        case ParamMatch =>
-          !ctx.erasedTypes && slowCheck
         case MethodNoMethodMatch =>
           !ctx.erasedTypes && !(symbol.is(JavaDefined) && other.symbol.is(JavaDefined))
-        case _ =>
+        case ParamMatch =>
+          !ctx.erasedTypes && slowCheck
+        case noMatch =>
           false
     end matches
 
