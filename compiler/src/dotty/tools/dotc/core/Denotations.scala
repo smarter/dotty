@@ -615,7 +615,7 @@ object Denotations {
     def atSignature(sig: Signature, site: Type, relaxed: Boolean)(implicit ctx: Context): SingleDenotation = {
       val situated = if (site == NoPrefix) this else asSeenFrom(site)
       val matches = sig.matchDegree(situated.signature).ordinal >=
-        (Signature.ParamMatch).ordinal
+        (Signature.FullMatch).ordinal
       if (matches) this else NoDenotation
     }
 
