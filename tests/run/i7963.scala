@@ -1,8 +1,8 @@
-class Comp extends java.lang.Comparable[Test]
-
 object Test {
   def main(args: Array[String]): Unit = {
-    java.util.Collections.min(new java.util.ArrayList[Test](new Comp))
+    val l = new java.util.ArrayList[String]
+    l.add("foo")
+    java.util.Collections.min(l)
   }
 }
 // object Test {
