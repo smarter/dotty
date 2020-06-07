@@ -389,7 +389,12 @@ class Typer extends Namer
       loop(NoContext)
     }
 
-    findRefRecur(NoType, BindingPrec.NothingBound, NoContext)
+    val res = findRefRecur(NoType, BindingPrec.NothingBound, NoContext)
+
+    if ctx.compilationUnit.isJava && (name eq tpnme.Object) && (res.typeSymbol eq defn.ObjectClass) then
+      defn.FromJavaObjectType
+    else
+      res
   }
 
   /** If `tree`'s type is a `TermRef` identified by flow typing to be non-null, then
