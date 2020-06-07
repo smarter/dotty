@@ -86,7 +86,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
         val tpe = arg.expr.tpe
         if isJavaDefined then
           val pt = tree.fun.tpe.widen.firstParamTypes.last
-          adaptToArray(arg.expr, pt.elemType)
+          adaptToArray(arg.expr, pt.elemType.bounds.hi)
         else if tpe.derivesFrom(defn.ArrayClass) then
           arrayToSeq(arg.expr)
         else
