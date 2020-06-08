@@ -530,14 +530,14 @@ object SymDenotations {
 
     /** The encoded full path name of this denotation, where outer names and inner names
      *  are separated by `separator` strings as indicated by the given name kind.
-     *  Drops package objects. Represents each term in the owner chain by a simple `_$`.
+     *  Drops package objects.
      */
     def fullNameSeparated(kind: QualifiedNameKind)(implicit ctx: Context): Name =
       maybeOwner.fullNameSeparated(kind, kind, name)
 
     /** The encoded full path name of this denotation (separated by `prefixKind`),
      *  followed by the separator implied by `kind` and the given `name`.
-     *  Drops package objects. Represents each term in the owner chain by a simple `_$`.
+     *  Drops package objects.
      */
     def fullNameSeparated(prefixKind: QualifiedNameKind, kind: QualifiedNameKind, name: Name)(implicit ctx: Context): Name =
       if (symbol == NoSymbol || isEffectiveRoot || kind == FlatName && is(PackageClass))
@@ -547,7 +547,6 @@ object SymDenotations {
         var encl = symbol
         while (!encl.isClass && !encl.isPackageObject) {
           encl = encl.owner
-          filler += "_$"
         }
         var prefix = encl.fullNameSeparated(prefixKind)
         if (kind.separator == "$")
