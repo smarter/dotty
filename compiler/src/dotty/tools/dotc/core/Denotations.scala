@@ -977,10 +977,7 @@ object Denotations {
 
       d match
         case FullMatch =>
-          if infoOrCompleter.isInstanceOf[PolyType] || other.infoOrCompleter.isInstanceOf[PolyType] then
-            slowCheck
-          else
-            true
+          true
         case MethodNotAMethodMatch =>
           // Java allows defining both a field and a zero-parameter method with the same name
           !ctx.erasedTypes && !(symbol.is(JavaDefined) && other.symbol.is(JavaDefined))
