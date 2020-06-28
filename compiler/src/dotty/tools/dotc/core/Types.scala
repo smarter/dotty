@@ -4165,20 +4165,27 @@ object Types {
     /** Is the variable already instantiated? */
     def isInstantiated(implicit ctx: Context): Boolean = instanceOpt.exists
 
-    /** Avoid term references in `tp` to parameters or local variables that
+    /** Avoid references in `tp` to definitions that
      *  are nested more deeply than the type variable itself.
      */
     private def avoidCaptures(tp: Type)(using Context): Type =
       val problemSyms = new TypeAccumulator[Set[Symbol]]:
         def apply(syms: Set[Symbol], t: Type): Set[Symbol] = t match
-          case ref @ TermRef(NoPrefix, _)
-          // AVOIDANCE TODO: Are there other problematic kinds of references?
-          // Our current tests only give us these, but we might need to generalize this.
-          if ref.symbol.maybeOwner.nestingLevel > nestingLevel =>
-            syms + ref.symbol
+          case ref: NamedType if ref.prefix eq NoPrefix =>
+            // AVOIDANCE TODO: Are there other problematic kinds of references?
+            // Our current tests only give us these, but we might need to generalize this.
+
+            if ref.symbol.nestingLevel > nestingLevel then
+              syms + ref.symbol
+            else
+              // println("ref: " + ref + " " + ref.symbol.maybeOwner.nestingLevel + " " + ref.symbol.maybeOwner)
+              // println("cur: " + nestingLevel)
+              foldOver(syms, t)
           case _ =>
             foldOver(syms, t)
       val problems = problemSyms(Set.empty, tp)
+      // println("tp: " + tp)
+      // println("p: " + problems)
       if problems.isEmpty then tp
       else
         val atp = TypeOps.avoid(tp, problems.toList)
