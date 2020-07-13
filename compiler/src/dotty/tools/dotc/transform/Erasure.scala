@@ -698,9 +698,21 @@ object Erasure {
           if (qual1.tpe.derivesFrom(sym.owner) || qual1.isInstanceOf[Super])
             select(qual1, sym)
           else
+            def isJvmAccessible(cls: Symbol): Boolean =
+              // Scala classes are always emitted as public, unless the
+              // `private` modifier is used, but a non-private class can never
+              // extend a private class, so such a class will never be a cast target.
+              !cls.is(Flags.JavaDefined) || {
+                // We can't rely on `isContainedWith` here because packages are
+                // not nested from the JVM point of view.
+                val boundary = cls.accessBoundary(cls.owner)(using preErasureCtx)
+                (boundary eq defn.RootClass) ||
+                (ctx.owner.enclosingPackageClass eq boundary)
+              }
             val castTarget = // Avoid inaccessible cast targets, see i8661
-              if sym.owner.isAccessibleFrom(qual1.tpe)(using preErasureCtx)
+              if isJvmAccessible(sym.owner)
               then sym.owner.typeRef
+              // XX: had loop check
               else erasure(tree.qualifier.typeOpt.widen)
             recur(cast(qual1, castTarget))
         }
