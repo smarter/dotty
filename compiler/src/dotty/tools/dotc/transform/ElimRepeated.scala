@@ -21,7 +21,7 @@ object ElimRepeated {
 }
 
 /** A transformer that removes repeated parameters (T*) from all types, replacing
- *  them with Seq types.
+ *  them with Seq or Array types.
  */
 class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
   import ast.tpd._
@@ -57,12 +57,14 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
       val paramTypes1 = paramTypes match
         case init :+ last if last.isRepeatedParam =>
           val isJava = tp.isJavaMethod
+          // A generic Java varargs T... will be erased to Object[],
+          // 
           val last1 =
             if isJava && {
               val elemTp = last.elemType
               elemTp.isInstanceOf[TypeParamRef] && !elemTp.derivesFrom(defn.ObjectClass)
             }
-            then defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
+            then defn.ArrayOf(defn.ObjectType)
             else last.translateFromRepeated(toArray = isJava)
           init :+ last1
         case _ =>
@@ -90,9 +92,10 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
       case arg: Typed if isWildcardStarArg(arg) =>
         val isJavaDefined = tree.fun.symbol.is(JavaDefined)
         val tpe = arg.expr.tpe
-        if isJavaDefined && tpe.derivesFrom(defn.SeqClass) then
-          seqToArray(arg.expr)
-        else if !isJavaDefined && tpe.derivesFrom(defn.ArrayClass)
+        if isJavaDefined then
+          val pt = tree.fun.tpe.widen.firstParamTypes.last
+          adaptToArray(arg.expr, pt.elemType.bounds.hi)
+        else if tpe.derivesFrom(defn.ArrayClass) then
           arrayToSeq(arg.expr)
         else
           arg.expr
@@ -115,7 +118,39 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
         .appliedToType(elemType)
         .appliedTo(tree, clsOf(elemClass.typeRef))
 
-  /** Convert Java array argument to Scala Seq */
+  /** Adapt a Seq or Array tree to be a subtype of `Array[_ <: $elemPt]`.
+   *
+   *  @pre `elemPt` must either be a super type of the argument element type or `Object`.
+   *        The special handling of `Object` is required to deal with the translation
+   *        of generic Java varargs in `elimRepeated`.
+   */
+  private def adaptToArray(tree: Tree, elemPt: Type)(implicit ctx: Context): Tree =
+    val elemTp = tree.tpe.elemType
+    val treeIsArray = tree.tpe.derivesFrom(defn.ArrayClass)
+    if elemTp <:< elemPt then
+      if treeIsArray then
+        tree // no adaptation needed
+      else
+        tree match
+          case SeqLiteral(elems, elemtpt) =>
+            JavaSeqLiteral(elems, elemtpt).withSpan(tree.span)
+          case _ =>
+            // Convert a Seq[T] to an Array[$elemPt]
+            ref(defn.DottyArraysModule)
+              .select(nme.seqToArray)
+              .appliedToType(elemPt)
+              .appliedTo(tree, clsOf(elemPt))
+    else if treeIsArray then
+      // Convert an Array[T] to an Array[Object]
+      ref(defn.ScalaRuntime_toObjectArray)
+        .appliedTo(tree)
+    else
+      // Convert a Seq[T] to an Array[Object]
+      ref(defn.ScalaRuntime_toArray)
+        .appliedToType(elemTp)
+        .appliedTo(tree)
+
+  /** Convert an Array into a scala.Seq */
   private def arrayToSeq(tree: Tree)(using Context): Tree =
     tpd.wrapArray(tree, tree.tpe.elemType)
 
