@@ -20,8 +20,9 @@ object ElimRepeated {
   val name: String = "elimRepeated"
 }
 
-/** A transformer that removes repeated parameters (T*) from all types, replacing
- *  them with Seq or Array types.
+/** A transformer that eliminates repeated parameters (T*) from all types, replacing
+ *  them with Seq or Array types and adapting repeated arguments to conform to
+ *  the transformed type if needed.
  */
 class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
   import ast.tpd._
@@ -57,8 +58,11 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
       val paramTypes1 = paramTypes match
         case init :+ last if last.isRepeatedParam =>
           val isJava = tp.isJavaMethod
-          // A generic Java varargs T... will be erased to Object[],
-          // 
+          // A generic unbounded Java varargs `T...` is erased to `Object[]` in
+          // bytecode, instead of leaving type parameter elimination to Erasure,
+          // we directly translate such a type to `Array[Object]` instead of
+          // `Array[T]` here. This allows the tree transformer of this phase
+          // to emit the correct adaptation for repeated arguments (cf `adaptToArray`).
           val last1 =
             if isJava && {
               val elemTp = last.elemType
