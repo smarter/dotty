@@ -986,9 +986,9 @@ object Denotations {
             // so they must not match.
             else if isJava && otherIsJava then
               false
-            // A Java field never matches any Scala definition
+            // A Java field never matches a Scala method.
             else if isJava then
-              symbol.is(Method)
+              !otherIsJava || symbol.is(Method)
             else // otherIsJava
               other.symbol.is(Method)
           }

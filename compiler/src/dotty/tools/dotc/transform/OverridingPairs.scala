@@ -39,8 +39,11 @@ object OverridingPairs {
      *  Types always match. Term symbols match if their membertypes
      *  relative to <base>.this do
      */
-    protected def matches(sym1: Symbol, sym2: Symbol): Boolean =
-      sym1.isType || sym1.asSeenFrom(self).matches(sym2.asSeenFrom(self))
+    protected def matches(sym1: Symbol, sym2: Symbol): Boolean = {
+      val res = sym1.isType || sym1.asSeenFrom(self).matches(sym2.asSeenFrom(self))
+      // println("sym1: " + sym1.showLocated + " sym2: " + sym2.showLocated + " res: " + res)
+      res
+    }
 
     /** The symbols that can take part in an overriding pair */
     private val decls = {
