@@ -423,7 +423,7 @@ class ClassfileParser(
               if isRepeatedParam(index) then
                 index += 1
                 val elemType = sig2type(tparams, skiptvs)
-                defn.RepeatedParamType.appliedTo(elemType.translateJavaArrayElementType)
+                defn.RepeatedParamType.appliedTo(elemType)
               else
                 objToAny(sig2type(tparams, skiptvs))
             }

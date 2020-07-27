@@ -54,11 +54,29 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
   private def elimRepeated(tp: Type)(using Context): Type = tp.stripTypeVar match
     case tp @ MethodTpe(paramNames, paramTypes, resultType) =>
       val resultType1 = elimRepeated(resultType)
-      val paramTypes1 =
-        if paramTypes.nonEmpty && paramTypes.last.isRepeatedParam then
-          val last = paramTypes.last.translateFromRepeated(toArray = tp.isJavaMethod)
-          paramTypes.init :+ last
-        else paramTypes
+      val paramTypes1 = paramTypes match {
+        case init :+ last if last.isRepeatedParam =>
+          println("i: " + init)
+          println("l: " + last.show)
+          init :+ last
+        case _ =>
+          paramTypes
+      }
+        // if paramTypes.nonEmpty && paramTypes.last.isRepeatedParam then {
+        //   val last = paramTypes.last
+        //   val last1 =
+        //     if (tp.isJavaMethod) {
+        //       val elemtp = paramTypes.last.elemType
+        //       println("tp: " + tp.show)
+        //       println("e: " + elemtp.show)
+        //       defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
+        //     } else {
+        //       paramTypes.last.translateFromRepeated(toArray = false)
+        //     }
+        //   val last = paramTypes.last.translateFromRepeated(toArray = tp.isJavaMethod)
+        //   paramTypes.init :+ last1
+        // }
+        // else paramTypes
       tp.derivedLambdaType(paramNames, paramTypes1, resultType1)
     case tp: PolyType =>
       tp.derivedLambdaType(tp.paramNames, tp.paramInfos, elimRepeated(tp.resultType))
