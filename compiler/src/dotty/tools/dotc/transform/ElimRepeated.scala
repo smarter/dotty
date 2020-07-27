@@ -60,7 +60,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
           val isJava = tp.isJavaMethod
           // A generic unbounded Java varargs `T...` is erased to `Object[]` in
           // bytecode, instead of leaving type parameter elimination to Erasure,
-          // we directly translate such a type to `Array[Object]` instead of
+          // we translate such a type to `Array[_ <: Object]` instead of
           // `Array[T]` here. This allows the tree transformer of this phase
           // to emit the correct adaptation for repeated arguments (cf `adaptToArray`).
           val last1 =
@@ -68,7 +68,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
               val elemTp = last.elemType
               elemTp.isInstanceOf[TypeParamRef] && !elemTp.derivesFrom(defn.ObjectClass)
             }
-            then defn.ArrayOf(defn.ObjectType)
+            then defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
             else last.translateFromRepeated(toArray = isJava)
           init :+ last1
         case _ =>
