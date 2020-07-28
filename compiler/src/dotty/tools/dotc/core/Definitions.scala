@@ -310,6 +310,34 @@ class Definitions {
   }
   def ObjectType: TypeRef = ObjectClass.typeRef
 
+  /** A type alias of Object used to represent any reference to Object in a Java
+   *  method signature, the secret sauce is that subtype checking treats it
+   *  specially:
+   *
+   *    tp <:< FromJavaObject
+   *
+   *  is equivalent to:
+   *
+   *    tp <:< Any
+   *
+   *  This is useful to avoid usability problems when interacting with Java methods,
+   *  where Object is the top type. It does not lead to soundness issue because
+   *  this type is only used in the signatures of Java methods 
+   *
+   *
+   *  This is similar to `ObjectTpeJavaRef` in Scala 2, except that we create a
+   *  new symbol with its own name, this is needed because this type can show up
+   *  in inferred types and therefore needs to be preserved when pickling so
+   *  that unpickled trees pass `-Ycheck`.
+   *
+   *  Note that by default we pretty-print `FromJavaObject` as `Object` or simply omit it
+   *  if it's the sole upper-bound of a type parameter, use `-Yprint-debug` to explicitly
+   *  display it.
+   */
+  @tu lazy val FromJavaObjectSymbol: TypeSymbol =
+    newPermanentSymbol(JavaLangPackageClass, tpnme.FromJavaObject, JavaDefined, TypeAlias(ObjectType)).entered
+  def FromJavaObjectType: TypeRef = FromJavaObjectSymbol.typeRef
+
   @tu lazy val AnyRefAlias: TypeSymbol = enterAliasType(tpnme.AnyRef, ObjectType)
   def AnyRefType: TypeRef = AnyRefAlias.typeRef
 

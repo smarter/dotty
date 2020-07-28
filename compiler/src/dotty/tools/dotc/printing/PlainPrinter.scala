@@ -3,6 +3,7 @@ package printing
 
 import core._
 import Texts._, Types._, Flags._, Names._, Symbols._, NameOps._, Constants._, Denotations._
+import StdNames._
 import Contexts._
 import Scopes.Scope, Denotations.Denotation, Annotations.Annotation
 import StdNames.nme
@@ -89,7 +90,10 @@ class PlainPrinter(_ctx: Context) extends Printer {
     || (sym.name == nme.PACKAGE)               // package
   )
 
-  def nameString(name: Name): String = name.toString
+  def nameString(name: Name): String =
+    if (name eq tpnme.FromJavaObject) && !printDebug
+    then nameString(tpnme.Object)
+    else name.toString
 
   def toText(name: Name): Text = Str(nameString(name))
 
@@ -365,7 +369,7 @@ class PlainPrinter(_ctx: Context) extends Printer {
             " = " ~ toText(tp.alias)
           case TypeBounds(lo, hi) =>
             (if (lo isRef defn.NothingClass) Text() else " >: " ~ toText(lo))
-            ~ (if hi.isAny then Text() else " <: " ~ toText(hi))
+            ~ (if hi.isAny || (!printDebug && hi.isFromJavaObject) then Text() else " <: " ~ toText(hi))
         tparamStr ~ binder
       case tp @ ClassInfo(pre, cls, cparents, decls, selfInfo) =>
         val preText = toTextLocal(pre)

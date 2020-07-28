@@ -430,7 +430,7 @@ class TypeApplications(val self: Type) extends AnyVal {
    *  So hopefully our grand-children will not have to deal with this non-sense!
    */
   def translateJavaArrayElementType(using Context): Type =
-    if self.typeSymbol.isAbstractOrParamType && !self.derivesFrom(defn.ObjectClass) then
+    if self.typeSymbol.isAbstractOrParamType && (self.classSymbol eq defn.ObjectClass) then
       AndType(self, defn.ObjectType)
     else
       self
