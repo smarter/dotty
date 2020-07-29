@@ -322,7 +322,7 @@ class Definitions {
    *  Erasure works: ...
    */
   @tu lazy val FromJavaObjectSymbol: TypeSymbol =
-    newPermanentSymbol(JavaLangPackageClass, "FromJavaObject".toTypeName /*tpnme.Object*/, JavaDefined, TypeAlias(ObjectType)).entered
+    newPermanentSymbol(JavaLangPackageClass, tpnme.FromJavaObject, JavaDefined, TypeAlias(ObjectType)).entered
   def FromJavaObjectType: TypeRef = FromJavaObjectSymbol.typeRef
 
   @tu lazy val AnyRefAlias: TypeSymbol = enterAliasType(tpnme.AnyRef, ObjectType)

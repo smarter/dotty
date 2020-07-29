@@ -148,10 +148,8 @@ class ClassfileParser(
           in.nextChar
           defn.AnyType
         }
-        else {
-          val tp = pool.getSuperClass(in.nextChar).typeRef
-          if (tp eq defn.FromJavaObjectType) defn.ObjectType else tp
-        }
+        else
+          pool.getSuperClass(in.nextChar).typeRef
       val ifaceCount = in.nextChar
       var ifaces = for (i <- (0 until ifaceCount).toList) yield pool.getSuperClass(in.nextChar).typeRef
         // Dotty deviation: was
@@ -499,10 +497,8 @@ class ClassfileParser(
       else {
         classTParams = tparams
         val parents = new ListBuffer[Type]()
-        while (index < end) {
-          val parent = sig2type(tparams, skiptvs = false) // here the variance doesn't matter
-          parents += (if (parent eq defn.FromJavaObjectType) defn.ObjectType else parent)
-        }
+        while (index < end)
+          parents += sig2type(tparams, skiptvs = false) // here the variance doesn't matter
         TempClassInfoType(parents.toList, instanceScope, owner)
       }
     if (ownTypeParams.isEmpty) tpe else TempPolyType(ownTypeParams, tpe)

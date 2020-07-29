@@ -71,7 +71,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
               if isJava && {
                 val elemTp = last.elemType
                 assert(elemTp.typeSymbol != defn.AnyClass)
-                elemTp.typeSymbol == defn.FromJavaObjectSymbol
+                elemTp.isFromJavaObject
               }
               then
                 defn.ArrayOf(TypeBounds.upper(defn.ObjectType))

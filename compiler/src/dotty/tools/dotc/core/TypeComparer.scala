@@ -273,7 +273,7 @@ class TypeComparer(using val comparerCtx: Context) extends ConstraintHandling wi
             case _ =>
               secondTry
         end compareNamed
-        if !ctx.erasedTypes && (tp2.symbol eq defn.FromJavaObjectSymbol) then
+        if !ctx.erasedTypes && tp2.isFromJavaObject then
           recur(tp1, defn.AnyType)
         else
           compareNamed(tp1, tp2)
