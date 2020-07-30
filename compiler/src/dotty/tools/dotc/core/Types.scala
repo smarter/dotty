@@ -673,7 +673,8 @@ object Types {
         val rinfo = tp.refinedInfo
         if (name.isTypeName && !pinfo.isInstanceOf[ClassInfo]) { // simplified case that runs more efficiently
           val jointInfo =
-            if (ctx.base.pendingMemberSearches.contains(name)) pinfo safe_& rinfo
+            if (rinfo.isInstanceOf[TypeAlias]) rinfo
+            else if (ctx.base.pendingMemberSearches.contains(name)) pinfo safe_& rinfo
             else pinfo recoverable_& rinfo
           pdenot.asSingleDenotation.derivedSingleDenotation(pdenot.symbol, jointInfo)
         }
@@ -1020,8 +1021,14 @@ object Types {
      */
     def safe_& (that: Type)(using Context): Type = (this, that) match {
       case (TypeBounds(lo1, hi1), TypeBounds(lo2, hi2)) =>
-        TypeBounds(OrType(lo1.stripLazyRef, lo2.stripLazyRef), AndType(hi1.stripLazyRef, hi2.stripLazyRef))
-      case _ => this & that
+        def safeOrType(tp1: Type, tp2: Type): Type =
+          ctx.typeComparer.liftIfHK(tp1, tp2, OrType(_, _), safeOrType, _ & _)
+        def safeAndType(tp1: Type, tp2: Type): Type =
+          ctx.typeComparer.liftIfHK(tp1, tp2, AndType(_, _), safeAndType, _ | _)
+
+        TypeBounds(safeOrType(lo1.stripLazyRef, lo2.stripLazyRef), safeAndType(hi1.stripLazyRef, hi2.stripLazyRef))
+      case _ =>
+        this & that
     }
 
     /** `this & that`, but handle CyclicReferences by falling back to `safe_&`.
