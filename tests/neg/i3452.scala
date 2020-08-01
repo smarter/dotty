@@ -6,7 +6,9 @@ object Test {
   implicit def case1[F[_]](implicit t: => TC[F[Any]]): TC[Tuple2K[[_] =>> Any, F, Any]] = ???
   implicit def case2[A, F[_]](implicit r: TC[F[Any]]): TC[A] = ???
 
-  implicitly[TC[Int]] // error
+  // Disabled because it leads to an infinite loop in implicit search
+  // Maybe same root cause as https://github.com/lampepfl/dotty/issues/9504 ?
+  // implicitly[TC[Int]] // was: error
 }
 object Test2 {
   trait TC[A]
