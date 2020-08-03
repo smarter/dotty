@@ -958,7 +958,7 @@ class TypeComparer(using val comparerCtx: Context) extends ConstraintHandling wi
                     tl => tparams1.map(tparam => tl.integrate(tparams, tparam.paramInfo).bounds),
                     tl => tp1base.tycon.appliedTo(args1.take(lengthDiff) ++
                             tparams1.indices.toList.map(tl.paramRefs(_))))
-                (assumedTrue(tycon2) || isSubType(tycon1.ensureLambdaSub, tycon2)) &&
+                (assumedTrue(tycon2) || isSameType(tycon1.ensureLambdaSub, tycon2)) &&
                 recur(tp1, tycon1.appliedTo(args2))
               }
             }
