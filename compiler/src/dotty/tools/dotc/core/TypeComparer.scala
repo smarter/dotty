@@ -1028,8 +1028,7 @@ class TypeComparer(using val comparerCtx: Context) extends ConstraintHandling wi
                   false
               }
               liftToBase(tp1w.baseClasses)
-            } ||
-            fourthTry
+            }
         }
       }
 
