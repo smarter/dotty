@@ -849,6 +849,85 @@ class TypeComparer(using val comparerCtx: Context) extends ConstraintHandling wi
         case _ =>
       isSubType(pre1, pre2)
 
+    /** Compare `tycon[args]` with `other := otherTycon[otherArgs]`, via `>:>` if fromBelow is true, `<:<` otherwise
+     *  (we call this relationship `~:~` in the rest of this comment).
+     *
+     *  This method works by:
+     *
+     *  1. Choosing an appropriate type constructor `adaptedTycon`
+     *  2. Constraining `tycon` such that `tycon ~:~ adaptedTycon`
+     *  3. Recursing on `adaptedTycon[args] ~:~ other`
+     *
+     *  So, how do we pick `adaptedTycon`? When `args` and `otherArgs` have the
+     *  same length the answer is simply:
+     *
+     *    adaptedTycon := otherTycon
+     *
+     *  But we also handle having `args.length < otherArgs.length`, in which
+     *  case we need to make up a type constructor of the right kind. For
+     *  example, if `fromBelow = false` and we're comparing:
+     *
+     *    ?F[A] <:< Either[String, B] where `?F <: [X] =>> Any`
+     *
+     *  we will choose:
+     *
+     *    adaptedTycon := [X] =>> Either[String, X]
+     *
+     *  this allows us to constrain:
+     *
+     *    ?F <: adaptedTycon
+     *
+     *  and then recurse on:
+     *
+     *    adaptedTycon[A] <:< Either[String, B]
+     *
+     *  In general, given:
+     *
+     *  - k := args.length
+     *  - d := otherArgs.length - k
+     *
+     *  `adaptedTycon` will be:
+     *
+     *    [T_0, ..., T_k-1] =>> otherTycon[otherArgs(0), ..., otherArgs(d-1), T_0, ..., T_k-1]
+     *
+     *  where `T_n` has the same bounds as `otherTycon.typeParams(d+n)`
+     *
+     *  Historical note: this strategy is known in Scala as "partial unification"
+     *  (even though the type constructor variable isn't actually unified but only
+     *  has one of its bounds constrained), for background see:
+     *  - The infamous SI-2712: https://github.com/scala/bug/issues/2712
+     *  - The PR against Scala 2.12 implementing -Ypartial-unification: https://github.com/scala/scala/pull/5102
+     *  - Some explanations on how this impacts API design: https://gist.github.com/djspiewak/7a81a395c461fd3a09a6941d4cd040f2
+     */
+    def compareAppliedTypeParamRef(tycon: TypeParamRef, args: List[Type], other: AppliedType, fromBelow: Boolean): Boolean =
+      def directionalIsSubType(tp1: Type, tp2: Type): Boolean =
+        if fromBelow then isSubType(tp2, tp1) else isSubType(tp1, tp2)
+      def directionalRecur(tp1: Type, tp2: Type): Boolean =
+        if fromBelow then recur(tp2, tp1) else recur(tp1, tp2)
+
+      val otherTycon = other.tycon
+      val otherArgs = other.args
+
+      val d = otherArgs.length - args.length
+      d >= 0 && {
+        val tparams = tycon.typeParams
+        val remainingTparams = otherTycon.typeParams.drop(d)
+        variancesConform(remainingTparams, tparams) && {
+          val adaptedTycon =
+            if d > 0 then
+              HKTypeLambda(remainingTparams.map(_.paramName))(
+                tl => remainingTparams.map(remainingTparam =>
+                  tl.integrate(remainingTparams, remainingTparam.paramInfo).bounds),
+                tl => otherTycon.appliedTo(
+                  otherArgs.take(d) ++ tl.paramRefs))
+            else
+              otherTycon
+          (assumedTrue(tycon) || directionalIsSubType(tycon, adaptedTycon.ensureLambdaSub)) &&
+          directionalRecur(adaptedTycon.appliedTo(args), other)
+        }
+      }
+    end compareAppliedTypeParamRef
+
     /** Subtype test for the hk application `tp2 = tycon2[args2]`.
      */
     def compareAppliedType2(tp2: AppliedType, tycon2: Type, args2: List[Type]): Boolean = {
@@ -930,40 +1009,9 @@ class TypeComparer(using val comparerCtx: Context) extends ConstraintHandling wi
        *  or fallback to fourthTry.
        */
       def canInstantiate(tycon2: TypeParamRef): Boolean = {
-
-        /** Let
-         *
-         *    `tparams_1, ..., tparams_k-1`    be the type parameters of the rhs
-         *    `tparams1_1, ..., tparams1_n-1`  be the type parameters of the constructor of the lhs
-         *    `args1_1, ..., args1_n-1`        be the type arguments of the lhs
-         *    `d  =  n - k`
-         *
-         *  Returns `true` iff `d >= 0` and `tycon2` can be instantiated to
-         *
-         *      [tparams1_d, ... tparams1_n-1] -> tycon1[args_1, ..., args_d-1, tparams_d, ... tparams_n-1]
-         *
-         *  such that the resulting type application is a supertype of `tp1`.
-         */
         def appOK(tp1base: Type) = tp1base match {
           case tp1base: AppliedType =>
             compareAppliedTypeParamRef(tycon2, args2, tp1base, fromBelow = true)
-
-            // var tycon1 = tp1base.tycon
-            // val args1 = tp1base.args
-            // val tparams1all = tycon1.typeParams
-            // val lengthDiff = tparams1all.length - tparams.length
-            // lengthDiff >= 0 && {
-            //   val tparams1 = tparams1all.drop(lengthDiff)
-            //   variancesConform(tparams1, tparams) && {
-            //     if (lengthDiff > 0)
-            //       tycon1 = HKTypeLambda(tparams1.map(_.paramName))(
-            //         tl => tparams1.map(tparam => tl.integrate(tparams, tparam.paramInfo).bounds),
-            //         tl => tp1base.tycon.appliedTo(args1.take(lengthDiff) ++
-            //                 tparams1.indices.toList.map(tl.paramRefs(_))))
-            //     (assumedTrue(tycon2) || isSubType(tycon1.ensureLambdaSub, tycon2)) &&
-            //     recur(tp1, tycon1.appliedTo(args2))
-            //   }
-            // }
           case _ => false
         }
 
@@ -1039,93 +1087,6 @@ class TypeComparer(using val comparerCtx: Context) extends ConstraintHandling wi
       }
     }
 
-
-    // Compare `$paramRef[$args]` with `other`, via ">:>" if fromBelow is true, "<:<" otherwise.
-    // Compare `$paramRef[$args]` with `$otherTycon[$otherArgs]`
-    // Continue with `$otherTycon[$args]` x:x `$otherTycon[$otherArgs]`
-    // If args and otherArgs are the same length, this implies $paramRef x:x $otherTycon
-    // Otherwise, if args.length < otherArgs.length we do limited higher-order unification:
-    // $paramRef x:x [X, Y, ...] => $otherTycon[otherArgs1, otherArgs2, X, Y, ...]
-    //
-    /** Compare `tycon[args]` with `other := otherTycon[otherArgs]`, via `>:>` if fromBelow is true, `<:<` otherwise
-     *  (we call this relationship `~:~` in the rest of this comment).
-     *
-     *  This method works by:
-     *
-     *  1. Choosing an appropriate type constructor `adaptedTycon`
-     *  2. Constraining `tycon` such that `tycon ~:~ adaptedTycon`
-     *  3. Recursing on `adaptedTycon[args] ~:~ other`
-     *
-     *  So, how do we pick `adaptedTycon`? When `args` and `otherArgs` have the
-     *  same length the answer is simply:
-     *
-     *    adaptedTycon := otherTycon
-     *
-     *  But we also handle having `args.length < otherArgs.length`, in which
-     *  case we need to make up a type constructor of the right kind. For
-     *  example, if `fromBelow = false` and we're comparing:
-     *
-     *    ?F[A] <:< Either[String, B] where `?F <: [X] =>> Any`
-     *
-     *  we will choose:
-     *
-     *    adaptedTycon := [X] =>> Either[String, X]
-     *
-     *  this allows us to constrain:
-     *
-     *    ?F <: adaptedTycon
-     *
-     *  and then recurse on:
-     *
-     *    adaptedTycon[A] <:< Either[String, B]
-     *
-     *  In general, given:
-     *
-     *  - k := args.length
-     *  - d := otherArgs.length - k
-     *
-     *  `adaptedTycon` will be:
-     *
-     *    [T_0, ..., T_k-1] =>> otherTycon[otherArgs(0), ..., otherArgs(d-1), T_0, ..., T_k-1]
-     *
-     *  where `T_n` has the same bounds as `otherTycon.typeParams(d+n)`
-     *
-     *  Historical note: this strategy is known in Scala as "partial unification"
-     *  (even though the type constructor variable isn't actually unified but only
-     *  has one of its bounds constrained), for background see:
-     *  - The infamous SI-2712: https://github.com/scala/bug/issues/2712
-     *  - The PR against Scala 2.12 implementing -Ypartial-unification: https://github.com/scala/scala/pull/5102
-     *  - Some explanations on how this impacts API design: https://gist.github.com/djspiewak/7a81a395c461fd3a09a6941d4cd040f2
-     */
-    def compareAppliedTypeParamRef(tycon: TypeParamRef, args: List[Type], other: AppliedType, fromBelow: Boolean): Boolean =
-      def directionalIsSubType(tp1: Type, tp2: Type): Boolean =
-        if fromBelow then isSubType(tp2, tp1) else isSubType(tp1, tp2)
-      def directionalRecur(tp1: Type, tp2: Type): Boolean =
-        if fromBelow then recur(tp2, tp1) else recur(tp1, tp2)
-
-      val otherTycon = other.tycon
-      val otherArgs = other.args
-
-      val d = otherArgs.length - args.length
-      d >= 0 && {
-        val tparams = tycon.typeParams
-        val remainingTparams = otherTycon.typeParams.drop(d)
-        variancesConform(remainingTparams, tparams) && {
-          val adaptedTycon =
-            if d > 0 then
-              HKTypeLambda(remainingTparams.map(_.paramName))(
-                tl => remainingTparams.map(remainingTparam =>
-                  tl.integrate(remainingTparams, remainingTparam.paramInfo).bounds),
-                tl => otherTycon.appliedTo(
-                  otherArgs.take(d) ++ tl.paramRefs))
-            else
-              otherTycon
-          (assumedTrue(tycon) || directionalIsSubType(tycon, adaptedTycon.ensureLambdaSub)) &&
-          directionalRecur(adaptedTycon.appliedTo(args), other)
-        }
-      }
-    end compareAppliedTypeParamRef
-
     /** Subtype test for the application `tp1 = tycon1[args1]`.
      */
     def compareAppliedType1(tp1: AppliedType, tycon1: Type, args1: List[Type]): Boolean =
@@ -1136,25 +1097,6 @@ class TypeComparer(using val comparerCtx: Context) extends ConstraintHandling wi
           def canInstantiate = tp2 match {
             case tp2base: AppliedType =>
               compareAppliedTypeParamRef(param1, args1, tp2base, fromBelow = false)
-              // var tycon2 = tp2base.tycon
-              // val args2 = tp2base.args
-              // val tparams2all = tycon2.typeParams
-              // val tparams1 = tycon1.typeParams
-
-              // val lengthDiff = tparams2all.length - tparams1.length
-              // lengthDiff >= 0 && {
-              //   val tparams2 = tparams2all.drop(lengthDiff)
-              //   variancesConform(tparams2, tparams1) && {
-              //     if (lengthDiff > 0)
-              //       tycon2 = HKTypeLambda(tparams2.map(_.paramName))(
-              //         tl => tparams2.map(tparam => tl.integrate(tparams1, tparam.paramInfo).bounds),
-              //         tl => tp2base.tycon.appliedTo(args2.take(lengthDiff) ++
-              //           tparams2.indices.toList.map(tl.paramRefs(_))))
-              //     (assumedTrue(param1) || isSubType(param1, tycon2.ensureLambdaSub)) && {
-              //       recur(tycon2.appliedTo(args1), tp2)
-              //     }
-              //   }
-              // }
             case _ =>
               false
           }
