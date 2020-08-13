@@ -2086,27 +2086,26 @@ trait Applications extends Compatibility {
    *  where <type-args> comes from `pt` if it is a (possibly ignored) PolyProto.
    */
   def extMethodApply(methodRef: untpd.Tree, receiver: Tree, pt: Type)(using Context): Tree = {
-    // (1) always reveal further arguments in extension method applications,
-    // (2) but do not reveal anything else in a prototype.
-    // (1) is needed for i9509.scala (2) is needed for i6900.scala
-    val normPt = pt match
-      case IgnoredProto(ignored: FunProto) => ignored
-      case _ => pt
-
-    /** Integrate the type arguments from `currentPt` into `methodRef`, and produce
+    /** Integrate the type arguments from `currentPt` into `tree`, and produce
      *  a matching expected type.
-     *  If `currentPt` is ignored, the new expected type will be ignored too.
+     *
+     *  The returned expected type will be an IgnoredProto _if and only if_ it
+     *  would be a SelectionProto otherwise, this ensures that arguments are
+     *  taken into account (see i9509.scala) while allowing extension methods to
+     *  be chained (see i6900.scala).
      */
-    def integrateTypeArgs(currentPt: Type, wasIgnored: Boolean = false): (untpd.Tree, Type) = currentPt match {
-      case IgnoredProto(ignored) =>
-        integrateTypeArgs(ignored, wasIgnored = true)
+    def integrateTypeArgs(tree: untpd.Tree, currentPt: Type): (untpd.Tree, Type) = currentPt match
+      case _: SelectionProto =>
+        (tree, IgnoredProto(currentPt))
       case PolyProto(targs, restpe) =>
-        val core = untpd.TypeApply(methodRef, targs.map(untpd.TypedSplice(_)))
-        (core, if (wasIgnored) IgnoredProto(restpe) else restpe)
-      case _ =>
-        (methodRef, normPt)
-    }
-    val (core, pt1) = integrateTypeArgs(normPt)
+        val tree1 = untpd.TypeApply(tree, targs.map(untpd.TypedSplice(_)))
+        integrateTypeArgs(tree1, restpe)
+      case IgnoredProto(ignored) if !ignored.isInstanceOf[SelectionProto] =>
+        integrateTypeArgs(tree, ignored)
+      case pt =>
+        (tree, currentPt)
+
+    val (core, pt1) = integrateTypeArgs(methodRef, pt)
     val app = withMode(Mode.SynthesizeExtMethodReceiver) {
       typed(untpd.Apply(core, untpd.TypedSplice(receiver) :: Nil), pt1, ctx.typerState.ownedVars)
     }
