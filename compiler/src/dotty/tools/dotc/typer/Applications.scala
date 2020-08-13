@@ -2086,26 +2086,23 @@ trait Applications extends Compatibility {
    *  where <type-args> comes from `pt` if it is a (possibly ignored) PolyProto.
    */
   def extMethodApply(methodRef: untpd.Tree, receiver: Tree, pt: Type)(using Context): Tree = {
-    /** Integrate the type arguments from `currentPt` into `tree`, and produce
-     *  a matching expected type.
-     *
-     *  The returned expected type will be an IgnoredProto _if and only if_ it
-     *  would be a SelectionProto otherwise, this ensures that arguments are
-     *  taken into account (see i9509.scala) while allowing extension methods to
-     *  be chained (see i6900.scala).
+    /** Integrate the type arguments (if any) from `currentPt` into `tree`, and produce
+     *  an expected type that hides the appropriate amount of information through IgnoreProto.
      */
-    def integrateTypeArgs(tree: untpd.Tree, currentPt: Type): (untpd.Tree, Type) = currentPt match
+    def normalizePt(tree: untpd.Tree, currentPt: Type): (untpd.Tree, Type) = currentPt match
+      // Always reveal expected arguments to guide inference (needed for i9509.scala)
+      case IgnoredProto(ignored: FunOrPolyProto) =>
+        normalizePt(tree, ignored)
+      // Always hide expected member to allow for chained extensions (needed for i6900.scala)
       case _: SelectionProto =>
         (tree, IgnoredProto(currentPt))
       case PolyProto(targs, restpe) =>
         val tree1 = untpd.TypeApply(tree, targs.map(untpd.TypedSplice(_)))
-        integrateTypeArgs(tree1, restpe)
-      case IgnoredProto(ignored) if !ignored.isInstanceOf[SelectionProto] =>
-        integrateTypeArgs(tree, ignored)
-      case pt =>
+        normalizePt(tree1, restpe)
+      case _ =>
         (tree, currentPt)
 
-    val (core, pt1) = integrateTypeArgs(methodRef, pt)
+    val (core, pt1) = normalizePt(methodRef, pt)
     val app = withMode(Mode.SynthesizeExtMethodReceiver) {
       typed(untpd.Apply(core, untpd.TypedSplice(receiver) :: Nil), pt1, ctx.typerState.ownedVars)
     }
