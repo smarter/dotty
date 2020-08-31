@@ -2,7 +2,7 @@ package dotty.tools
 package dotc
 package core
 
-import Types._, Contexts._, Symbols._, Decorators._
+import Types._, Contexts._, Symbols._, Decorators._, TypeApplications._
 import util.SimpleIdentityMap
 import collection.mutable
 import printing.Printer
@@ -360,14 +360,25 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *    Q <: tp  implies  Q <: P      and isUpper = true, or
    *    tp <: Q  implies  P <: Q      and isUpper = false
    */
-  private def dependentParams(tp: Type, isUpper: Boolean): List[TypeParamRef] = tp match
+  private def dependentParams(tp: Type, isUpper: Boolean)(using Context): List[TypeParamRef] = tp match
     case param: TypeParamRef if contains(param) =>
       param :: (if (isUpper) upper(param) else lower(param))
     case tp: AndType if isUpper  =>
       dependentParams(tp.tp1, isUpper) | (dependentParams(tp.tp2, isUpper))
     case tp: OrType if !isUpper =>
       dependentParams(tp.tp1, isUpper).intersect(dependentParams(tp.tp2, isUpper))
+
+    case EtaExpansion(tycon) =>
+      // println("tyco: " + tycon.show)
+      dependentParams(tycon, isUpper)
+
+    // case tp @ HKTypeLambda(tparams, AppliedType(fn: TypeRef, args)) =>
+    //   println("#tp: " + tp)
+    //   println("tparams: " + tparams)
+    //   println("args: " + args)
+    //   Nil
     case _ =>
+      // println("tp: " + tp.show + " -- " + tp)
       Nil
 
   private def updateEntry(current: This, param: TypeParamRef, tp: Type)(using Context): This = {
