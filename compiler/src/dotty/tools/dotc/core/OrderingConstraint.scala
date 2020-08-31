@@ -259,6 +259,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         if (tp2.exists) tp.derivedOrType(tp1, tp2)
         else tp1
       else tp2
+    case EtaExpansion(tycon) =>
+      stripParams(tycon, todos, isUpper)
     case _ =>
       tp
   }
