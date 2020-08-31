@@ -167,7 +167,7 @@ class ExtractDependencies extends Phase {
       if (depFile.extension == "class") {
         // Dependency is external -- source is undefined
         // val binaryClassName = dep.to.enclosingPackageClass.fullName.toString + dep.to.flatName.toString
-        val b = dep.to.flatName.stripModuleClassSuffix.mangledString
+        val b = dep.to.flatName.mangledString
         val pkg = dep.to.enclosingPackageClass
         val binaryClassName =
           if pkg.isEffectiveRoot then b
