@@ -166,12 +166,14 @@ class ExtractDependencies extends Phase {
       def allowLocal = dep.context == DependencyByInheritance || dep.context == LocalDependencyByInheritance
       if (depFile.extension == "class") {
         // Dependency is external -- source is undefined
-        // val binaryClassName = dep.to.enclosingPackageClass.fullName.toString + dep.to.flatName.toString
-        val b = dep.to.flatName.mangledString
+
+        val builder = new StringBuilder
         val pkg = dep.to.enclosingPackageClass
-        val binaryClassName =
-          if pkg.isEffectiveRoot then b
-          else pkg.fullName.mangledString + "." + b
+        if (!pkg.isEffectiveRoot)
+          builder.append(pkg.fullName.mangledString)
+          builder.append(".")
+        builder.append(dep.to.flatName.mangledString)
+        val binaryClassName = builder.toString
 
         processExternalDependency(depFile, binaryClassName)
       } else if (allowLocal || depFile.file != sourceFile) {
