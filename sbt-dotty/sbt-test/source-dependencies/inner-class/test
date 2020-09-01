@@ -1,0 +1,10 @@
+> run
+
+# Recompile B
+$ copy-file changes/B2.scala B.scala
+> compile
+
+# Change the signature of A.Inner#foo, this requires B to be recompiled,
+# otherwise run will fail:
+$ copy-file changes/A2.scala A.scala
+> run
