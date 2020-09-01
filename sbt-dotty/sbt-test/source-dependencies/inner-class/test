@@ -1,6 +1,8 @@
 > run
 
-# Recompile B
+# Recompile B (no meaningful change, this is just so that the dependencies on A.InnerClass are
+# recorded using the `binaryDependency` sbt callback, which will only work correctly
+# if we call it with the inner class binary name and not the top-level class name).
 $ copy-file changes/B2.scala B.scala
 > compile
 
