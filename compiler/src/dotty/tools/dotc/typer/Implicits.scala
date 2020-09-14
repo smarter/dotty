@@ -1132,6 +1132,11 @@ trait Implicits:
         else if (prev.level != level) prev.level - level
         else explore(compare(prev.ref, ref))(using nestedContext())
 
+      def compareCandidate2(prev: Candidate, ref: TermRef, level: Int): Int =
+        if (prev.ref eq ref) 0
+        else if (prev.level != level) prev.level - level
+        else explore(compare(prev.ref, ref))(using nestedContext())
+
       /** If `alt1` is also a search success, try to disambiguate as follows:
        *    - If alt2 is preferred over alt1, pick alt2, otherwise return an
        *      ambiguous implicits error.
@@ -1200,7 +1205,12 @@ trait Implicits:
                     if (result.isSuccess)
                       warnAmbiguousNegation(fail.reason.asInstanceOf[AmbiguousImplicits])
                     result
-                  else healAmbiguous(remaining, fail)
+                  else {
+                    // healAmbiguous(remaining, fail)
+                    val newPending = pending
+                      .filter(p => compareCandidate2(cand, p.ref, p.level) < 0)
+                    rank(newPending, fail, Nil).recoverWith(_ => fail)
+                  }
                 else rank(remaining, found, fail :: rfailures)
               case best: SearchSuccess =>
                 if (ctx.mode.is(Mode.ImplicitExploration) || isCoherent)
