@@ -153,6 +153,7 @@ class TreePickler(pickler: TastyPickler) {
       writeByte(CLASSconst)
       pickleType(c.typeValue)
     case EnumTag =>
+      assert(false, "Reached: " + c + " " + ctx.compilationUnit.source)
       writeByte(ENUMconst)
       pickleType(c.symbolValue.termRef)
   }
