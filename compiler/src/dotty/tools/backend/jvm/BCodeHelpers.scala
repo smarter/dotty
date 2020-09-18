@@ -384,7 +384,7 @@ trait BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
           }
         case Ident(nme.WILDCARD) =>
           // An underscore argument indicates that we want to use the default value for this parameter, so do not emit anything
-        case t: tpd.RefTree if t.symbol.denot.owner.isAllOf(JavaEnumTrait) =>
+        case t: tpd.RefTree if t.symbol.owner.linkedClass.isAllOf(JavaEnumTrait) =>
           val edesc = innerClasesStore.typeDescriptor(t.tpe) // the class descriptor of the enumeration class.
           val evalue = t.symbol.javaSimpleName // value the actual enumeration value.
           av.visitEnum(name, edesc, evalue)
@@ -454,7 +454,7 @@ trait BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
 
     private def retentionPolicyOf(annot: Annotation): Symbol =
       annot.tree.tpe.typeSymbol.getAnnotation(AnnotationRetentionAttr).
-        flatMap(_.argumentConstant(0).map(_.symbolValue)).getOrElse(AnnotationRetentionClassAttr)
+        flatMap(_.argument(0).map(_.tpe.termSymbol)).getOrElse(AnnotationRetentionClassAttr)
 
     private def assocsFromApply(tree: Tree): List[(Name, Tree)] = {
       tree match {
