@@ -32,10 +32,22 @@ object Inferencing {
    *  Variables that are successfully minimized do not count as uninstantiated.
    */
   def isFullyDefined(tp: Type, force: ForceDegree.Value)(using Context): Boolean = {
+    val wasBottom = defn.isBottomType(tp)
     val nestedCtx = ctx.fresh.setNewTyperState()
-    val result = new IsFullyDefinedAccumulator(force)(using nestedCtx).process(tp)
-    if (result) nestedCtx.typerState.commit()
-    result
+    val force1 = if force == ForceDegree.flipBottom then ForceDegree.all else force
+    val result = new IsFullyDefinedAccumulator(force1)(using nestedCtx).process(tp)
+    // Only flipBottom if top-level is bottom (TODO: also probably only flip at top-level?)
+    if (result) {
+      if (!wasBottom && force == ForceDegree.flipBottom && defn(using nestedCtx).isBottomType(tp.stripTypeVar(using nestedCtx))) {
+        val nestedCtx2 = ctx.fresh.setNewTyperState()
+        val res2 = new IsFullyDefinedAccumulator(ForceDegree.flipBottom)(using nestedCtx2).process(tp)
+        if (res2) nestedCtx2.typerState.commit()
+        res2
+      } else {
+        nestedCtx.typerState.commit()
+        true
+      }
+    } else false
   }
 
   /** The fully defined type, where all type variables are forced.

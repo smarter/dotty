@@ -1205,8 +1205,8 @@ class Typer extends Namer
           else NoType
         case _ => NoType
       if target.exists then formal <:< target
-      if isFullyDefined(formal, ForceDegree.all) then formal
-      else if target.exists && isFullyDefined(target, ForceDegree.all) then target
+      if isFullyDefined(formal, ForceDegree.flipBottom) then formal
+      else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
       else errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.srcPos)
 
     def protoFormal(i: Int): Type =
