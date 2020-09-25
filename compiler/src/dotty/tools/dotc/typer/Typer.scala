@@ -1195,7 +1195,7 @@ class Typer extends Namer
      *  If all attempts fail, issue a "missing parameter type" error.
      */
     def inferredParamType(param: untpd.ValDef, formal: Type): Type =
-      if isFullyDefined(formal, ForceDegree.failBottom) then return formal
+      if isFullyDefined(formal, ForceDegree.flipBottom) then return formal
       val target = calleeType.widen match
         case mtpe: MethodType =>
           val pos = paramIndex(param.name)
