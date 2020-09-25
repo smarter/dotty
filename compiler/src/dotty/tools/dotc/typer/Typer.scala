@@ -1195,7 +1195,7 @@ class Typer extends Namer
      *  If all attempts fail, issue a "missing parameter type" error.
      */
     def inferredParamType(param: untpd.ValDef, formal: Type): Type =
-      if isFullyDefined(formal, ForceDegree.failBottom) then return formal
+      if isHeadDefined(formal, IfBottom.fail) then return formal
       val target = calleeType.widen match
         case mtpe: MethodType =>
           val pos = paramIndex(param.name)
@@ -1205,8 +1205,8 @@ class Typer extends Namer
           else NoType
         case _ => NoType
       if target.exists then formal <:< target
-      if isFullyDefined(formal, ForceDegree.flipBottom) then formal
-      else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
+      if isHeadDefined(formal, IfBottom.flip) then formal
+      else if target.exists && isHeadDefined(target, IfBottom.flip) then target
       else errorType(AnonymousFunctionMissingParamType(param, params, tree, formal), param.srcPos)
 
     def protoFormal(i: Int): Type =

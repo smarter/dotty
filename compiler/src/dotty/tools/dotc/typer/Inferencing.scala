@@ -38,6 +38,32 @@ object Inferencing {
     result
   }
 
+  def isHeadDefined(tp: Type, ifBottom: IfBottom)(using Context): Boolean = tp.dealias match {
+    case _: WildcardType | _: ProtoType =>
+      false
+    case tvar: TypeVar if !tvar.isInstantiated =>
+      ctx.typerState.constraint.contains(tvar) && {
+        val direction = instDirection(tvar.origin)
+        if direction != 0 then
+          instantiate(tvar, fromBelow = direction < 0)
+          true
+        else if tvar.hasLowerBound then
+          instantiate(tvar, fromBelow = true)
+          true
+        else if ifBottom != IfBottom.fail then
+          instantiate(tvar, fromBelow = ifBottom != IfBottom.flip)
+          true
+        else
+          false
+      }
+    case AppliedType(tycon, _) =>
+      isHeadDefined(tycon, ifBottom)
+    case tl: TypeLambda =>
+      isHeadDefined(tl.resType, ifBottom)
+    case _ =>
+      true
+  }
+
   /** The fully defined type, where all type variables are forced.
    *  Throws an error if type contains wildcards.
    */
@@ -81,6 +107,12 @@ object Inferencing {
     if (depVars.nonEmpty) instantiateSelected(tp, depVars.toList)
   }
 
+  private def instantiate(tvar: TypeVar, fromBelow: Boolean)(using Context): Type = {
+    val inst = tvar.instantiate(fromBelow)
+    typr.println(i"forced instantiation of ${tvar.origin} = $inst")
+    inst
+  }
+
   /** The accumulator which forces type variables using the policy encoded in `force`
    *  and returns whether the type is fully defined. The direction in which
    *  a type variable is instantiated is determined as follows:
@@ -111,12 +143,6 @@ object Inferencing {
    */
   private class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false)
     (using Context) extends TypeAccumulator[Boolean] {
-
-    private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
-      val inst = tvar.instantiate(fromBelow)
-      typr.println(i"forced instantiation of ${tvar.origin} = $inst")
-      inst
-    }
 
     private var toMaximize: List[TypeVar] = Nil
 
