@@ -3590,7 +3590,7 @@ class Typer extends Namer
               case _ => Nil
             }
             if (typeArgs.isEmpty) typeArgs = constrained(poly, tree)._2
-            convertNewGenericArray(readapt(tree.appliedToTypeTrees(typeArgs)))
+            convertNewGenericArray(readaptSimplified(tree.appliedToTypeTrees(typeArgs)))
           }
         case wtp =>
           val isStructuralCall = wtp.isValueType && isStructuralTermSelectOrApply(tree)
