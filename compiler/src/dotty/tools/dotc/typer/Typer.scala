@@ -2529,6 +2529,7 @@ class Typer extends Namer
   protected def simplify(tree: Tree, pt: Type, locked: TypeVars)(using Context): tree.type = {
     if (!tree.denot.isOverloaded &&
           // for overloaded trees: resolve overloading before simplifying
+        !tree.symbol.isTypeCast && // XX
         !tree.isInstanceOf[Applications.IntegratedTypeArgs])
           // don't interpolate in the middle of an extension method application
       if (!tree.tpe.widen.isInstanceOf[MethodOrPoly] // wait with simplifying until method is fully applied
