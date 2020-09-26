@@ -42,7 +42,7 @@ object Inferencing {
     case _: WildcardType | _: ProtoType =>
       false
     case tvar: TypeVar if !tvar.isInstantiated =>
-      ctx.typerState.constraint.contains(tvar) && {
+      val z = ctx.typerState.constraint.contains(tvar) && {
         val direction = instDirection(tvar.origin)
         if direction != 0 then
           instantiate(tvar, fromBelow = direction < 0)
@@ -56,6 +56,7 @@ object Inferencing {
         else
           false
       }
+      if z then isHeadDefined(tvar, ifBottom) else z
     case AppliedType(tycon, _) =>
       isHeadDefined(tycon, ifBottom)
     case tl: TypeLambda =>
