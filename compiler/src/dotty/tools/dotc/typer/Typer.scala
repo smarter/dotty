@@ -2591,7 +2591,8 @@ class Typer extends Namer
             tree match {
               case Select(_, i) if i == nme.asInstanceOf_ =>
               case _ =>
-                if (!tvar.isInstantiated && !locked.contains(tvar)) {
+                // XX: ownedVars check could hide issues, fine if it only happens in eta-expansion
+                if (!tvar.isInstantiated && !locked.contains(tvar) && ctx.typerState.ownedVars.contains(tvar)) {
                   report.error(
                     i"[t=$t]; typed($tree, $pt, $locked) -- ${tvar.toString} -- ${ctx.typerState.constraint}", t.srcPos)
                 }
