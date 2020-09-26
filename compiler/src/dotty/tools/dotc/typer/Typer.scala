@@ -2584,7 +2584,29 @@ class Typer extends Namer
         typed(tree, pt, locked)(using ctx.withSource(tree.source))
       else if ctx.run.isCancelled then
         tree.withType(WildcardType)
-      else adapt(typedUnadapted(tree, pt, locked), pt, locked)
+      else {
+        val ut = typedUnadapted(tree, pt, locked)
+        def check(t: Tree, tp: Type): Unit = tp.widenDealias match {
+          case tvar: TypeVar if !tvar.isInstantiated =>
+            tree match {
+              case Select(_, i) if i == nme.asInstanceOf_ =>
+              case _ =>
+                if (!tvar.isInstantiated && !locked.contains(tvar)) {
+                  report.error(
+                    i"[t=$t]; typed($tree, $pt, $locked) -- ${tvar.toString} -- ${ctx.typerState.constraint}", t.srcPos)
+                }
+            }
+          case AppliedType(tycon, _) =>
+            check(t, tycon)
+          case tl: TypeLambda =>
+            check(t, tl.resType)
+          case _ =>
+        }
+        // if (tree.isTerm) check(ut, ut.tpe)
+        val at = adapt(ut, pt, locked)
+        if (tree.isTerm && !at.isInstanceOf[IntegratedTypeArgs]) check(at, at.tpe)
+        at
+      }
     }
 
   def typed(tree: untpd.Tree, pt: Type = WildcardType)(using Context): Tree =
