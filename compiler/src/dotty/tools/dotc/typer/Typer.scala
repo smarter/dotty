@@ -2607,7 +2607,7 @@ class Typer extends Namer
         }
         // if (tree.isTerm) check(ut, ut.tpe)
         val at = adapt(ut, pt, locked)
-        if (tree.isTerm && !at.isInstanceOf[IntegratedTypeArgs]) check(at, at.tpe)
+        if (tree.isTerm && !at.isInstanceOf[IntegratedTypeArgs] && !at.tpe.widen.isInstanceOf[MethodOrPoly]) check(at, at.tpe)
         at
       }
     }
