@@ -32,22 +32,51 @@ object Inferencing {
    *  Variables that are successfully minimized do not count as uninstantiated.
    */
   def isFullyDefined(tp: Type, force: ForceDegree.Value)(using Context): Boolean = {
-    val wasBottom = defn.isBottomType(tp)
     val nestedCtx = ctx.fresh.setNewTyperState()
-    val force1 = if force == ForceDegree.flipBottom then ForceDegree.all else force
-    val result = new IsFullyDefinedAccumulator(force1)(using nestedCtx).process(tp)
-    // Only flipBottom if top-level is bottom (TODO: also probably only flip at top-level?)
-    if (result) {
-      if (!wasBottom && force == ForceDegree.flipBottom && defn(using nestedCtx).isBottomType(tp.stripTypeVar(using nestedCtx))) {
-        val nestedCtx2 = ctx.fresh.setNewTyperState()
-        val res2 = new IsFullyDefinedAccumulator(ForceDegree.flipBottom)(using nestedCtx2).process(tp)
-        if (res2) nestedCtx2.typerState.commit()
-        res2
-      } else {
+
+    if (!isHeadDefined(tp, force)(using nestedCtx)) false
+    else {
+      val result = new IsFullyDefinedAccumulator(force)(using nestedCtx).process(tp)
+      if (result) {
         nestedCtx.typerState.commit()
-        true
+        result
       }
-    } else false
+      else
+        false
+    }
+  }
+
+  def isHeadDefined(tp: Type, force: ForceDegree.Value)(using Context): Boolean = tp.dealias match {
+    case _: WildcardType | _: ProtoType =>
+      false
+    case tvar: TypeVar if !tvar.isInstantiated =>
+      val z = force.appliesTo(tvar) && ctx.typerState.constraint.contains(tvar) && {
+        val direction = instDirection(tvar.origin)
+        if direction != 0 then
+          instantiate(tvar, fromBelow = direction < 0)
+          true
+        else if tvar.hasLowerBound then
+          instantiate(tvar, fromBelow = true)
+          true
+        else if force.ifBottom != IfBottom.fail then
+          instantiate(tvar, fromBelow = force.ifBottom != IfBottom.flip)
+          true
+        else
+          false
+      }
+      if z then isHeadDefined(tvar, force) else z
+    case AppliedType(tycon, _) =>
+      isHeadDefined(tycon, force)
+    case tl: TypeLambda =>
+      isHeadDefined(tl.resType, force)
+    case _ =>
+      true
+  }
+
+  private def instantiate(tvar: TypeVar, fromBelow: Boolean)(using Context): Type = {
+    val inst = tvar.instantiate(fromBelow)
+    typr.println(i"forced instantiation of ${tvar.origin} = $inst")
+    inst
   }
 
   /** The fully defined type, where all type variables are forced.
@@ -124,12 +153,6 @@ object Inferencing {
   private class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false)
     (using Context) extends TypeAccumulator[Boolean] {
 
-    private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
-      val inst = tvar.instantiate(fromBelow)
-      typr.println(i"forced instantiation of ${tvar.origin} = $inst")
-      inst
-    }
-
     private var toMaximize: List[TypeVar] = Nil
 
     def apply(x: Boolean, tp: Type): Boolean = tp.dealias match {
@@ -146,10 +169,8 @@ object Inferencing {
             if tvar.hasLowerBound then instantiate(tvar, fromBelow = true)
             else if tvar.hasUpperBound then instantiate(tvar, fromBelow = false)
             else () // hold off instantiating unbounded unconstrained variables
-          else if variance >= 0 && (force.ifBottom == IfBottom.ok || tvar.hasLowerBound) then
+          else if variance >= 0 then
             instantiate(tvar, fromBelow = true)
-          else if variance >= 0 && force.ifBottom == IfBottom.fail then
-            return false
           else
             toMaximize = tvar :: toMaximize
           foldOver(x, tvar)
@@ -592,7 +613,7 @@ trait Inferencing { this: Typer =>
   }
 }
 
-/** An enumeration controlling the degree of forcing in "is-dully-defined" checks. */
+/** An enumeration controlling the degree of forcing in "is-fully-defined" checks. */
 @sharable object ForceDegree {
   class Value(val appliesTo: TypeVar => Boolean, val ifBottom: IfBottom)
   val none: Value = new Value(_ => false, IfBottom.ok)
