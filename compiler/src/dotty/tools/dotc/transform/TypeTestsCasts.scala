@@ -282,6 +282,15 @@ object TypeTestsCasts {
           else if (testCls eq defn.BoxedUnitClass)
             // as a special case, casting to Unit always successfully returns Unit
             Block(expr :: Nil, Literal(Constant(()))).withSpan(expr.span)
+          else if (testCls eq defn.NothingClass) {
+            // don't report if @unchecked is used?
+            report.error(ex"a cast to `Nothing` will always throw a `ClassCastException` at runtime", tree.srcPos)
+            // In the JVM `x.asInstanceOf[Nothing]` would throw a class cast exception except when `x eq null`.
+            // To avoid this loophole we execute `x` and then regardless of the result throw a `ClassCastException`
+            val throwCCE = Throw(New(defn.ClassCastExceptionClass.typeRef, defn.ClassCastExceptionClass_stringConstructor,
+                Literal(Constant("Cannot cast to scala.Nothing")) :: Nil))
+            Block(expr :: Nil, throwCCE).withSpan(expr.span)
+          }
           else if (foundClsSymPrimitive)
             if (testCls.isPrimitiveValueClass) primitiveConversion(expr, testCls)
             else derivedTree(box(expr), defn.Any_asInstanceOf, testType)
@@ -289,13 +298,6 @@ object TypeTestsCasts {
             unbox(expr.ensureConforms(defn.ObjectType), testType)
           else if (isDerivedValueClass(testCls))
             expr // adaptToType in Erasure will do the necessary type adaptation
-          else if (testCls eq defn.NothingClass) {
-            // In the JVM `x.asInstanceOf[Nothing]` would throw a class cast exception except when `x eq null`.
-            // To avoid this loophole we execute `x` and then regardless of the result throw a `ClassCastException`
-            val throwCCE = Throw(New(defn.ClassCastExceptionClass.typeRef, defn.ClassCastExceptionClass_stringConstructor,
-                Literal(Constant("Cannot cast to scala.Nothing")) :: Nil))
-            Block(expr :: Nil, throwCCE).withSpan(expr.span)
-          }
           else
             derivedTree(expr, defn.Any_asInstanceOf, testType)
         }
