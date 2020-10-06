@@ -3831,6 +3831,8 @@ object Types {
   abstract case class AppliedType(tycon: Type, args: List[Type])
   extends CachedProxyType with ValueType {
 
+    assert(!tycon.isInstanceOf[HKTypeLambda], s"$tycon -- $args")
+
     private var validSuper: Period = Nowhere
     private var cachedSuper: Type = _
 
