@@ -85,7 +85,7 @@ final case class SbtCommunityProject(
       if (forceUpgradeSbtScalajsPlugin) List(s"--addPluginSbtFile=$sbtScalaJSPluginFilePath")
       else Nil
     extraSbtArgs ++ sbtProps ++ List(
-      "-sbt-version", "1.3.8",
+      "-sbt-version", "1.4.1",
        "-Dsbt.supershell=false",
       s"--addPluginSbtFile=$sbtPluginFilePath"
     ) ++ scalaJSPluginArgs
