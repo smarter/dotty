@@ -172,8 +172,8 @@ object projects:
 
   lazy val scalacheck = SbtCommunityProject(
     project       = "scalacheck",
-    sbtTestCommand   = "jvm/test",
-    sbtPublishCommand = ";set jvm/publishArtifact in (Compile, packageDoc) := false ;jvm/publishLocal"
+    sbtTestCommand   = "test",
+    sbtPublishCommand = "publishLocal"
   )
 
   lazy val scalatest = SbtCommunityProject(
@@ -222,6 +222,7 @@ object projects:
   lazy val minitest = SbtCommunityProject(
     project       = "minitest",
     sbtTestCommand   = "compile",
+    dependencies = List(scalacheck)
   )
 
   lazy val fastparse = SbtCommunityProject(
