@@ -515,7 +515,7 @@ class TreeChecker extends Phase with SymTransformer {
     override def typedStats(trees: List[untpd.Tree], exprOwner: Symbol)(using Context): (List[Tree], Context) = {
       for (tree <- trees) tree match {
         case tree: untpd.DefTree => checkOwner(tree)
-        case _: untpd.Thicket => assert(false, i"unexpanded thicket $tree in statement sequence $trees%\n%")
+        case t: untpd.Thicket if !t.isEmpty => assert(false, i"unexpanded thicket $tree in statement sequence $trees%\n%")
         case _ =>
       }
       super.typedStats(trees, exprOwner)

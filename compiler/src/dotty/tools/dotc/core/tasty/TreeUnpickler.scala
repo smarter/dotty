@@ -984,7 +984,12 @@ class TreeUnpickler(reader: TastyReader,
       val importGiven = nextByte == GIVEN  // TODO: drop the next time we bump Tasty versions
       if (importGiven) readByte()
       val expr = readTerm()
-      setSpan(start, Import(expr, readSelectors(importGiven)))
+      val selectors = readSelectors(importGiven)
+
+      val tree =
+        if (ctx.settings.YtestPickler.value) Import(expr, selectors) else EmptyTree
+
+      setSpan(start, tree)
     }
     def readSelectors(givenPrefix: Boolean)(using Context): List[untpd.ImportSelector] =
       if nextByte == IMPORTED then
