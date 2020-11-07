@@ -462,7 +462,7 @@ class ClassfileParser(
       while (sig(index) == ':') {
         index += 1
         if (sig(index) != ':') // guard against empty class bound
-          ts += sig2type(tparams, skiptvs)
+          ts += cook(sig2type(tparams, skiptvs))
       }
       val bound = if ts.isEmpty then defn.AnyType else ts.reduceLeft(AndType.apply)
       TypeBounds.upper(bound)
