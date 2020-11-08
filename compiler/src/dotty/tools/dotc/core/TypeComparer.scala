@@ -1065,6 +1065,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
                           case tp1a as AppliedType(_, args1a) if args1a.eqElements(args1) =>
                             tp2.superType match
                               case tp2a as AppliedType(_, args2a) if args2a.eqElements(args2) =>
+                                assert(false, i"$tp1 - $tp1a || $tp2 - $tp2a")
                                 return recur(tp1a, tp2a)
                               case _ =>
                           case _ =>
