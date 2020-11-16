@@ -484,8 +484,18 @@ trait BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
     def getGenericSignature(sym: Symbol, owner: Symbol): String = {
       atPhase(erasurePhase) {
         val memberTpe =
-          if (sym.is(Method)) sym.denot.info
-          else owner.denot.thisType.memberInfo(sym)
+          if (sym.is(Method)) {
+            val x = sym.denot.info
+            val y = owner.denot.thisType.memberInfo(sym)
+            assert(x =:= y, s"M owner: ${owner.show} -- x: ${x.show}, y: ${y.show}")
+            y
+          }
+          else {
+            val x = sym.denot.info
+            val y = owner.denot.thisType.memberInfo(sym)
+            assert(x =:= y, s"O owner: ${owner.show} -- x: ${x.show}, y: ${y.show}")
+            x
+          }
         getGenericSignatureHelper(sym, owner, memberTpe).orNull
       }
     }
