@@ -88,9 +88,9 @@ object Inferencing {
   def couldInstantiateTypeVar(tp: Type)(using Context): Boolean = tp.dealias match
     case tvar: TypeVar
     if !tvar.isInstantiated
-       && ctx.typerState.constraint.contains(tvar)
-       && tvar.hasLowerBound =>
-      tvar.instantiate(fromBelow = true)
+       && ctx.typerState.constraint.contains(tvar) =>
+      val direction = instDirection(tvar.origin)
+      tvar.instantiate(fromBelow = direction < 0 || tvar.hasLowerBound)
       true
     case AppliedType(tycon, _) =>
       couldInstantiateTypeVar(tycon)
