@@ -18,11 +18,12 @@ jobs:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
         - ${{ github.workspace }}/../../cache/general:/root/.cache
-    if: "(
+    if: "contains(github.event.head_commit.message, '[test_non_bootstrapped]') ||
+         (
            github.event_name == 'push' &&
            !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
          ) ||
-         github.event_name == 'schedule')"
+         github.event_name == 'schedule'"
     steps:
       - name: Set JDK 15 as default
         run: echo "/usr/lib/jvm/java-15-openjdk-amd64/bin" >> $GITHUB_PATH
@@ -78,8 +79,11 @@ jobs:
 
   test_windows:
     runs-on: [self-hosted, Windows]
-    if: "!(github.event_name == 'push' &&
-           startsWith(github.event.ref, 'refs/tags/sbt-dotty-'))"
+    if: "!contains(github.event.head_commit.message, '[skip test_windows]') &&
+         !(
+           github.event_name == 'push' &&
+           startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+         )"
 
     steps:
       - name: Git Checkout
@@ -157,11 +161,12 @@ jobs:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
         - ${{ github.workspace }}/../../cache/general:/root/.cache
-    if: (
-          github.event_name == 'push' &&
-          startsWith(github.event.ref, 'refs/tags/')
-        ) ||
-        github.event_name == 'schedule'
+    if: "contains(github.event.head_commit.message, '[test_sbt]') ||
+         (
+           github.event_name == 'push' &&
+           startsWith(github.event.ref, 'refs/tags/')
+         ) ||
+         github.event_name == 'schedule'"
 
     steps:
       - name: Checkout cleanup script
@@ -188,10 +193,13 @@ jobs:
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
         - ${{ github.workspace }}/../../cache/general:/root/.cache
 
-    if: "(
-          github.event_name == 'push' &&
-          startsWith(github.event.ref, 'refs/tags/') &&
-          !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+    if: "contains(github.event.head_commit.message, '[test_java8]') ||
+         (
+           github.event_name == 'push' &&
+           (
+             startsWith(github.event.ref, 'refs/tags/') &&
+             !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+           )
          ) ||
          github.event_name == 'schedule'"
 
