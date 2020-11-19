@@ -18,12 +18,13 @@ jobs:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
         - ${{ github.workspace }}/../../cache/general:/root/.cache
-    if: "contains(github.event.head_commit.message, '[test_non_bootstrapped]') ||
-         (
-           github.event_name == 'push' &&
-           !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
-         ) ||
-         github.event_name == 'schedule'"
+    if: "!contains(github.event.head_commit.message, '[skip ci]')
+         && (contains(github.event.head_commit.message, '[test_non_bootstrapped]')
+         || (
+           github.event_name == 'push'
+           && !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+         )
+         || github.event_name == 'schedule')"
     steps:
       - name: Set JDK 15 as default
         run: echo "/usr/lib/jvm/java-15-openjdk-amd64/bin" >> $GITHUB_PATH
@@ -45,418 +46,420 @@ jobs:
           ./project/scripts/sbt ";compile ;test"
           ./project/scripts/cmdTests
 
-  test:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-    if: "!(github.event_name == 'push' &&
-           startsWith(github.event.ref, 'refs/tags/sbt-dotty-'))"
-
-    steps:
-      - name: Set JDK 15 as default
-        run: echo "/usr/lib/jvm/java-15-openjdk-amd64/bin" >> $GITHUB_PATH
-
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Test
-        run: |
-          ./project/scripts/sbt ";scala3-bootstrapped/compile ;scala3-bootstrapped/test;sjsSandbox/run;sjsSandbox/test;sjsJUnitTests/test;sjsCompilerTests/test ;sbt-dotty/scripted scala2-compat/* ;configureIDE ;stdlib-bootstrapped/test:run ;stdlib-bootstrapped-tasty-tests/test"
-          ./project/scripts/bootstrapCmdTests
-
-  test_windows:
-    runs-on: [self-hosted, Windows]
-    if: "!contains(github.event.head_commit.message, '[skip test_windows]') &&
-         !(
-           github.event_name == 'push' &&
-           startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
-         )"
-
-    steps:
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Test
-        run: sbt ";scala3-bootstrapped/compile ;scala3-bootstrapped/test"
-        shell: cmd
-
-      - name: Scala.js Test
-        run: sbt ";sjsJUnitTests/test ;sjsCompilerTests/test"
-        shell: cmd
-
-  community_build_a:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Test
-        run: |
-          git submodule sync
-          git submodule update --init --recursive --jobs 7
-          ./project/scripts/sbt "community-build/testOnly dotty.communitybuild.CommunityBuildTestA"
-
-  community_build_b:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Test
-        run: |
-          git submodule sync
-          git submodule update --init --recursive --jobs 7
-          ./project/scripts/sbt "community-build/testOnly dotty.communitybuild.CommunityBuildTestB"
-
-  test_sbt:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-    if: "contains(github.event.head_commit.message, '[test_sbt]') ||
-         (
-           github.event_name == 'push' &&
-           startsWith(github.event.ref, 'refs/tags/')
-         ) ||
-         github.event_name == 'schedule'"
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Test
-        run: ./project/scripts/sbt sbt-dotty/scripted
-
-  test_java8:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-
-    if: "contains(github.event.head_commit.message, '[test_java8]') ||
-         (
-           github.event_name == 'push' &&
-           (
-             startsWith(github.event.ref, 'refs/tags/') &&
-             !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
-           )
-         ) ||
-         github.event_name == 'schedule'"
-
-    steps:
-      - name: Set JDK 8 as default
-        run: echo "/usr/lib/jvm/java-8-openjdk-amd64/bin" >> $GITHUB_PATH
-
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Test
-        run: |
-          ./project/scripts/sbt ";scala3-bootstrapped/compile ;scala3-bootstrapped/test;sjsSandbox/run;sjsSandbox/test;sjsJUnitTests/test;sjsCompilerTests/test ;sbt-dotty/scripted scala2-compat/* ;configureIDE ;stdlib-bootstrapped/test:run ;stdlib-bootstrapped-tasty-tests/test"
-          ./project/scripts/bootstrapCmdTests
-
-  publish_nightly:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-    needs: [test_non_bootstrapped, test, community_build_a, community_build_b, test_sbt, test_java8]
-    if: github.event_name == 'schedule'
-    env:
-      NIGHTLYBUILD: yes
-      PGP_PW: ${{ secrets.PGP_PW }}  # PGP passphrase
-      PGP_SECRET: ${{ secrets.PGP_SECRET }}  # Export your private and public PGP key to an *.asc file, take the file's contents as a string
-      SONATYPE_PW: ${{ secrets.SONATYPE_PW_ORGSCALALANG }}
-      SONATYPE_USER: ${{ secrets.SONATYPE_USER_ORGSCALALANG }}
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Publish Nightly
-        run: |
-          ./project/scripts/sbtPublish ";project scala3-bootstrapped ;publishSigned ;sonatypeBundleRelease"
-
-  nightly_documentation:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-    needs: [publish_nightly]
-    if: github.event_name == 'schedule'
-    env:
-      NIGHTLYBUILD: yes
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # If you need to change this:
-                                           # Generate one at https://github.com/settings/tokens
-                                           # Make sure you have the write permissions to the repo: https://github.com/lampepfl/dotty-website
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Generate Website
-        run: |
-          ./project/scripts/genDocs -doc-snapshot
-
-      - name: Deploy Website
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.BOT_TOKEN }}
-          publish_dir: docs/_site
-          external_repository: lampepfl/dotty-website
-          publish_branch: gh-pages
-
-  publish_release:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-    needs: [test_non_bootstrapped, test, community_build_a, community_build_b, test_sbt, test_java8]
-    if: github.event_name == 'push' &&
-        startsWith(github.event.ref, 'refs/tags/') &&
-        !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
-
-    env:
-      RELEASEBUILD: yes
-      PGP_PW: ${{ secrets.PGP_PW }}  # PGP passphrase
-      PGP_SECRET: ${{ secrets.PGP_SECRET }}  # Export your private and public PGP key to an *.asc file, take the file's contents as a string
-      SONATYPE_PW: ${{ secrets.SONATYPE_PW_ORGSCALALANG }}
-      SONATYPE_USER: ${{ secrets.SONATYPE_USER_ORGSCALALANG }}
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Publish Release
-        run: |
-          ./project/scripts/sbt dist/packArchive
-          sha256sum dist/target/dotty-* > dist/target/sha256sum.txt
-          ./project/scripts/sbtPublish ";project scala3-bootstrapped ;publishSigned ;sonatypeBundleRelease"
-          echo "name=RELEASE_TAG::${GITHUB_REF#*refs/tags/}" >> $GITHUB_ENV
-
-      - name: Create GitHub Release
-        id: create_gh_release
-        uses: actions/create-release@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          body:
-          draft: false
-          prerelease: ${{ contains(env.RELEASE_TAG, 'RC') }}
-
-      - name: Upload zip archive to GitHub Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_gh_release.outputs.upload_url }}
-          asset_path: ./dist/target/dotty-${{ env.RELEASE_TAG }}.zip
-          asset_name: dotty-${{ env.RELEASE_TAG }}.zip
-          asset_content_type: application/zip
-
-      - name: Upload tar.gz archive to GitHub Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_gh_release.outputs.upload_url }}
-          asset_path: ./dist/target/dotty-${{ env.RELEASE_TAG }}.tar.gz
-          asset_name: dotty-${{ env.RELEASE_TAG }}.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload SHA256 sum of the release artefacts to GitHub Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_gh_release.outputs.upload_url }}
-          asset_path: ./dist/target/sha256sum.txt
-          asset_name: sha256sum.txt
-          asset_content_type: text/plain
-
-  release_documentation:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-    needs: [publish_release]
-    if: github.event_name == 'push' &&
-        startsWith(github.event.ref, 'refs/tags/') &&
-        !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
-
-    env:
-      RELEASEBUILD: yes
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # If you need to change this:
-                                           # Generate one at https://github.com/settings/tokens
-                                           # Make sure you have the write permissions to the repo: https://github.com/lampepfl/dotty-website
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Generate Website
-        run: |
-          ./project/scripts/genDocs -doc-snapshot
-
-      - name: Deploy Website
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.BOT_TOKEN }}
-          publish_dir: docs/_site
-          external_repository: lampepfl/dotty-website
-          publish_branch: gh-pages
-
-  publish_sbt_release:
-    runs-on: [self-hosted, Linux]
-    container:
-      image: lampepfl/dotty:2020-11-19
-      volumes:
-        - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
-        - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
-        - ${{ github.workspace }}/../../cache/general:/root/.cache
-    needs: [community_build_a, community_build_b, test_sbt]
-    if: github.event_name == 'push' &&
-        startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
-
-    env:
-      RELEASEBUILD: yes
-      PGP_PW: ${{ secrets.PGP_PW }}  # PGP passphrase
-      PGP_SECRET: ${{ secrets.PGP_SECRET }}  # Export your private and public PGP key to an *.asc file, take the file's contents as a string
-      SONATYPE_PW: ${{ secrets.SONATYPE_PW }}
-      SONATYPE_USER: ${{ secrets.SONATYPE_USER }}
-
-    steps:
-      - name: Checkout cleanup script
-        uses: actions/checkout@v2
-
-      - name: Cleanup
-        run: .github/workflows/cleanup.sh
-
-      - name: Git Checkout
-        uses: actions/checkout@v2
-
-      - name: Add SBT proxy repositories
-        run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
-
-      - name: Publish Dotty SBT Plugin Release
-        run: |
-          ./project/scripts/sbtPublish ";project sbt-dotty ;publishSigned ;sonatypeBundleRelease"
+  # test:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+  #   if: "!contains(github.event.head_commit.message, '[skip ci]') && (
+  #          !(github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/sbt-dotty-'))
+  #        )"
+
+  #   steps:
+  #     - name: Set JDK 15 as default
+  #       run: echo "/usr/lib/jvm/java-15-openjdk-amd64/bin" >> $GITHUB_PATH
+
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Test
+  #       run: |
+  #         ./project/scripts/sbt ";scala3-bootstrapped/compile ;scala3-bootstrapped/test;sjsSandbox/run;sjsSandbox/test;sjsJUnitTests/test;sjsCompilerTests/test ;sbt-dotty/scripted scala2-compat/* ;configureIDE ;stdlib-bootstrapped/test:run ;stdlib-bootstrapped-tasty-tests/test"
+  #         ./project/scripts/bootstrapCmdTests
+
+  # test_windows:
+  #   runs-on: [self-hosted, Windows]
+  #   if: "!contains(github.event.head_commit.message, '[skip ci]') &&
+  #        !contains(github.event.head_commit.message, '[skip test_windows]') && (
+  #          github.event_name != 'push' ||
+  #          !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+  #        )"
+
+  #   steps:
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Test
+  #       run: sbt ";scala3-bootstrapped/compile ;scala3-bootstrapped/test"
+  #       shell: cmd
+
+  #     - name: Scala.js Test
+  #       run: sbt ";sjsJUnitTests/test ;sjsCompilerTests/test"
+  #       shell: cmd
+
+  # community_build_a:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Test
+  #       run: |
+  #         git submodule sync
+  #         git submodule update --init --recursive --jobs 7
+  #         ./project/scripts/sbt "community-build/testOnly dotty.communitybuild.CommunityBuildTestA"
+
+  # community_build_b:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Test
+  #       run: |
+  #         git submodule sync
+  #         git submodule update --init --recursive --jobs 7
+  #         ./project/scripts/sbt "community-build/testOnly dotty.communitybuild.CommunityBuildTestB"
+
+  # test_sbt:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+  #   if: "!contains(github.event.head_commit.message, '[skip ci]') && (
+  #          contains(github.event.head_commit.message, '[test_sbt]') || (
+  #            github.event_name == 'push' &&
+  #            startsWith(github.event.ref, 'refs/tags/')
+  #          ) ||
+  #          github.event_name == 'schedule'
+  #        )"
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Test
+  #       run: ./project/scripts/sbt sbt-dotty/scripted
+
+  # test_java8:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+
+  #   if: "!contains(github.event.head_commit.message, '[skip ci]') && (
+  #          contains(github.event.head_commit.message, '[test_java8]') || (
+  #            github.event_name == 'push' && (
+  #              startsWith(github.event.ref, 'refs/tags/') &&
+  #              !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+  #            )
+  #          ) ||
+  #          github.event_name == 'schedule'
+  #        )"
+
+  #   steps:
+  #     - name: Set JDK 8 as default
+  #       run: echo "/usr/lib/jvm/java-8-openjdk-amd64/bin" >> $GITHUB_PATH
+
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Test
+  #       run: |
+  #         ./project/scripts/sbt ";scala3-bootstrapped/compile ;scala3-bootstrapped/test;sjsSandbox/run;sjsSandbox/test;sjsJUnitTests/test;sjsCompilerTests/test ;sbt-dotty/scripted scala2-compat/* ;configureIDE ;stdlib-bootstrapped/test:run ;stdlib-bootstrapped-tasty-tests/test"
+  #         ./project/scripts/bootstrapCmdTests
+
+  # publish_nightly:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+  #   needs: [test_non_bootstrapped, test, community_build_a, community_build_b, test_sbt, test_java8]
+  #   if: github.event_name == 'schedule'
+  #   env:
+  #     NIGHTLYBUILD: yes
+  #     PGP_PW: ${{ secrets.PGP_PW }}  # PGP passphrase
+  #     PGP_SECRET: ${{ secrets.PGP_SECRET }}  # Export your private and public PGP key to an *.asc file, take the file's contents as a string
+  #     SONATYPE_PW: ${{ secrets.SONATYPE_PW_ORGSCALALANG }}
+  #     SONATYPE_USER: ${{ secrets.SONATYPE_USER_ORGSCALALANG }}
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Publish Nightly
+  #       run: |
+  #         ./project/scripts/sbtPublish ";project scala3-bootstrapped ;publishSigned ;sonatypeBundleRelease"
+
+  # nightly_documentation:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+  #   needs: [publish_nightly]
+  #   if: github.event_name == 'schedule'
+  #   env:
+  #     NIGHTLYBUILD: yes
+  #     BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # If you need to change this:
+  #                                          # Generate one at https://github.com/settings/tokens
+  #                                          # Make sure you have the write permissions to the repo: https://github.com/lampepfl/dotty-website
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Generate Website
+  #       run: |
+  #         ./project/scripts/genDocs -doc-snapshot
+
+  #     - name: Deploy Website
+  #       uses: peaceiris/actions-gh-pages@v3
+  #       with:
+  #         personal_token: ${{ secrets.BOT_TOKEN }}
+  #         publish_dir: docs/_site
+  #         external_repository: lampepfl/dotty-website
+  #         publish_branch: gh-pages
+
+  # publish_release:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+  #   needs: [test_non_bootstrapped, test, community_build_a, community_build_b, test_sbt, test_java8]
+  #   if: github.event_name == 'push' &&
+  #       startsWith(github.event.ref, 'refs/tags/') &&
+  #       !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+
+  #   env:
+  #     RELEASEBUILD: yes
+  #     PGP_PW: ${{ secrets.PGP_PW }}  # PGP passphrase
+  #     PGP_SECRET: ${{ secrets.PGP_SECRET }}  # Export your private and public PGP key to an *.asc file, take the file's contents as a string
+  #     SONATYPE_PW: ${{ secrets.SONATYPE_PW_ORGSCALALANG }}
+  #     SONATYPE_USER: ${{ secrets.SONATYPE_USER_ORGSCALALANG }}
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Publish Release
+  #       run: |
+  #         ./project/scripts/sbt dist/packArchive
+  #         sha256sum dist/target/dotty-* > dist/target/sha256sum.txt
+  #         ./project/scripts/sbtPublish ";project scala3-bootstrapped ;publishSigned ;sonatypeBundleRelease"
+  #         echo "name=RELEASE_TAG::${GITHUB_REF#*refs/tags/}" >> $GITHUB_ENV
+
+  #     - name: Create GitHub Release
+  #       id: create_gh_release
+  #       uses: actions/create-release@latest
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+  #       with:
+  #         tag_name: ${{ github.ref }}
+  #         release_name: ${{ github.ref }}
+  #         body:
+  #         draft: false
+  #         prerelease: ${{ contains(env.RELEASE_TAG, 'RC') }}
+
+  #     - name: Upload zip archive to GitHub Release
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ steps.create_gh_release.outputs.upload_url }}
+  #         asset_path: ./dist/target/dotty-${{ env.RELEASE_TAG }}.zip
+  #         asset_name: dotty-${{ env.RELEASE_TAG }}.zip
+  #         asset_content_type: application/zip
+
+  #     - name: Upload tar.gz archive to GitHub Release
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ steps.create_gh_release.outputs.upload_url }}
+  #         asset_path: ./dist/target/dotty-${{ env.RELEASE_TAG }}.tar.gz
+  #         asset_name: dotty-${{ env.RELEASE_TAG }}.tar.gz
+  #         asset_content_type: application/gzip
+
+  #     - name: Upload SHA256 sum of the release artefacts to GitHub Release
+  #       uses: actions/upload-release-asset@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         upload_url: ${{ steps.create_gh_release.outputs.upload_url }}
+  #         asset_path: ./dist/target/sha256sum.txt
+  #         asset_name: sha256sum.txt
+  #         asset_content_type: text/plain
+
+  # release_documentation:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+  #   needs: [publish_release]
+  #   if: github.event_name == 'push' &&
+  #       startsWith(github.event.ref, 'refs/tags/') &&
+  #       !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+
+  #   env:
+  #     RELEASEBUILD: yes
+  #     BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # If you need to change this:
+  #                                          # Generate one at https://github.com/settings/tokens
+  #                                          # Make sure you have the write permissions to the repo: https://github.com/lampepfl/dotty-website
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Generate Website
+  #       run: |
+  #         ./project/scripts/genDocs -doc-snapshot
+
+  #     - name: Deploy Website
+  #       uses: peaceiris/actions-gh-pages@v3
+  #       with:
+  #         personal_token: ${{ secrets.BOT_TOKEN }}
+  #         publish_dir: docs/_site
+  #         external_repository: lampepfl/dotty-website
+  #         publish_branch: gh-pages
+
+  # publish_sbt_release:
+  #   runs-on: [self-hosted, Linux]
+  #   container:
+  #     image: lampepfl/dotty:2020-11-19
+  #     volumes:
+  #       - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
+  #       - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
+  #       - ${{ github.workspace }}/../../cache/general:/root/.cache
+  #   needs: [community_build_a, community_build_b, test_sbt]
+  #   if: github.event_name == 'push' &&
+  #       startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+
+  #   env:
+  #     RELEASEBUILD: yes
+  #     PGP_PW: ${{ secrets.PGP_PW }}  # PGP passphrase
+  #     PGP_SECRET: ${{ secrets.PGP_SECRET }}  # Export your private and public PGP key to an *.asc file, take the file's contents as a string
+  #     SONATYPE_PW: ${{ secrets.SONATYPE_PW }}
+  #     SONATYPE_USER: ${{ secrets.SONATYPE_USER }}
+
+  #   steps:
+  #     - name: Checkout cleanup script
+  #       uses: actions/checkout@v2
+
+  #     - name: Cleanup
+  #       run: .github/workflows/cleanup.sh
+
+  #     - name: Git Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Add SBT proxy repositories
+  #       run: cp -vf .github/workflows/repositories /root/.sbt/ ; true
+
+  #     - name: Publish Dotty SBT Plugin Release
+  #       run: |
+  #         ./project/scripts/sbtPublish ";project sbt-dotty ;publishSigned ;sonatypeBundleRelease"
