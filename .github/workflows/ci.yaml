@@ -192,16 +192,6 @@ jobs:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
         - ${{ github.workspace }}/../../cache/general:/root/.cache
-    if: "github.event_name == 'schedule'
-         || (
-           github.event_name == 'push'
-           && startsWith(github.event.ref, 'refs/tags/')
-         )
-         || (
-           github.event_name == 'pull_request'
-           && !contains(github.event.pull_request.body, '[skip ci]')
-           && contains(github.event.pull_request.body, '[test_sbt]')
-         )"
 
     steps:
       - name: Checkout cleanup script
