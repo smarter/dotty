@@ -198,19 +198,9 @@ object projects:
     sbtTestCommand   = "xml/test",
   )
 
-  lazy val scopt = SbtCommunityProject(
-    project       = "scopt",
-    sbtTestCommand   = "scoptJVM/compile",
-  )
-
   lazy val scalap = SbtCommunityProject(
     project       = "scalap",
     sbtTestCommand   = "scalap/compile",
-  )
-
-  lazy val squants = SbtCommunityProject(
-    project       = "squants",
-    sbtTestCommand   = "squantsJVM/compile",
   )
 
   lazy val betterfiles = SbtCommunityProject(
