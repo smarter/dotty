@@ -211,7 +211,14 @@ object Build {
         }
       // Do not cut off the bottom of large stack traces (default is 1024)
       "-XX:MaxJavaStackTraceDepth=1000000" :: agentOptions ::: ciOptions
-    }
+    },
+
+    excludeLintKeys ++= Set(
+      // We set these settings in `commonSettings`, if a project
+      // uses `commonSettings` but overrides `unmanagedSourceDirectories`,
+      // sbt will complain if we don't exclude them here.
+      Keys.scalaSource, Keys.javaSource
+    ),
   )
 
   lazy val disableDocSetting =
