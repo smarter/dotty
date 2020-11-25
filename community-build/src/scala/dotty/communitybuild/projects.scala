@@ -182,8 +182,8 @@ object projects:
 
   lazy val scalatest = SbtCommunityProject(
     project       = "scalatest",
-    sbtTestCommand   = ";scalacticDotty/clean;scalacticTestDotty/test;scalatestTestDotty/test",
-    sbtPublishCommand = ";scalacticDotty/publishLocal; scalatestDotty/publishLocal"
+    sbtTestCommand   = "scalacticDotty/clean;scalacticTestDotty/test; scalatestTestDotty/test",
+    sbtPublishCommand = "scalacticDotty/publishLocal; scalatestDotty/publishLocal"
   )
 
   lazy val scalatestplusScalacheck = SbtCommunityProject(
@@ -228,7 +228,7 @@ object projects:
     project       = "stdLib213",
     extraSbtArgs  = List("-Dscala.build.compileWithDotty=true"),
     sbtTestCommand   = """library/compile""",
-    sbtPublishCommand = """;set publishArtifact in (library, Compile, packageDoc) := false ;library/publishLocal""",
+    sbtPublishCommand = """set publishArtifact in (library, Compile, packageDoc) := false ;library/publishLocal""",
   )
 
   lazy val shapeless = SbtCommunityProject(
@@ -251,9 +251,9 @@ object projects:
     // has not been updated since 2018, so no 2.13 compat. Some akka tests are dropped due to MutableBehaviour being
     // dropped in the 2.13 compatible release
 
-    // sbtTestCommand   = ";set ThisBuild / useEffpiPlugin := false; effpi/test:compile; plugin/test:compile; benchmarks/test:compile; examples/test:compile; pluginBenchmarks/test:compile",
+    // sbtTestCommand   = "set ThisBuild / useEffpiPlugin := false; effpi/test:compile; plugin/test:compile; benchmarks/test:compile; examples/test:compile; pluginBenchmarks/test:compile",
 
-    sbtTestCommand   = ";set ThisBuild / useEffpiPlugin := false; effpi/test:compile; benchmarks/test:compile; examples/test:compile; pluginBenchmarks/test:compile",
+    sbtTestCommand   = "set ThisBuild / useEffpiPlugin := false; effpi/test:compile; benchmarks/test:compile; examples/test:compile; pluginBenchmarks/test:compile",
   )
 
   // TODO @odersky? It got broken by #5458
@@ -308,7 +308,7 @@ object projects:
 
   lazy val endpoints4s = SbtCommunityProject(
     project        = "endpoints4s",
-    sbtTestCommand = ";json-schemaJVM/compile;algebraJVM/compile;openapiJVM/compile;http4s-server/compile;http4s-client/compile;play-server/compile;play-client/compile;akka-http-server/compile;akka-http-client/compile"
+    sbtTestCommand = "json-schemaJVM/compile;algebraJVM/compile;openapiJVM/compile;http4s-server/compile;http4s-client/compile;play-server/compile;play-client/compile;akka-http-server/compile;akka-http-client/compile"
   )
 
   lazy val catsEffect2 = SbtCommunityProject(
