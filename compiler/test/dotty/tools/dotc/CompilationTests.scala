@@ -330,7 +330,7 @@ object CompilationTests extends ParallelTesting {
   // Test suite configuration --------------------------------------------------
 
   def maxDuration = 45.seconds
-  def numberOfSlaves = 5 //Runtime.getRuntime().availableProcessors()
+  def numberOfSlaves = 1 //Runtime.getRuntime().availableProcessors()
   def safeMode = Properties.testsSafeMode
   def isInteractive = SummaryReport.isInteractive
   def testFilter = Properties.testsFilter
