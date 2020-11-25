@@ -221,7 +221,7 @@ object projects:
 
   lazy val minitest = SbtCommunityProject(
     project       = "minitest",
-    sbtTestCommand   = "dotty-community-build/compile",
+    sbtTestCommand   = "compile",
   )
 
   lazy val fastparse = SbtCommunityProject(
