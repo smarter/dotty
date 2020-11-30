@@ -170,7 +170,6 @@ jobs:
         run: |
           git submodule sync
           git submodule update --init --recursive --jobs 7
-          git submodule foreach --recursive 'git fetch -f --tags'
           ./project/scripts/sbt "community-build/testOnly dotty.communitybuild.CommunityBuildTestA"
 
   community_build_b:
@@ -206,7 +205,6 @@ jobs:
         run: |
           git submodule sync
           git submodule update --init --recursive --jobs 7
-          git submodule foreach --recursive 'git fetch -f --tags'
           ./project/scripts/sbt "community-build/testOnly dotty.communitybuild.CommunityBuildTestB"
 
   test_sbt:
