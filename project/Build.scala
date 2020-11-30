@@ -162,7 +162,7 @@ object Build {
     runCode := (run in `scala3-language-server`).toTask("").value,
 
     // Avoid various sbt craziness involving classloaders and parallelism
-    fork in run := true,
+    // fork in run := true,
     fork in Test := true,
     parallelExecution in Test := false,
 
