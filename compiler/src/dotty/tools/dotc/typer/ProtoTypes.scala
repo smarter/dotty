@@ -155,10 +155,11 @@ object ProtoTypes {
     /** Is the set of members of this type unknown? This is the case if:
      *  1. The type has Nothing or Wildcard as a prefix or underlying type
      *  2. The type has an uninstantiated TypeVar as a prefix or underlying type,
-     *  or as an upper bound of a prefix or underlying type.
+     *  or as an upper bound of a prefix or underlying type and that TypeVar
+     *  doesn't have a more precise lower-bounded than Nothing.
      */
     private def hasUnknownMembers(tp: Type)(using Context): Boolean = tp match {
-      case tp: TypeVar => !tp.isInstantiated
+      case tp: TypeVar => !tp.isInstantiated && !tp.hasLowerBound
       case tp: WildcardType => true
       case NoType => true
       case tp: TypeRef =>
