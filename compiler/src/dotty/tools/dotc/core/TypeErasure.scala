@@ -568,17 +568,19 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     val cls = tp.classSymbol.asClass
     val unbox = valueClassUnbox(cls)
     if unbox.exists && !isCyclic(cls) then
-      val underlying = tp.select(unbox).widen.resultType
       val genericUnderlying = unbox.info.resultType
+      val underlying = tp.select(unbox).widen.resultType
 
       // println("tp: " + tp)
       // println("u: " + underlying)
       
       // val erasedValue = erasure(underlying)
             
+
       val erasedValue0 = erasure(underlying)
       val erasedValue =
-        if erasedValue0.isPrimitiveValueType && !genericUnderlying.isPrimitiveValueType then defn.boxedType(erasedValue0)
+        if genericUnderlying.derivesFrom(defn.ArrayClass) then erasure(genericUnderlying)
+        else if erasedValue0.isPrimitiveValueType && !genericUnderlying.isPrimitiveValueType then defn.boxedType(erasedValue0)
         else erasedValue0
 
 
