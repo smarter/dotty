@@ -444,7 +444,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     case tp: TypeRef =>
       val sym = tp.symbol
       if (!sym.isClass) this(tp.translucentSuperType)
-      else if (semiEraseVCs && isDerivedValueClass(sym)) eraseDerivedValueClassRef(tp)
+      else if (semiEraseVCs && isDerivedValueClass(sym)) eraseDerivedValueClass(tp)
       else if (defn.isSyntheticFunctionClass(sym)) defn.erasedFunctionType(sym)
       else eraseNormalClassRef(tp)
     case tp: AppliedType =>
@@ -452,6 +452,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       if (tycon.isRef(defn.ArrayClass)) eraseArray(tp)
       else if (tycon.isRef(defn.PairClass)) erasePair(tp)
       else if (tp.isRepeatedParam) apply(tp.translateFromRepeated(toArray = isJava))
+      else if (semiEraseVCs && tycon.classSymbol.exists && isDerivedValueClass(tycon.classSymbol.asClass)) eraseDerivedValueClass(tp)
       else apply(tp.translucentSuperType)
     case _: TermRef | _: ThisType =>
       this(tp.widen)
@@ -551,12 +552,28 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
           case rt => MethodType(Nil, Nil, rt)
       case tp1 => this(tp1)
 
-  private def eraseDerivedValueClassRef(tref: TypeRef)(using Context): Type = {
-    val cls = tref.symbol.asClass
-    val underlying = underlyingOfValueClass(cls)
-    if underlying.exists && !isCyclic(cls) then
-      val erasedValue = valueErasure(underlying)
-      if erasedValue.exists then ErasedValueType(tref, erasedValue)
+  private def eraseDerivedValueClass(tp: Type)(using Context): Type = {
+    val cls = tp.classSymbol.asClass
+    val unbox = valueClassUnbox(cls)
+    if unbox.exists then
+      val genericUnderlying = unbox.info.resultType
+      val underlying = tp.select(unbox).widen.resultType
+
+      // println("tp: " + tp)
+      // println("u: " + underlying)
+      
+      // val erasedValue = erasure(underlying)
+            
+
+      val erasedValue0 = erasure(underlying)
+      val erasedValue =
+        if genericUnderlying.derivesFrom(defn.ArrayClass) then erasure(genericUnderlying)
+        else if erasedValue0.isPrimitiveValueType && !genericUnderlying.isPrimitiveValueType then defn.boxedType(erasedValue0)
+        else erasedValue0
+
+
+      // println("e: " + erasedValue)
+      if erasedValue.exists then ErasedValueType(cls.typeRef, erasedValue)
       else
         assert(ctx.reporter.errorsReported, i"no erasure for $underlying")
         NoType
@@ -569,7 +586,8 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
   }
 
   /** The erasure of a function result type. */
-  private def eraseResult(tp: Type)(using Context): Type = tp match {
+  private def eraseResult(tp: Type)(using Context): Type =
+    tp match {
     case tp: TypeRef =>
       val sym = tp.symbol
       if (sym eq defn.UnitClass) sym.typeRef
@@ -580,11 +598,12 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       else this(tp)
     case tp: AppliedType =>
       val sym = tp.tycon.typeSymbol
-      if (sym.isClass && !erasureDependsOnArgs(sym)) eraseResult(tp.tycon)
+      if (!isConstructor && sym.isClass && isDerivedValueClass(sym.asClass)) eraseDerivedValueClass(tp)
+      else if (sym.isClass && !erasureDependsOnArgs(sym)) eraseResult(tp.tycon)
       else this(tp)
     case _ =>
       this(tp)
-  }
+    }
 
   /** The name of the type as it is used in `Signature`s.
    *  Need to ensure correspondence with erasure!
@@ -602,7 +621,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
           return sigName(info)
         }
         if (isDerivedValueClass(sym)) {
-          val erasedVCRef = eraseDerivedValueClassRef(tp)
+          val erasedVCRef = eraseDerivedValueClass(tp)
           if (erasedVCRef.exists) return sigName(erasedVCRef)
         }
         if (defn.isSyntheticFunctionClass(sym))
@@ -620,6 +639,12 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
           fullName.asTypeName
       case tp: AppliedType =>
         val sym = tp.tycon.typeSymbol
+
+        if (isDerivedValueClass(sym)) {
+          val erasedVCRef = eraseDerivedValueClass(tp)
+          /*if (erasedVCRef.exists)*/ return sigName(erasedVCRef)
+        }
+
         sigName( // todo: what about repeatedParam?
           if (erasureDependsOnArgs(sym)) this(tp)
           else if (sym.isClass) tp.underlying
