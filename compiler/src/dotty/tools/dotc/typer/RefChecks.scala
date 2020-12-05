@@ -527,11 +527,14 @@ object RefChecks {
         || mbr.is(JavaDefined) && hasJavaErasedOverriding(mbr)
 
       def isImplemented(mbr: Symbol) =
-        val mbrType = clazz.thisType.memberInfo(mbr)
+        // val mbrType = clazz.thisType.memberInfo(mbr)
         extension (sym: Symbol) def isConcrete = sym.exists && !sym.is(Deferred)
         clazz.nonPrivateMembersNamed(mbr.name)
           .filterWithPredicate(
-            impl => impl.symbol.isConcrete && mbrType.matchesLoosely(impl.info))
+            impl => impl.symbol.isConcrete && {
+              //mbrType.matchesLoosely(impl.info)
+              mbr.asSeenFrom(clazz.thisType).matches(impl)
+            })
           .exists
 
       /** The term symbols in this class and its baseclasses that are
