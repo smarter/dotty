@@ -249,8 +249,8 @@ object TypeErasure {
       !classify(tp).derivesFrom(defn.ObjectClass) &&
       !tp.symbol.is(JavaDefined)
     case tp: TypeParamRef =>
-      !classify(tp).derivesFrom(defn.ObjectClass) &&
-      !tp.binder.resultType.isJavaMethod
+      !classify(tp).derivesFrom(defn.ObjectClass)// &&
+      // !tp.binder.resultType.isJavaMethod
     case tp: TypeAlias => isUnboundedGeneric(tp.alias)
     case tp: TypeBounds =>
       val upper = classify(tp.hi)
@@ -516,7 +516,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
   private def eraseArray(tp: Type)(using Context) = {
     val defn.ArrayOf(elemtp) = tp
     if (classify(elemtp).derivesFrom(defn.NullClass)) JavaArrayType(defn.ObjectType)
-    else if (isUnboundedGeneric(elemtp) && !isJava) defn.ObjectType
+    else if (isUnboundedGeneric(elemtp) /*&& !isJava*/) defn.ObjectType
     else JavaArrayType(erasureFn(isJava, semiEraseVCs = false, isConstructor, wildcardOK)(elemtp))
   }
 
