@@ -357,12 +357,7 @@ object Erasure {
             tree
           else if (tpw.isErasedValueType)
             if (pt.isErasedValueType) then
-              (tpw, pt) match {
-                case (ErasedValueType(tycon, underlying), ErasedValueType(ptTycon, ptUnderlying)) =>
-                  cast(cast(tree, underlying).asInstance(ptUnderlying), pt)
-                case _ => ???
-              }
-              // tree.asInstance(pt)
+              tree.asInstance(pt)
             else
               adaptToType(box(tree), pt)
           else if (pt.isErasedValueType)
