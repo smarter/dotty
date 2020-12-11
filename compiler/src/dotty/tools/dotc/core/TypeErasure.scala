@@ -157,7 +157,7 @@ object TypeErasure {
 
   def sigName(tp: Type, isJava: Boolean)(using Context): TypeName = {
     val normTp = tp.translateFromRepeated(toArray = isJava)
-    val erase = erasureFn(isJava, semiEraseVCs = false, isConstructor = false, wildcardOK = true)
+    val erase = erasureFn(isJava, semiEraseVCs = true, isConstructor = false, wildcardOK = true)
     erase.sigName(normTp)(using preErasureCtx)
   }
 
