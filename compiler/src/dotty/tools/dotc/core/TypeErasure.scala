@@ -452,7 +452,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       if (tycon.isRef(defn.ArrayClass)) eraseArray(tp)
       else if (tycon.isRef(defn.PairClass)) erasePair(tp)
       else if (tp.isRepeatedParam) apply(tp.translateFromRepeated(toArray = isJava))
-      else if (semiEraseVCs && tycon.classSymbol.exists && isDerivedValueClass(tycon.classSymbol.asClass)) eraseDerivedValueClass(tp)
+      else if (semiEraseVCs && isDerivedValueClass(tycon.classSymbol)) eraseDerivedValueClass(tp)
       else apply(tp.translucentSuperType)
     case _: TermRef | _: ThisType =>
       this(tp.widen)
@@ -559,21 +559,23 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       val genericUnderlying = unbox.info.resultType
       val underlying = tp.select(unbox).widen.resultType
 
-      // println("tp: " + tp)
-      // println("u: " + underlying)
-      
-      // val erasedValue = erasure(underlying)
-            
+      val erasedUnderlying = erasure(underlying)
 
-      val erasedValue0 = erasure(underlying)
-      val erasedValue =
-        if genericUnderlying.derivesFrom(defn.ArrayClass) then erasure(genericUnderlying)
-        else if erasedValue0.isPrimitiveValueType && !genericUnderlying.isPrimitiveValueType then defn.boxedType(erasedValue0)
-        else erasedValue0
+      // Ideally, we would just use `erasedUnderlying` as the erasure of `tp`, but to
+      // be binary-compatible with Scala 2 we need two special cases for polymorphic
+      // value classes:
+      // - Given `class Foo[A](x: A) extends AnyVal`, `Foo[Int]` should erase to
+      //   its boxed representation `Integer` (same for all primitives).
+      // - Given `class Bar[A](x: Array[A]) extends AnyVal`, `Bar[X]` will
+      //   be erased like `Array[A]`, no matter the `X` (same if `A` is bounded).
+      val erasedValueClass =
+        if erasedUnderlying.isPrimitiveValueType && !genericUnderlying.isPrimitiveValueType then
+          defn.boxedType(erasedUnderlying)
+        else if genericUnderlying.derivesFrom(defn.ArrayClass) then
+          erasure(genericUnderlying)
+        else erasedUnderlying
 
-
-      // println("e: " + erasedValue)
-      if erasedValue.exists then ErasedValueType(cls.typeRef, erasedValue)
+      if erasedValueClass.exists then ErasedValueType(cls.typeRef, erasedValueClass)
       else
         assert(ctx.reporter.errorsReported, i"no erasure for $underlying")
         NoType
