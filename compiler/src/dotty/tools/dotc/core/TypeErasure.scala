@@ -36,7 +36,7 @@ import scala.annotation.tailrec
 object TypeErasure {
 
   private def erasureDependsOnArgs(sym: Symbol)(using Context) =
-    sym == defn.ArrayClass || sym == defn.PairClass
+    sym == defn.ArrayClass || sym == defn.PairClass || isDerivedValueClass(sym)
 
   def normalizeClass(cls: ClassSymbol)(using Context): ClassSymbol = {
     if (cls.owner == defn.ScalaPackageClass) {
@@ -59,7 +59,7 @@ object TypeErasure {
     case tp: TypeRef =>
       val sym = tp.symbol
       sym.isClass &&
-      !erasureDependsOnArgs(sym) &&
+      (!erasureDependsOnArgs(sym) || isDerivedValueClass(sym)) &&
       !defn.specialErasure.contains(sym) &&
       !defn.isSyntheticFunctionClass(sym)
     case _: TermRef =>
@@ -588,24 +588,23 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
   }
 
   /** The erasure of a function result type. */
-  private def eraseResult(tp: Type)(using Context): Type =
-    tp match {
-    case tp: TypeRef =>
-      val sym = tp.symbol
-      if (sym eq defn.UnitClass) sym.typeRef
-      // For a value class V, "new V(x)" should have type V for type adaptation to work
-      // correctly (see SIP-15 and [[Erasure.Boxing.adaptToType]]), so the return type of a
-      // constructor method should not be semi-erased.
-      else if (isConstructor && isDerivedValueClass(sym)) eraseNormalClassRef(tp)
-      else this(tp)
-    case tp: AppliedType =>
-      val sym = tp.tycon.typeSymbol
-      if (!isConstructor && sym.isClass && isDerivedValueClass(sym.asClass)) eraseDerivedValueClass(tp)
-      else if (sym.isClass && !erasureDependsOnArgs(sym)) eraseResult(tp.tycon)
-      else this(tp)
-    case _ =>
-      this(tp)
-    }
+  def eraseResult(tp: Type)(using Context): Type = 
+    // For a value class V, "new V(x)" should have type V for type adaptation to work
+    // correctly (see SIP-15 and [[Erasure.Boxing.adaptToType]]), so the return type of a
+    // constructor method should not be semi-erased.
+    if semiEraseVCs && isConstructor then
+      erasureFn(isJava, semiEraseVCs = false, isConstructor, wildcardOK).eraseResult(tp)
+    else tp match
+      case tp: TypeRef =>
+        val sym = tp.symbol
+        if (sym eq defn.UnitClass) sym.typeRef
+        else this(tp)
+      case tp: AppliedType =>
+        val sym = tp.tycon.typeSymbol
+        if (sym.isClass && !erasureDependsOnArgs(sym)) eraseResult(tp.tycon)
+        else this(tp)
+      case _ =>
+        this(tp)
 
   /** The name of the type as it is used in `Signature`s.
    *  Need to ensure correspondence with erasure!
@@ -641,11 +640,6 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
           fullName.asTypeName
       case tp: AppliedType =>
         val sym = tp.tycon.typeSymbol
-
-        if (isDerivedValueClass(sym)) {
-          val erasedVCRef = eraseDerivedValueClass(tp)
-          /*if (erasedVCRef.exists)*/ return sigName(erasedVCRef)
-        }
 
         sigName( // todo: what about repeatedParam?
           if (erasureDependsOnArgs(sym)) this(tp)

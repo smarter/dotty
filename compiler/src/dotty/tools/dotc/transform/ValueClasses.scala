@@ -13,7 +13,7 @@ import SymUtils._
 /** Methods that apply to user-defined value classes */
 object ValueClasses {
 
-  def isDerivedValueClass(sym: Symbol)(using Context): Boolean = sym.exists && {
+  def isDerivedValueClass(sym: Symbol)(using Context): Boolean = sym.isClass && {
     val d = sym.denot
     !d.isRefinementClass &&
     d.isValueClass &&
