@@ -277,17 +277,17 @@ jobs:
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
         - ${{ github.workspace }}/../../cache/general:/root/.cache
 
-    if: "github.event_name == 'schedule' && github.repository == 'lampepfl/dotty'
-         || (
-           github.event_name == 'push'
-           && startsWith(github.event.ref, 'refs/tags/')
-           && !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
-         )
-         || (
-           github.event_name == 'pull_request'
-           && !contains(github.event.pull_request.body, '[skip ci]')
-           && contains(github.event.pull_request.body, '[test_java8]')
-         )"
+    # if: "github.event_name == 'schedule' && github.repository == 'lampepfl/dotty'
+    #      || (
+    #        github.event_name == 'push'
+    #        && startsWith(github.event.ref, 'refs/tags/')
+    #        && !startsWith(github.event.ref, 'refs/tags/sbt-dotty-')
+    #      )
+    #      || (
+    #        github.event_name == 'pull_request'
+    #        && !contains(github.event.pull_request.body, '[skip ci]')
+    #        && contains(github.event.pull_request.body, '[test_java8]')
+    #      )"
 
     steps:
       - name: Set JDK 8 as default
