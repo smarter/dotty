@@ -32,6 +32,13 @@ extends Reporter with UniqueMessagePositions with HideNonSensicalMessages with M
   private var _didCrash = false
   final def compilerCrashed: Boolean = _didCrash
 
+  override def toString: String =
+    s"""TestReporter:
+        |_didCrash = $_didCrash
+        |_errorBuf = $_errorBuf
+        |_messageBuf = $_messageBuf
+        |consoleOutput = $consoleOutput"""
+
   protected final def inlineInfo(pos: SourcePosition)(using Context): String =
     if (pos.exists) {
       if (pos.outer.exists)

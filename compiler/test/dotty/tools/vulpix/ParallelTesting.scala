@@ -261,7 +261,9 @@ trait ParallelTesting extends RunnerOrchestration { self =>
     /** Entry point: runs the test */
     final def encapsulatedCompilation(testSource: TestSource) = new LoggedRunnable { self =>
       def checkTestSource(): Unit = tryCompile(testSource) {
+        println("compile: " + testSource)
         val reportersOrCrash = compileTestSource(testSource)
+        println("result: " + testSource + " " + reportersOrCrash)
         onComplete(testSource, reportersOrCrash, self)
         registerCompletion()
       }
