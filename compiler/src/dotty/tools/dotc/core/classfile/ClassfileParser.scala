@@ -349,9 +349,15 @@ class ClassfileParser(
       val tag = sig(index); index += 1
       (tag: @switch) match {
         case 'L' =>
+          /** Inner class references of A.this.B into A#B, do the same transformation recursively on `A` */
           def processInner(tp: Type): Type = tp match {
             case tp: TypeRef if !tp.symbol.owner.is(Flags.ModuleClass) =>
-              TypeRef(processInner(tp.prefix), tp.symbol.asType)
+              val prefix = tp.prefix match
+                case ThisType(prefix) =>
+                  println("tp.prefix: " + tp.prefix + " " + tp.prefix.hashCode)
+                  prefix
+                case prefix => prefix
+              TypeRef(processInner(prefix), tp.symbol.asType)
             case _ =>
               tp
           }
