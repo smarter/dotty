@@ -1478,6 +1478,21 @@ class Definitions {
         false
     })
 
+  def isSpecializableFunctionX(paramTypes: List[Type], retType: Type)(using Context): Boolean =
+    paramTypes.length <= 2 && (paramTypes match {
+      case Nil =>
+        Function0SpecializedReturnClasses().contains(retType.typeSymbol)
+      case List(paramType0) =>
+        Function1SpecializedParamClasses().contains(paramType0.typeSymbol) &&
+        Function1SpecializedReturnClasses().contains(retType.typeSymbol)
+      case List(paramType0, paramType1) =>
+        Function2SpecializedParamClasses().contains(paramType0.typeSymbol) &&
+        Function2SpecializedParamClasses().contains(paramType1.typeSymbol) &&
+        Function2SpecializedReturnClasses().contains(retType.typeSymbol)
+      case _ =>
+        false
+    })
+
   @tu lazy val Function0SpecializedApplyNames: collection.Set[TermName] =
     for r <- Function0SpecializedReturnTypes
     yield nme.apply.specializedFunction(r, Nil).asTermName
