@@ -300,7 +300,7 @@ object NameOps {
      *
      *  `<return type><first type><second type><...>`
      */
-    def specializedFunction(ret: Type, args: List[Type])(using Context): Name =
+    def specializedFunctionStr(ret: Type, args: List[Type])(using Context): String =
       val sb = new StringBuilder
       sb.append(name.toString)
       sb.append(nme.specializedTypeNames.prefix.toString)
@@ -308,7 +308,10 @@ object NameOps {
       sb.append(defn.typeTag(ret).toString)
       args.foreach { arg => sb.append(defn.typeTag(arg)) }
       sb.append(nme.specializedTypeNames.suffix)
-      termName(sb.toString)
+      sb.toString
+
+    def specializedFunction(ret: Type, args: List[Type])(using Context): N =
+      likeSpacedN(name.specializedFunctionStr(ret, args).toTermName)
 
     /** If name length exceeds allowable limit, replace part of it by hash */
     def compactified(using Context): TermName = termName(compactify(name.toString))

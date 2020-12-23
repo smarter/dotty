@@ -15,6 +15,7 @@ import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Flags.{Label => LabelFlag, _}
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.core.StdNames.{nme, str}
+import dotty.tools.dotc.core.NameOps._
 import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.transform.Erasure
 import dotty.tools.dotc.transform.SymUtils._
@@ -325,10 +326,20 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
             val t = app.tpt.tpe.typeSymbol
             if (t.exists) t
             else {
-              val arity = app.meth.tpe.widenDealias.firstParamTypes.size - env.size
-              val returnsUnit = app.meth.tpe.widenDealias.resultType.classSymbol == defn.UnitClass
-              if (returnsUnit) requiredClass(("scala.runtime.function.JProcedure" + arity))
-              else requiredClass(("scala.Function" + arity))
+              val implType = app.meth.tpe.widen
+              val implParamTypes = implType.paramInfoss.head.drop(env.size)
+              val implResultType = implType.resultType
+              val arity = implParamTypes.length
+              val returnsUnit = implResultType.classSymbol == defn.UnitClass
+
+              val className =
+                if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
+                  s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
+                else if returnsUnit then
+                  s"scala.runtime.function.JProcedure${arity}"
+                else
+                  s"scala.Function${arity}"
+              requiredClass(className)
             }
           }
           val (fun, args) = call match {
