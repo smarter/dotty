@@ -410,6 +410,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
               // (5) Create a stub symbol to defer hard failure a little longer.
               System.err.println(i"***** missing reference, looking for ${name.debugString} in $owner")
               System.err.println(i"decls = ${owner.info.decls}")
+              System.err.println("XXphase: " + ctx.phase)
               owner.info.decls.checkConsistent()
               if (slowSearch(name).exists)
                 System.err.println(i"**** slow search found: ${slowSearch(name)}")
@@ -570,7 +571,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
         var inforef = readNat()
         if (isSymbolRef(inforef)) inforef = readNat()
 
-        // println("reading type for " + denot) // !!! DEBUG
+        // println("reading type for " + denot + " at phase " + ctx.phase) // !!! DEBUG
         val tp = at(inforef, () => readType()(using ctx))
         if denot.is(Method) then
           var params = paramssOfType(tp)
@@ -608,7 +609,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
       }
       atReadPos(startCoord(denot).toIndex,
           () => withMode(Mode.Scala2Unpickling) {
-            atPhaseNoLater(picklerPhase) {
+            atPhaseBeforeTransforms {
               parseToCompletion(denot)
             }
           })
@@ -751,6 +752,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
           case tp: TermRef => tp
       case TYPEREFtpe =>
         var pre = readPrefix()
+        // println("reading pre: " + pre + " at phase " + ctx.phase)
         val sym = readSymbolRef()
         pre match {
           case thispre: ThisType =>
