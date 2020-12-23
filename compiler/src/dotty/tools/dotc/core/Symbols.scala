@@ -697,8 +697,10 @@ object Symbols {
   def newStubSymbol(owner: Symbol, name: Name, file: AbstractFile = null)(using Context): Symbol = {
     def stubCompleter = new StubInfo()
     val normalizedOwner = if (owner.is(ModuleVal)) owner.moduleClass else owner
-    typr.println(s"creating stub for ${name.show}, owner = ${normalizedOwner.denot.debugString}, file = $file")
-    typr.println(s"decls = ${normalizedOwner.unforcedDecls.toList.map(_.debugString).mkString("\n  ")}") // !!! DEBUG
+    println(s"creating stub for ${name.show}, owner = ${normalizedOwner.denot.debugString}, file = $file")
+    println(s"decls = ${normalizedOwner.unforcedDecls.toList.map(_.debugString).mkString("\n  ")}") // !!! DEBUG
+    println("phase: " + ctx.phase)
+    Thread.dumpStack
     //if (base.settings.debug.value) throw new Error()
     val stub = name match {
       case name: TermName =>
