@@ -16,13 +16,14 @@ import Periods._
 import typer.{FrontEnd, RefChecks}
 import typer.ImportInfo.withRootImports
 import ast.tpd
+import scala.annotation.internal.sharable
 
 object Phases {
 
   inline def phaseOf(id: PhaseId)(using Context): Phase =
     ctx.base.phases(id)
 
-  object NoPhase extends Phase {
+  @sharable object NoPhase extends Phase {
     override def exists: Boolean = false
     def phaseName: String = "<no phase>"
     def run(using Context): Unit = unsupported("run")
