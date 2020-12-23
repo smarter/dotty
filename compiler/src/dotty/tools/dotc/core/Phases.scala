@@ -22,18 +22,18 @@ object Phases {
   inline def phaseOf(id: PhaseId)(using Context): Phase =
     ctx.base.phases(id)
 
+  object NoPhase extends Phase {
+    override def exists: Boolean = false
+    def phaseName: String = "<no phase>"
+    def run(using Context): Unit = unsupported("run")
+    def transform(ref: SingleDenotation)(using Context): SingleDenotation = unsupported("transform")
+  }
+
   trait PhasesBase {
     this: ContextBase =>
 
     // drop NoPhase at beginning
     def allPhases: Array[Phase] = (if (fusedPhases.nonEmpty) fusedPhases else phases).tail
-
-    object NoPhase extends Phase {
-      override def exists: Boolean = false
-      def phaseName: String = "<no phase>"
-      def run(using Context): Unit = unsupported("run")
-      def transform(ref: SingleDenotation)(using Context): SingleDenotation = unsupported("transform")
-    }
 
     object SomePhase extends Phase {
       def phaseName: String = "<some phase>"
@@ -388,10 +388,10 @@ object Phases {
       exists && id <= that.id
 
     final def prev: Phase =
-      if (id > FirstPhaseId) myBase.phases(start - 1) else myBase.NoPhase
+      if (id > FirstPhaseId) myBase.phases(start - 1) else NoPhase
 
     final def next: Phase =
-      if (hasNext) myBase.phases(end + 1) else myBase.NoPhase
+      if (hasNext) myBase.phases(end + 1) else NoPhase
 
     final def hasNext: Boolean = start >= FirstPhaseId && end + 1 < myBase.phases.length
 
