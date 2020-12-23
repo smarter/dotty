@@ -336,7 +336,7 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
                 // println("imp: " + implType.show)
                 // val interfaceName = ("JFunction".toTermName ++ arity).specializedFor(implParamTypes ::: implResultType :: Nil, names, Nil, Nil)
                 // "JFunction" + arity + nme.specializedTypeNames.prefix
-                val z = s"scala.runtime.function.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
+                val z = s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
                 requiredClass(z)
               } else if (returnsUnit) requiredClass(("scala.runtime.function.JProcedure" + arity))
               else requiredClass(("scala.Function" + arity))
