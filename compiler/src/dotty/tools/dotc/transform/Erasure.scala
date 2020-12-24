@@ -410,8 +410,10 @@ object Erasure {
      *  - if the SAM is a Unit-returning Function ... (2)
      *  - if a result type of ... we can rely ... (3)
      *
-     *  Note: on Scala.js we can only rely on (3)
-     *  XX: but previously we relied on (1) and (2), was it broken?
+     *  TODO: on Scala.js, auto-adaptation works for all non-Unit primitives
+     *  but not for derived value classes.
+     *  TODO: Unit unboxing is not supported in Scala 2, here it doesn't work
+     *  either because it's actually BoxedUnit, so doc needs to be updated.
      *
      *  Auto-adaptation works in the following cases:
      *  - If the SAM is replaced by JFunction*mc* in
@@ -431,6 +433,9 @@ object Erasure {
     def adaptClosure(tree: tpd.Closure)(using Context): Tree =
       val Closure(env, meth, tpt) = tree
       assert(env.isEmpty, tree)
+
+      // if ctx.settings.scalajs.value then
+      //   return tree
 
       val lambdaType = tree.tpe
       val explicitSAMClass = tpt.tpe
