@@ -28,7 +28,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -68,7 +68,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -163,7 +163,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -199,7 +199,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -235,7 +235,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -271,7 +271,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -314,7 +314,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -349,7 +349,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -391,7 +391,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -474,7 +474,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
@@ -519,7 +519,7 @@ jobs:
     runs-on: [self-hosted, Linux]
     container:
       image: lampepfl/dotty:2020-11-19
-      options: --cpu-shares 4096
+      options: --cpu-shares 4096 --memory 6g
       volumes:
         - ${{ github.workspace }}/../../cache/sbt:/root/.sbt
         - ${{ github.workspace }}/../../cache/ivy:/root/.ivy2/cache
