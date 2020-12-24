@@ -381,7 +381,7 @@ object Erasure {
      *      def $anonfun(x: Int): Any = ...
      *      val f: Function1[Int, Any] = closure($anonfun)
      *
-     *  Notice that `$anonfun` takes a primitive as argument, but the single abstract method
+     *  Notice that `$anonfun` takes a primitive as argument, but the SAM (Single Abstract Method)
      *  of `Function1` after erasure is:
      *
      *      def apply(x: Object): Object
@@ -389,7 +389,7 @@ object Erasure {
      *  which takes a reference as argument. Hence, some form of adaptation is required.
      *
      *  If we do nothing, the LambdaMetaFactory bootstrap method will
-     *  automatically do the adaptation. Unfortunately, the result does not
+     *  perform the adaptation for us. Unfortunately, the result does not
      *  implement the expected Scala semantics: null should be "unboxed" to
      *  the default value of the value class, but LMF will throw a
      *  NullPointerException instead. LMF is also not capable of doing
@@ -404,7 +404,14 @@ object Erasure {
      *
      *  In general a bridge is needed when, after Erasure, one of the
      *  parameter type or the result type of the closure method has a
-     *  different type, and we cannot rely on auto-adaptation.
+     *  different type -than the corresponding type in the target SAM...- //, and we cannot rely on auto-adaptation.
+     *  , however there are situations where we can get avoid generating that bridge:
+     *  - if the SAM is a specializable Function type ... (1)
+     *  - if the SAM is a Unit-returning Function ... (2)
+     *  - if a result type of ... we can rely ... (3)
+     *
+     *  Note: on Scala.js we can only rely on (3)
+     *  XX: but previously we relied on (1) and (2), was it broken?
      *
      *  Auto-adaptation works in the following cases:
      *  - If the SAM is replaced by JFunction*mc* in
