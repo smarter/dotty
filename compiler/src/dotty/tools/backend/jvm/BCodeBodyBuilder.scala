@@ -333,11 +333,11 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
               val returnsUnit = implResultType.classSymbol == defn.UnitClass
 
               val className =
-                if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
-                  s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
-                else if returnsUnit then
-                  s"scala.runtime.function.JProcedure${arity}"
-                else
+                // if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
+                //   s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
+                // else if returnsUnit then
+                //   s"scala.runtime.function.JProcedure${arity}"
+                // else
                   s"scala.Function${arity}"
               requiredClass(className)
             }

@@ -421,54 +421,63 @@ object Erasure {
      *
      *  See test cases lambda-*.scala and t8017/ for concrete examples.
      */
-    def adaptClosure(tree: tpd.Closure)(using Context): Tree = {
+    def adaptClosure(tree: tpd.Closure)(using Context): Tree =
       val implClosure @ Closure(_, meth, _) = tree
 
-      implClosure.tpe match {
-        case SAMType(sam) =>
-          val implType = meth.tpe.widen.asInstanceOf[MethodType]
+      val explicitSAMType = implClosure.tpt.tpe
+      val implType = meth.tpe.widen.asInstanceOf[MethodType]
+      val implParamTypes = implType.paramInfos
+      val implResultType = implType.resultType
+      val returnsUnit = implResultType.classSymbol == defn.UnitClass
 
-          val implParamTypes = implType.paramInfos
-          val List(samParamTypes) = sam.paramInfoss
-          val implResultType = implType.resultType
+      implClosure.tpe match
+        case SAMType(sam) =>
+          val samParamTypes = sam.paramInfos
           val samResultType = sam.resultType
 
-          if (!defn.isSpecializableFunction(implClosure.tpe.classSymbol.asClass, implParamTypes, implResultType)) {
-            def autoAdaptedParam(tp: Type) = !tp.isErasedValueType && !tp.isPrimitiveValueType
-            val explicitSAMType = implClosure.tpt.tpe.exists
-            def autoAdaptedResult(tp: Type) = !tp.isErasedValueType &&
-              (!explicitSAMType || tp.typeSymbol != defn.UnitClass)
-            def sameSymbol(tp1: Type, tp2: Type) = tp1.typeSymbol == tp2.typeSymbol
+          def autoAdaptedParam(tp: Type) = !tp.isErasedValueType && !tp.isPrimitiveValueType
+          def autoAdaptedResult = !implResultType.isErasedValueType && !returnsUnit
+          def sameSymbol(tp1: Type, tp2: Type) = tp1.typeSymbol == tp2.typeSymbol
 
-            val paramAdaptationNeeded =
-              implParamTypes.lazyZip(samParamTypes).exists((implType, samType) =>
-                !sameSymbol(implType, samType) && !autoAdaptedParam(implType))
-            val resultAdaptationNeeded =
-              !sameSymbol(implResultType, samResultType) && !autoAdaptedResult(implResultType)
+          val paramAdaptationNeeded =
+            implParamTypes.lazyZip(samParamTypes).exists((implType, samType) =>
+              !sameSymbol(implType, samType) && !autoAdaptedParam(implType))
+          val resultAdaptationNeeded =
+            !sameSymbol(implResultType, samResultType) && !autoAdaptedResult
 
-            if (paramAdaptationNeeded || resultAdaptationNeeded) {
-              val bridgeType =
-                if (paramAdaptationNeeded)
-                  if (resultAdaptationNeeded) sam
-                  else implType.derivedLambdaType(paramInfos = samParamTypes)
-                else implType.derivedLambdaType(resType = samResultType)
-              val bridge = newSymbol(ctx.owner, AdaptedClosureName(meth.symbol.name.asTermName), Flags.Synthetic | Flags.Method, bridgeType)
-              Closure(bridge, bridgeParamss =>
-                inContext(ctx.withOwner(bridge)) {
-                  val List(bridgeParams) = bridgeParamss
-                  assert(ctx.typer.isInstanceOf[Erasure.Typer])
-                  val rhs = Apply(meth, bridgeParams.lazyZip(implParamTypes).map(ctx.typer.adapt(_, _)))
-                  ctx.typer.adapt(rhs, bridgeType.resultType)
-                },
-                targetType = implClosure.tpt.tpe)
-            }
-            else implClosure
-          }
-          else implClosure
+          // Function handling
+          if !explicitSAMType.exists && !ctx.settings.scalajs.value then
+            val arity = implParamTypes.length
+            val samClass =
+              if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
+                s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
+              else if !paramAdaptationNeeded && returnsUnit then
+                s"scala.runtime.function.JProcedure${arity}"
+              else
+                ""
+            if !samClass.isEmpty then
+              return cpy.Closure(tree)(tpt = TypeTree(requiredClass(samClass).typeRef))
+
+          if paramAdaptationNeeded || resultAdaptationNeeded then
+            val bridgeType =
+              if (paramAdaptationNeeded)
+                if (resultAdaptationNeeded) sam
+                else implType.derivedLambdaType(paramInfos = samParamTypes)
+              else implType.derivedLambdaType(resType = samResultType)
+            val bridge = newSymbol(ctx.owner, AdaptedClosureName(meth.symbol.name.asTermName), Flags.Synthetic | Flags.Method, bridgeType)
+            Closure(bridge, bridgeParamss =>
+              inContext(ctx.withOwner(bridge)) {
+                val List(bridgeParams) = bridgeParamss
+                assert(ctx.typer.isInstanceOf[Erasure.Typer])
+                val rhs = Apply(meth, bridgeParams.lazyZip(implParamTypes).map(ctx.typer.adapt(_, _)))
+                ctx.typer.adapt(rhs, bridgeType.resultType)
+              },
+              targetType = explicitSAMType)
+          else
+            implClosure
         case _ =>
           implClosure
-      }
-    }
+    end adaptClosure
 
     /** Eta expand given `tree` that has the given method type `mt`, so that
      *  it conforms to erased result type `pt`.
