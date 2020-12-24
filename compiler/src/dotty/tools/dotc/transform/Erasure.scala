@@ -461,10 +461,13 @@ object Erasure {
 
       if paramAdaptationNeeded || resultAdaptationNeeded then
         val bridgeType =
-          if (paramAdaptationNeeded)
-            if (resultAdaptationNeeded) sam
-            else implType.derivedLambdaType(paramInfos = samParamTypes)
-          else implType.derivedLambdaType(resType = samResultType)
+          if paramAdaptationNeeded then
+            if resultAdaptationNeeded then
+              sam
+            else
+              implType.derivedLambdaType(paramInfos = samParamTypes)
+          else
+            implType.derivedLambdaType(resType = samResultType)
         val bridge = newSymbol(ctx.owner, AdaptedClosureName(meth.symbol.name.asTermName), Flags.Synthetic | Flags.Method, bridgeType)
         Closure(bridge, bridgeParamss =>
           inContext(ctx.withOwner(bridge)) {
