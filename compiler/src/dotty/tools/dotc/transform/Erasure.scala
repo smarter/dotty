@@ -376,7 +376,7 @@ object Erasure {
      *
      *      val f: Function1[Int, Any] = x => ...
      *
-     *  results in the creation of a closure and a method in the typer:
+     *  results in the creation of a closure and an implementation method in the typer:
      *
      *      def $anonfun(x: Int): Any = ...
      *      val f: Function1[Int, Any] = closure($anonfun)
@@ -386,47 +386,19 @@ object Erasure {
      *
      *      def apply(x: Object): Object
      *
-     *  which takes a reference as argument. Hence, some form of adaptation is required.
+     *  which takes a reference as argument. Hence, some form of adaptation is
+     *  required. The most reliable way to do this adaptation is to replace the
+     *  closure implementation method by a bridge method that forwards to the
+     *  original method with appropriate boxing/unboxing. For our example above,
+     *  this would be:
      *
-     *  If we do nothing, the LambdaMetaFactory bootstrap method will
-     *  perform the adaptation for us. Unfortunately, the result does not
-     *  implement the expected Scala semantics: null should be "unboxed" to
-     *  the default value of the value class, but LMF will throw a
-     *  NullPointerException instead. LMF is also not capable of doing
-     *  adaptation for derived value classes and Unit result types.
+     *      def $anonfun$adapted(x: Object): Object = $anonfun(BoxesRunTime.unboxToInt(x))
+     *      val f: Function1 = closure($anonfun$adapted)
      *
-     *  Thus, we need to replace the closure method by a bridge method that
-     *  forwards to the original closure method with appropriate
-     *  boxing/unboxing. For our example above, this would be:
-     *
-     *      def $anonfun1(x: Object): Object = $anonfun(BoxesRunTime.unboxToInt(x))
-     *      val f: Function1 = closure($anonfun1)
-     *
-     *  In general a bridge is needed when, after Erasure, one of the
-     *  parameter type or the result type of the closure method has a
-     *  different type -than the corresponding type in the target SAM...- //, and we cannot rely on auto-adaptation.
-     *  , however there are situations where we can get avoid generating that bridge:
-     *  - if the SAM is a specializable Function type ... (1)
-     *  - if the SAM is a Unit-returning Function ... (2)
-     *  - if a result type of ... we can rely ... (3)
-     *
-     *  TODO: on Scala.js, auto-adaptation works for all non-Unit primitives
-     *  but not for derived value classes.
-     *  TODO: Unit unboxing is not supported in Scala 2, here it doesn't work
-     *  either because it's actually BoxedUnit, so doc needs to be updated.
-     *
-     *  Auto-adaptation works in the following cases:
-     *  - If the SAM is replaced by JFunction*mc* in
-     *    [[FunctionalInterfaces]], no bridge is needed: the SAM contains
-     *    default methods to handle adaptation.
-     *  - If a result type of the closure method is a primitive value type
-     *    different from Unit, we can rely on the auto-adaptation done by
-     *    LMF (because it only needs to box, not unbox, so no special
-     *    handling of null is required).
-     *  - If the SAM is replaced by JProcedure* in
-     *    [[DottyBackendInterface]] (this only happens when no explicit SAM
-     *    type is given), no bridge is needed to box a Unit result type:
-     *    the SAM contains a default method to handle that.
+     *  But in some situations we can avoid generating this bridge, either
+     *  because the runtime can perform auto-adaptation, or because we can
+     *  replace the closure SAM class by a specialized subclass, see comments
+     *  in this method for details.
      *
      *  See test cases lambda-*.scala and t8017/ for concrete examples.
      */
@@ -449,7 +421,6 @@ object Erasure {
       val SAMType(sam) = lambdaType: @unchecked
       val samParamTypes = sam.paramInfos
       val samResultType = sam.resultType
-
       val isScalaJS = ctx.settings.scalajs.value
 
       /** Can the implementation parameter type `tp` be auto-adapted to a different
@@ -489,16 +460,22 @@ object Erasure {
       if paramAdaptationNeeded || resultAdaptationNeeded then
         // Instead of instantiating `scala.FunctionN`, see if we can instantiate
         // a specialized subclass where the SAM type matches the implementation
-        // method type, thus avoiding the need for boxing.
+        // method type, thus avoiding the need for bridging and potential boxing.
         // The Scala.js backend does not support closures with custom SAM
         // classes, but that doesn't matter since it can perform auto-adaptation
         // in these cases anyway.
         if isFunction && !isScalaJS then
           val arity = implParamTypes.length
           val specializedSamClass =
-            if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
+            if defn.isSpecializableFunctionSAM(implParamTypes, implResultType) then
+              // Using these subclasses is critical to avoid boxing since their
+              // SAM is a specialized method `apply$mc*$sp` whose default
+              // implementation in FunctionN boxes.
               s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
             else if !paramAdaptationNeeded && implReturnsUnit then
+              // Here, there is no actual boxing to avoid so we could get by
+              // without JProcedureN, but Unit-returning functions are very
+              // common so it seems worth it to not generate bridges for them.
               s"scala.runtime.function.JProcedure${arity}"
             else
               ""

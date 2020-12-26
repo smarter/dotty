@@ -1464,21 +1464,11 @@ class Definitions {
     new PerRun(Function2SpecializedReturnTypes.map(_.symbol))
 
   def isSpecializableFunction(cls: ClassSymbol, paramTypes: List[Type], retType: Type)(using Context): Boolean =
-    paramTypes.length <= 2 && cls.derivesFrom(FunctionClass(paramTypes.length)) && (paramTypes match {
-      case Nil =>
-        Function0SpecializedReturnClasses().contains(retType.typeSymbol)
-      case List(paramType0) =>
-        Function1SpecializedParamClasses().contains(paramType0.typeSymbol) &&
-        Function1SpecializedReturnClasses().contains(retType.typeSymbol)
-      case List(paramType0, paramType1) =>
-        Function2SpecializedParamClasses().contains(paramType0.typeSymbol) &&
-        Function2SpecializedParamClasses().contains(paramType1.typeSymbol) &&
-        Function2SpecializedReturnClasses().contains(retType.typeSymbol)
-      case _ =>
-        false
-    })
+    paramTypes.length <= 2 && cls.derivesFrom(FunctionClass(paramTypes.length))
+    && isSpecializableFunctionSAM(paramTypes, retType)
 
-  def isSpecializableFunctionX(paramTypes: List[Type], retType: Type)(using Context): Boolean =
+  /** If the Single Abstract Method of a Function class has this type, is it specializable? */
+  def isSpecializableFunctionSAM(paramTypes: List[Type], retType: Type)(using Context): Boolean =
     paramTypes.length <= 2 && (paramTypes match {
       case Nil =>
         Function0SpecializedReturnClasses().contains(retType.typeSymbol)
