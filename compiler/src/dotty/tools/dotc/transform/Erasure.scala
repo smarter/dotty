@@ -471,14 +471,14 @@ object Erasure {
               // Using these subclasses is critical to avoid boxing since their
               // SAM is a specialized method `apply$mc*$sp` whose default
               // implementation in FunctionN boxes.
-              s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
+              tpnme.JFunctionPrefix(arity).specializedFunction(implResultType, implParamTypes)
             else if !paramAdaptationNeeded && implReturnsUnit then
               // Here, there is no actual boxing to avoid so we could get by
               // without JProcedureN, but Unit-returning functions are very
               // common so it seems worth it to not generate bridges for them.
-              s"scala.runtime.function.JProcedure${arity}"
+              tpnme.JProcedure(arity)
             else
-              ""
+              EmptyTypeName
           if !specializedSamClass.isEmpty then
             return cpy.Closure(tree)(tpt = TypeTree(requiredClass(specializedSamClass).typeRef))
 
