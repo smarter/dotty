@@ -478,13 +478,13 @@ object Erasure {
       def autoAdaptedResult =
         !implResultType.isErasedValueType && (isScalaJS || !implReturnsUnit)
 
-      def sameSymbol(tp1: Type, tp2: Type) = tp1.typeSymbol == tp2.typeSymbol
+      def sameClass(tp1: Type, tp2: Type) = tp1.classSymbol == tp2.classSymbol
 
       val paramAdaptationNeeded =
         implParamTypes.lazyZip(samParamTypes).exists((implType, samType) =>
-          !sameSymbol(implType, samType) && !autoAdaptedParam(implType))
+          !sameClass(implType, samType) && !autoAdaptedParam(implType))
       val resultAdaptationNeeded =
-        !sameSymbol(implResultType, samResultType) && !autoAdaptedResult
+        !sameClass(implResultType, samResultType) && !autoAdaptedResult
 
       if paramAdaptationNeeded || resultAdaptationNeeded then
         // Instead of instantiating `scala.FunctionN`, see if we can instantiate
