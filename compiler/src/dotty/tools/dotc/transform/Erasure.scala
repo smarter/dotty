@@ -421,7 +421,6 @@ object Erasure {
       val SAMType(sam) = lambdaType: @unchecked
       val samParamTypes = sam.paramInfos
       val samResultType = sam.resultType
-      val isScalaJS = ctx.settings.scalajs.value
 
       /** Can the implementation parameter type `tp` be auto-adapted to a different
        *  parameter type in the SAM?
@@ -436,7 +435,7 @@ object Erasure {
        *  @see [LambdaMetaFactory](https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html)
        */
       def autoAdaptedParam(tp: Type) =
-        !tp.isErasedValueType && (isScalaJS || !tp.isPrimitiveValueType)
+        !tp.isErasedValueType && !tp.isPrimitiveValueType
 
       /** Can the implementation result type be auto-adapted to a different result
        *  type in the SAM?
@@ -447,7 +446,7 @@ object Erasure {
        *  handling of null is required.
        */
       def autoAdaptedResult =
-        !implResultType.isErasedValueType && (isScalaJS || !implReturnsUnit)
+        !implResultType.isErasedValueType && !implReturnsUnit
 
       def sameClass(tp1: Type, tp2: Type) = tp1.classSymbol == tp2.classSymbol
 
@@ -460,11 +459,10 @@ object Erasure {
       if paramAdaptationNeeded || resultAdaptationNeeded then
         // Instead of instantiating `scala.FunctionN`, see if we can instantiate
         // a specialized subclass where the SAM type matches the implementation
-        // method type, thus avoiding the need for bridging and potential boxing.
-        // The Scala.js backend does not support closures with custom SAM
-        // classes, but that doesn't matter since it can perform auto-adaptation
-        // in these cases anyway.
-        if isFunction && !isScalaJS then
+        // method type, thus avoiding the need for bridging and potential
+        // boxing. This optimization is skipped when using Scala.js because its
+        // backend does not support closures with custom SAM classes.
+        if isFunction && !ctx.settings.scalajs.value then
           val arity = implParamTypes.length
           val specializedSamClass =
             if defn.isSpecializableFunctionSAM(implParamTypes, implResultType) then
