@@ -434,20 +434,50 @@ object Erasure {
       val Closure(env, meth, tpt) = tree
       assert(env.isEmpty, tree)
 
+      // The type of the lambda expression
       val lambdaType = tree.tpe
+      // The class containing the SAM that this closure should implement
       val explicitSAMClass = tpt.tpe
+      // A lack of explicit SAM means we're implementing a scala.FunctionN
+      val isFunction = !explicitSAMClass.exists
+      // The actual type of the implementation method
       val implType = meth.tpe.widen.asInstanceOf[MethodType]
       val implParamTypes = implType.paramInfos
       val implResultType = implType.resultType
-      val returnsUnit = implResultType.classSymbol == defn.UnitClass
-
+      val implReturnsUnit = implResultType.classSymbol eq defn.UnitClass
+      // The SAM that this closure should implement
       val SAMType(sam) = lambdaType: @unchecked
       val samParamTypes = sam.paramInfos
       val samResultType = sam.resultType
+
       val isScalaJS = ctx.settings.scalajs.value
 
-      def autoAdaptedParam(tp: Type) = !tp.isErasedValueType && (isScalaJS || !tp.isPrimitiveValueType)
-      def autoAdaptedResult = !implResultType.isErasedValueType && (isScalaJS || !returnsUnit)
+      /** Can the implementation parameter type `tp` be auto-adapted to a different
+       *  parameter type in the SAM?
+       *
+       *  For derived value classes, we always need to do the bridging manually.
+       *  For primitives, we cannot rely on auto-adaptation on the JVM because
+       *  the Scala spec requires null to be "unboxed" to the default value of
+       *  the value class, but the adaptation performed by LambdaMetaFactory
+       *  will throw a `NullPointerException` instead. See `lambda-null.scala`
+       *  for test cases.
+       *
+       *  @see [LambdaMetaFactory](https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html)
+       */
+      def autoAdaptedParam(tp: Type) =
+        !tp.isErasedValueType && (isScalaJS || !tp.isPrimitiveValueType)
+
+      /** Can the implementation result type be auto-adapted to a different result
+       *  type in the SAM?
+       *
+       *  For derived value classes, it's the same story as for parameters.
+       *  For non-Unit primitives, we can actually rely on the `LambdaMetaFactory`
+       *  adaptation, because it only needs to box, not unbox, so no special
+       *  handling of null is required.
+       */
+      def autoAdaptedResult =
+        !implResultType.isErasedValueType && (isScalaJS || !implReturnsUnit)
+
       def sameSymbol(tp1: Type, tp2: Type) = tp1.typeSymbol == tp2.typeSymbol
 
       val paramAdaptationNeeded =
@@ -456,20 +486,24 @@ object Erasure {
       val resultAdaptationNeeded =
         !sameSymbol(implResultType, samResultType) && !autoAdaptedResult
 
-      // Function handling
-      if !isScalaJS && !explicitSAMClass.exists then
-        val arity = implParamTypes.length
-        val samClass =
-          if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
-            s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
-          else if !paramAdaptationNeeded && returnsUnit then
-            s"scala.runtime.function.JProcedure${arity}"
-          else
-            ""
-        if !samClass.isEmpty then
-          return cpy.Closure(tree)(tpt = TypeTree(requiredClass(samClass).typeRef))
-
       if paramAdaptationNeeded || resultAdaptationNeeded then
+        // Instead of instantiating `scala.FunctionN`, see if we can instantiate
+        // a specialized subclass where the SAM type matches the implementation
+        // method type, thus avoiding the need for boxing.
+        // The Scala.js backend does not support closures with custom SAM
+        // classes, but that doesn't matter since it can perform auto-adaptation
+        // in these cases anyway.
+        if isFunction && !isScalaJS then
+          val arity = implParamTypes.length
+          val specializedSamClass =
+            if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
+              s"scala.runtime.java8.JFunction${arity}".toTypeName.specializedFunctionStr(implResultType, implParamTypes)
+            else if !paramAdaptationNeeded && implReturnsUnit then
+              s"scala.runtime.function.JProcedure${arity}"
+            else
+              ""
+          if !specializedSamClass.isEmpty then
+            return cpy.Closure(tree)(tpt = TypeTree(requiredClass(specializedSamClass).typeRef))
         val bridgeType =
           if paramAdaptationNeeded then
             if resultAdaptationNeeded then
