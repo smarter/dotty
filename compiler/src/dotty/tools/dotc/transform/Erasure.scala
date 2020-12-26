@@ -434,9 +434,6 @@ object Erasure {
       val Closure(env, meth, tpt) = tree
       assert(env.isEmpty, tree)
 
-      // if ctx.settings.scalajs.value then
-      //   return tree
-
       val lambdaType = tree.tpe
       val explicitSAMClass = tpt.tpe
       val implType = meth.tpe.widen.asInstanceOf[MethodType]
@@ -447,9 +444,10 @@ object Erasure {
       val SAMType(sam) = lambdaType: @unchecked
       val samParamTypes = sam.paramInfos
       val samResultType = sam.resultType
+      val isScalaJS = ctx.settings.scalajs.value
 
-      def autoAdaptedParam(tp: Type) = !tp.isErasedValueType && !tp.isPrimitiveValueType
-      def autoAdaptedResult = !implResultType.isErasedValueType && !returnsUnit
+      def autoAdaptedParam(tp: Type) = !tp.isErasedValueType && (isScalaJS || !tp.isPrimitiveValueType)
+      def autoAdaptedResult = !implResultType.isErasedValueType && (isScalaJS || !returnsUnit)
       def sameSymbol(tp1: Type, tp2: Type) = tp1.typeSymbol == tp2.typeSymbol
 
       val paramAdaptationNeeded =
@@ -459,7 +457,7 @@ object Erasure {
         !sameSymbol(implResultType, samResultType) && !autoAdaptedResult
 
       // Function handling
-      if !explicitSAMClass.exists && !ctx.settings.scalajs.value then
+      if !isScalaJS && !explicitSAMClass.exists then
         val arity = implParamTypes.length
         val samClass =
           if defn.isSpecializableFunctionX(implParamTypes, implResultType) then
