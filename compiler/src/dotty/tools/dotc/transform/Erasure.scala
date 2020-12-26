@@ -504,6 +504,8 @@ object Erasure {
               ""
           if !specializedSamClass.isEmpty then
             return cpy.Closure(tree)(tpt = TypeTree(requiredClass(specializedSamClass).typeRef))
+
+        // Otherwise, generate a new closure implemented with a bridge.
         val bridgeType =
           if paramAdaptationNeeded then
             if resultAdaptationNeeded then
@@ -520,7 +522,7 @@ object Erasure {
             val rhs = Apply(meth, bridgeParams.lazyZip(implParamTypes).map(ctx.typer.adapt(_, _)))
             ctx.typer.adapt(rhs, bridgeType.resultType)
           },
-          targetType = explicitSAMClass)
+          targetType = explicitSAMClass).withSpan(tree.span)
       else
         tree
     end adaptClosure
