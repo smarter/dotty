@@ -1015,7 +1015,7 @@ object Denotations {
           // The signatures do not tell us enough to be sure about matching
           !ctx.erasedTypes && info.matches(other.info)
         case noMatch =>
-          false
+          !ctx.erasedTypes && symbol.is(JavaDefined) != other.symbol.is(JavaDefined) && info.matches(other.info)
 
     def mapInherited(ownDenots: PreDenotation, prevDenots: PreDenotation, pre: Type)(using Context): SingleDenotation =
       if hasUniqueSym && prevDenots.containsSym(symbol) then NoDenotation
