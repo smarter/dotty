@@ -990,8 +990,7 @@ object Denotations {
 
     /** matches without a target name check */
     def matchesLoosely(other: SingleDenotation)(using Context): Boolean =
-      val d = signature.matchDegree(other.signature)
-      d match
+      def matchingSignatures(s1: Signature, s2: Signature, again: Boolean): Boolean = s1.matchDegree(s2) match
         case FullMatch =>
           true
         case MethodNotAMethodMatch =>
@@ -1015,7 +1014,11 @@ object Denotations {
           // The signatures do not tell us enough to be sure about matching
           !ctx.erasedTypes && info.matches(other.info)
         case noMatch =>
-          !ctx.erasedTypes && symbol.is(JavaDefined) != other.symbol.is(JavaDefined) && info.matches(other.info)
+          again && !ctx.erasedTypes && signature != Signature.NotAMethod && other.signature != Signature.NotAMethod &&
+          symbol.is(JavaDefined) != other.symbol.is(JavaDefined) && {
+            matchingSignatures(info.dropJavaMethod.signature, other.info.dropJavaMethod.signature, again = false)
+          }
+      matchingSignatures(signature, other.signature, again = true)
 
     def mapInherited(ownDenots: PreDenotation, prevDenots: PreDenotation, pre: Type)(using Context): SingleDenotation =
       if hasUniqueSym && prevDenots.containsSym(symbol) then NoDenotation
