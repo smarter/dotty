@@ -16,4 +16,5 @@
 -- Error: tests/neg/targetName-override.scala:14:6 ---------------------------------------------------------------------
 14 |class Beta extends Alpha[String] {  // error: needs to be abstract
    |      ^
-   |class Beta needs to be abstract, since there is a deferred declaration of method foo in class Alpha of type (x: String): String which is not implemented in a subclass
+   |      class Beta needs to be abstract, since def foo(x: T): T is not defined 
+   |      (Note that T does not match String)
