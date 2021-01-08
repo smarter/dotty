@@ -60,6 +60,8 @@ object TypeOps:
     /** Set to true when the result of `apply` was approximated to avoid an unstable prefix. */
     var approximated: Boolean = false
 
+    @threadUnsafe lazy val preIsJava = pre.classSymbol.is(JavaDefined)
+
     def apply(tp: Type): Type = {
 
       /** Map a `C.this` type to the right prefix. If the prefix is unstable, and
@@ -101,7 +103,18 @@ object TypeOps:
             if (sym.isStatic && !sym.maybeOwner.seesOpaques || (tp.prefix `eq` NoPrefix)) tp
             else derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
           case tp: LambdaType =>
-            mapOverLambda(tp) // special cased common case
+            val tp1 = tp match {
+              case tp: MethodType =>
+                if tp.isJavaMethod && !preIsJava then
+                  tp.dropJavaMethod.asInstanceOf[MethodType]
+                else if !tp.isJavaMethod && preIsJava then
+                  tp // add JavaMethod
+                else
+                  tp
+              case _ =>
+                tp
+            }
+            mapOverLambda(tp1) // special cased common case
           case tp: ThisType =>
             toPrefix(pre, cls, tp.cls)
           case _: BoundType =>
