@@ -588,7 +588,7 @@ object RefChecks {
 
         for (member <- missing) {
           def undefined(msg: String) =
-            abstractClassError(false, s"${member.showDcl} is not defined $msg")
+            abstractClassError(false, i"${member.asSeenFrom(self).showDcl} defined in ${member.owner} is not defined $msg")
           val underlying = member.underlyingSymbol
 
           // Give a specific error message for abstract vars based on why it fails:
@@ -645,6 +645,7 @@ object RefChecks {
                     // XX: incorrect message for tests/neg/targetName-override.scala foo when the problem is actually the targetName
                     undefined(ex"\n(Note that ${pa} does not match ${pc}$addendum)")
                   case xs =>
+                    // TODO: if defined in supertrait, show "(defined in ...)"
                     undefined(
                       if concrete.symbol.is(AbsOverride) then
                         s"\n(The class implements ${concrete.showDcl} but that definition still needs an implementation)"
