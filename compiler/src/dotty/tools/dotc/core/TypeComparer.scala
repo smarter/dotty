@@ -681,7 +681,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       case tp2: MethodType =>
         def compareMethod = tp1 match {
           case tp1: MethodType =>
-            (tp1.signature consistentParams tp2.signature) &&
+            (tp1.isJavaMethod != tp2.isJavaMethod || (tp1.signature consistentParams tp2.signature)) &&
             matchingMethodParams(tp1, tp2) &&
             (!tp2.isImplicitMethod || tp1.isImplicitMethod) &&
             isSubType(tp1.resultType, tp2.resultType.subst(tp2, tp1))
@@ -691,7 +691,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       case tp2: PolyType =>
         def comparePoly = tp1 match {
           case tp1: PolyType =>
-            (tp1.signature consistentParams tp2.signature) &&
+            // (tp1.signature consistentParams tp2.signature) && // XX
             matchingPolyParams(tp1, tp2) &&
             isSubType(tp1.resultType, tp2.resultType.subst(tp2, tp1))
           case _ => false
