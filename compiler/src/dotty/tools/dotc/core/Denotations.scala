@@ -582,7 +582,17 @@ object Denotations {
       if (isType) Signature.NotAMethod // don't force info if this is a type SymDenotation
       else info match {
         case info: MethodicType =>
-          try info.signature
+          try
+            val isJavaMethod = info.stripPoly.isJavaMethod
+            def isJavaPrefix = prefix.classSymbol.is(JavaDefined)
+            val meth =
+              if isJavaMethod && !isJavaPrefix then
+                info.dropJavaMethod
+              else if !isJavaMethod && isJavaPrefix then
+                info.toJavaMethod
+              else
+                info
+            meth.signature
           catch { // !!! DEBUG
             case scala.util.control.NonFatal(ex) =>
               report.echo(s"cannot take signature of $info")
