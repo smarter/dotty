@@ -893,7 +893,7 @@ object SymDenotations {
        || this.isStaticOwner && !this.seesOpaques
        || ctx.erasedTypes
        || (pre eq NoPrefix)
-       || (pre eq thisType)
+       || (pre =:= thisType)
        )
 
     /** Is this symbol concrete, or that symbol deferred? */
