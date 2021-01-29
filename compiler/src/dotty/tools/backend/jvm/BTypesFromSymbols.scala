@@ -49,7 +49,6 @@ class BTypesFromSymbols[I <: DottyBackendInterface](val int: I) extends BTypes {
     def newAnyRefMap[K <: AnyRef, V](): mutable.AnyRefMap[K, V] = new mutable.AnyRefMap[K, V]()
     def newWeakMap[K, V](): mutable.WeakHashMap[K, V] = new mutable.WeakHashMap[K, V]()
     def recordCache[T <: Clearable](cache: T): T = cache
-    def newWeakSet[K >: Null <: AnyRef](): WeakHashSet[K] = new WeakHashSet[K]()
     def newMap[K, V](): mutable.HashMap[K, V] = new mutable.HashMap[K, V]()
     def newSet[K](): mutable.Set[K] = new mutable.HashSet[K]
   }
@@ -60,7 +59,6 @@ class BTypesFromSymbols[I <: DottyBackendInterface](val int: I) extends BTypes {
     def newWeakMap[K, V](): collection.mutable.WeakHashMap[K, V]
     def newMap[K, V](): collection.mutable.HashMap[K, V]
     def newSet[K](): collection.mutable.Set[K]
-    def newWeakSet[K >: Null <: AnyRef](): dotty.tools.dotc.util.WeakHashSet[K]
     def newAnyRefMap[K <: AnyRef, V](): collection.mutable.AnyRefMap[K, V]
   }
 
