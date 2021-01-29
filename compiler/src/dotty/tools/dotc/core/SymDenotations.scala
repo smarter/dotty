@@ -1393,10 +1393,10 @@ object SymDenotations {
     def thisType(using Context): Type = NoPrefix
 
     def typeRef(using Context): TypeRef =
-      TypeRef(maybeOwner.thisType, symbol)
+      TypeRef(maybeOwner.thisType, symbol).withDenot(this)
 
     def termRef(using Context): TermRef =
-      TermRef(maybeOwner.thisType, symbol)
+      TermRef(maybeOwner.thisType, symbol).withDenot(this)
 
     /** The typeRef applied to its own type parameters */
     def appliedRef(using Context): Type =
@@ -1415,7 +1415,7 @@ object SymDenotations {
      *  See tests/pos/i10769.scala
      */
      def reachableTypeRef(using Context) =
-       TypeRef(owner.reachableThisType, symbol)
+       TypeRef(owner.reachableThisType, symbol).withDenot(this)
 
     /** Like termRef, but objects in the prefix are represented by their singleton type,
      *  this means we output `pre.O.member` rather than `pre.O$.this.member`.
@@ -1424,7 +1424,7 @@ object SymDenotations {
      *  See tests/pos/i10769.scala
      */
     def reachableTermRef(using Context) =
-      TermRef(owner.reachableThisType, symbol)
+      TermRef(owner.reachableThisType, symbol).withDenot(this)
 
     /** Like thisType, but objects in the type are represented by their singleton type,
      *  this means we output `pre.O.member` rather than `pre.O$.this.member`.
