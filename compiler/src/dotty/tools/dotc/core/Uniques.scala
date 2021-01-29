@@ -29,8 +29,7 @@ object Uniques:
 
   def unique[T <: Type](tp: T)(using Context): T =
     recordCaching(tp)
-    if tp.hash == NotCached then tp
-    else ctx.uniques.put(tp).asInstanceOf[T]
+    tp
 
   final class NamedTypeUniques extends HashSet[NamedType](Config.initialUniquesCapacity * 4) with Hashable:
     override def hash(x: NamedType): Int = x.hash
@@ -41,16 +40,7 @@ object Uniques:
       def newType =
         if (isTerm) new CachedTermRef(prefix, designator, h)
         else new CachedTypeRef(prefix, designator, h)
-      if h == NotCached then newType
-      else
-        Stats.record(statsItem("put"))
-        var idx = index(h)
-        var e = entryAt(idx)
-        while e != null do
-          if (e.prefix eq prefix) && (e.designator eq designator) && (e.isTerm == isTerm) then return e
-          idx = nextIndex(idx)
-          e = entryAt(idx)
-        addEntryAt(idx, newType)
+      newType
   end NamedTypeUniques
 
   final class AppliedUniques extends HashSet[AppliedType](Config.initialUniquesCapacity * 2) with Hashable:
@@ -60,15 +50,6 @@ object Uniques:
       val h = doHash(null, tycon, args)
       def newType = new CachedAppliedType(tycon, args, h)
       if monitored then recordCaching(h, classOf[CachedAppliedType])
-      if h == NotCached then newType
-      else
-        Stats.record(statsItem("put"))
-        var idx = index(h)
-        var e = entryAt(idx)
-        while e != null do
-          if (e.tycon eq tycon) && e.args.eqElements(args) then return e
-          idx = nextIndex(idx)
-          e = entryAt(idx)
-        addEntryAt(idx, newType)
+      newType
   end AppliedUniques
 end Uniques
