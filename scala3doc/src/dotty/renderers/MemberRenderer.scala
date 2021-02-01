@@ -97,7 +97,7 @@ class MemberRenderer(signatureRenderer: SignatureRenderer, buildNode: ContentNod
 
     val content =
       since.fold(Nil)(since =>
-        Seq[TagArg](code("[Since version ", parameter(since), "] ")) ++
+        Seq(code("[Since version ", parameter(since), "] ")) ++
           message.fold(Nil)(m => Seq(parameter(m))) ++
           m.docs.fold(Nil)(_.deprecated.toSeq.map(renderDocPart))
       )
