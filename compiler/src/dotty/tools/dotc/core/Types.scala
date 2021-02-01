@@ -2302,6 +2302,7 @@ object Types {
      */
     private def infoDependsOnPrefix(symd: SymDenotation, prefix: Type)(using Context): Boolean =
       symd.maybeOwner.membersNeedAsSeenFrom(prefix) && !symd.is(NonMember)
+      || (prefix.isInstanceOf[Types.ThisType] && symd.is(Opaque))
 
     /** Is this a reference to a class or object member? */
     def isMemberRef(using Context): Boolean = designator match {
@@ -2438,7 +2439,7 @@ object Types {
 
     /** A reference like this one, but with the given symbol, if it exists */
     final def withSym(sym: Symbol)(using Context): ThisType =
-      if ((designator ne sym) && sym.exists) NamedType(prefix, sym).asInstanceOf[ThisType]
+      if ((designator ne sym) && sym.exists /*&& !sameThis(prefix, sym.owner.thisType)*/) NamedType(prefix, sym).asInstanceOf[ThisType]
       else this
 
     /** A reference like this one, but with the given denotation, if it exists.
