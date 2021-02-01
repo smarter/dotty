@@ -1998,12 +1998,24 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
               val tp2a = dropIfSuper(tp2, tp1)
               if tp2a ne tp2 then glb(tp1, tp2a)
               else tp2 match // normalize to disjunctive normal form if possible.
-                case OrType(tp21, tp22) =>
-                  tp1 & tp21 | tp1 & tp22
+                case tp2 @ OrType(tp21, tp22) =>
+                  val z = tp1 & tp21 | tp1 & tp22
+                  z match {
+                    case z: OrType =>
+                      z.derivedOrType(z.tp1, z.tp2, soft = tp2.isSoft)
+                    case _ =>
+                      z
+                  }
                 case _ =>
                   tp1 match
-                    case OrType(tp11, tp12) =>
-                      tp11 & tp2 | tp12 & tp2
+                    case tp1 @ OrType(tp11, tp12) =>
+                      val z = tp11 & tp2 | tp12 & tp2
+                      z match {
+                        case z: OrType =>
+                          z.derivedOrType(z.tp1, z.tp2, soft = tp1.isSoft)
+                        case _ =>
+                          z
+                      }
                     case tp1: ConstantType =>
                       tp2 match
                         case tp2: ConstantType =>
@@ -2163,11 +2175,27 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       case tp2 @ OrType(tp21, tp22) =>
         val higher1 = mergeIfSuper(tp1, tp21, canConstrain)
         if (higher1 eq tp21) tp2
-        else if (higher1.exists) higher1 | tp22
+        else if (higher1.exists) {
+          val z = higher1 | tp22
+          z match {
+            case z: OrType =>
+              z.derivedOrType(z.tp1, z.tp2, soft = tp2.isSoft)
+            case _ =>
+              z
+          }
+        }
         else {
           val higher2 = mergeIfSuper(tp1, tp22, canConstrain)
           if (higher2 eq tp22) tp2
-          else if (higher2.exists) tp21 | higher2
+          else if (higher2.exists) {
+            val z = tp21 | higher2
+            z match {
+              case z: OrType =>
+                z.derivedOrType(z.tp1, z.tp2, soft = tp2.isSoft)
+              case _ =>
+                z
+            }
+          }
           else NoType
         }
       case _ =>
