@@ -310,7 +310,15 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         val r2 = recur(tp.tp2, fromBelow)
         if (r1 eq tp.tp1) && (r2 eq tp.tp2) then tp
         else if tp.isAnd then r1 & r2
-        else r1 | r2
+        else {
+          val z = r1 | r2
+          z match {
+            case z: OrType =>
+              z.derivedOrType(z.tp1, z.tp2, soft = tp.asInstanceOf[OrType].isSoft)
+            case _ =>
+              z
+          }
+        }
       case tp: TypeParamRef =>
         if tp eq param then
           if fromBelow then defn.NothingType else defn.AnyType
