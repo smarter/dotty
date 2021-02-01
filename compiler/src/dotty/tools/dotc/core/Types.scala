@@ -2681,7 +2681,7 @@ object Types {
      *  from the denotation's symbol if the latter exists, or else it is the given name.
      */
     def apply(prefix: Type, name: TypeName, denot: Denotation)(using Context): TypeRef =
-      apply(prefix, designatorFor(prefix, name, denot)).withDenot(denot)
+      (new TypeRef(prefix, designatorFor(prefix, name, denot)) {}).withDenot(denot)
   }
 
   // --- Other SingletonTypes: ThisType/SuperType/ConstantType ---------------------------
