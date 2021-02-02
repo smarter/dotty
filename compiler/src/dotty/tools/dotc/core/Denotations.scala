@@ -587,7 +587,14 @@ object Denotations {
       else info match {
         case info: MethodicType =>
           try
-            if prefix.classSymbol.is(JavaDefined) then
+            val isJava =
+              if prefix eq NoPrefix then
+                symbol.is(JavaDefined)
+              else
+                prefix.classSymbol.is(JavaDefined)
+            if isJava then
+              // println("this: " + this + " pre: " + prefix)
+              // Thread.dumpStack
               info.javaSignature
             else
               info.signature
