@@ -118,11 +118,14 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
       tp.derivedLambdaType(paramNames, paramTypes1, resultType1)
     case tp: PolyType =>
       tp.derivedLambdaType(tp.paramNames, tp.paramInfos, elimRepeated(tp.resultType))
-    case tp =>
+    case _ =>
       tp
 
   def transformTypeOfTree(tree: Tree)(using Context): Tree =
-    tree.withType(elimRepeated(tree.tpe))
+    val tp = tree.tpe
+    val etp = elimRepeated(tree.tpe)
+    assert(tp eq etp, s"tp: $tp - etp: $etp")
+    tree.withType(etp)
 
   override def transformTypeApply(tree: TypeApply)(using Context): Tree =
     transformTypeOfTree(tree)
