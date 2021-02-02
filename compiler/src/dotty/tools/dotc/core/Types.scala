@@ -3243,11 +3243,12 @@ object Types {
   }
 
   trait MethodicType extends TermType {
-    protected def resultSignature(using Context): Signature = try resultType match {
+    protected def resultSignature(isJava: Boolean)(using Context): Signature = try resultType match {
+      case rtp: MethodOrPoly => if isJava then rtp.javaSignature else rtp.signature
       case rtp: MethodicType => rtp.signature
       case tp =>
         if (tp.isRef(defn.UnitClass)) Signature(Nil, defn.UnitClass.fullName.asTypeName)
-        else Signature(tp, isJava = false)
+        else Signature(tp, isJava)
     }
     catch {
       case ex: AssertionError =>
@@ -3382,6 +3383,24 @@ object Types {
     final override def hashCode: Int = System.identityHashCode(this)
 
     final override def equals(that: Any): Boolean = equals(that, null)
+
+    protected var myJavaSignature: Signature = _
+    protected var myJavaSignatureRunId: Int = NoRunId
+
+    private def computeJavaSignature(using Context): Signature = this match
+      case tp: PolyType =>
+        resultSignature(isJava = true).prependTypeParams(paramNames.length)
+      case tp: MethodType =>
+        val params = if (isErasedMethod) Nil else paramInfos
+        resultSignature(isJava = true).prependTermParams(params, isJava = true)
+
+    final def javaSignature(using Context): Signature = {
+      if (ctx.runId != myJavaSignatureRunId) {
+        myJavaSignature = computeJavaSignature
+        if (!myJavaSignature.isUnderDefined) myJavaSignatureRunId = ctx.runId
+      }
+      myJavaSignature
+    }
 
     // No definition of `eql` --> fall back on equals, which is `eq`
 
@@ -3540,7 +3559,7 @@ object Types {
 
     protected[dotc] def computeSignature(using Context): Signature = {
       val params = if (isErasedMethod) Nil else paramInfos
-      resultSignature.prependTermParams(params, isJavaMethod)
+      resultSignature(isJava = false).prependTermParams(params, isJavaMethod)
     }
 
     protected def prefixString: String = companion.prefixString
@@ -3774,7 +3793,7 @@ object Types {
     assert(paramNames.nonEmpty)
 
     protected[dotc] def computeSignature(using Context): Signature =
-      resultSignature.prependTypeParams(paramNames.length)
+      resultSignature(isJava = false).prependTypeParams(paramNames.length)
 
     override def isContextualMethod = resType.isContextualMethod
     override def isImplicitMethod = resType.isImplicitMethod
