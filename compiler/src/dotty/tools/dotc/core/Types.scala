@@ -1754,19 +1754,6 @@ object Types {
 
     end dropJavaMethod
 
-    final def toJavaMethod(using Context): Type = this match
-      case pt: PolyType => pt.derivedLambdaType(resType = pt.resType.toJavaMethod)
-
-      case mt: MethodType =>
-        if mt.isJavaMethod then
-          mt.derivedLambdaType(resType = mt.resType.toJavaMethod)
-        else
-          JavaMethodType.apply(mt.paramNames, mt.paramInfos, mt.resType.toJavaMethod)
-
-      case _ => this
-
-    end toJavaMethod
-
     /** The signature of this type. This is by default NotAMethod,
      *  but is overridden for PolyTypes, MethodTypes, and TermRef types.
      *  (the reason why we deviate from the "final-method-with-pattern-match-in-base-class"
@@ -3249,6 +3236,8 @@ object Types {
   }
 
   trait MethodicType extends TermType {
+    def javaSignature(using Context): Signature
+
     protected def resultSignature(isJava: Boolean)(using Context): Signature = try resultType match {
       case rtp: MethodOrPoly => if isJava then rtp.javaSignature else rtp.signature
       case rtp: MethodicType => rtp.signature
@@ -3269,6 +3258,7 @@ object Types {
     override def resultType(using Context): Type = resType
     override def underlying(using Context): Type = resType
 
+    override def javaSignature(using Context): Signature = Signature.NotAMethod
     override def signature(using Context): Signature = Signature.NotAMethod
 
     def derivedExprType(resType: Type)(using Context): ExprType =
@@ -3565,7 +3555,7 @@ object Types {
 
     protected[dotc] def computeSignature(using Context): Signature = {
       val params = if (isErasedMethod) Nil else paramInfos
-      resultSignature(isJava = false).prependTermParams(params, isJavaMethod)
+      resultSignature(isJava = false).prependTermParams(params, isJava = false)
     }
 
     protected def prefixString: String = companion.prefixString
