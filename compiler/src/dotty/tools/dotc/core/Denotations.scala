@@ -577,26 +577,16 @@ object Denotations {
      *  NoPrefix for SymDenotations.
      */
     def prefix: Type = NoPrefix
-    private var mySignature: Signature = null
 
     final def signature(using Context): Signature =
       if (isType) Signature.NotAMethod // don't force info if this is a type SymDenotation
       else info match {
         case info: MethodicType =>
           try
-            if mySignature == null then
-              val isJavaMethod = info.stripPoly.isJavaMethod
-              val isJavaPrefix = prefix.classSymbol.is(JavaDefined)
-              val meth =
-                if isJavaMethod && !isJavaPrefix then
-                  info.dropJavaMethod
-                else if !isJavaMethod && isJavaPrefix then
-                  info.toJavaMethod
-                else
-                  info
-              mySignature = meth.signature
-            end if
-            mySignature
+            if prefix.classSymbol.is(JavaDefined) then
+              info.javaSignature
+            else
+              info.signature
           catch { // !!! DEBUG
             case scala.util.control.NonFatal(ex) =>
               report.echo(s"cannot take signature of $info")
