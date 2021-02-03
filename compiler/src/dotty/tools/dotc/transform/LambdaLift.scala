@@ -550,8 +550,9 @@ class LambdaLift extends MiniPhase with IdentityDenotTransformer { thisPhase =>
   }
 
   override def transformSelect(tree: Select)(using Context): Tree =
+    val denot = tree.denot
     val sym = tree.symbol
-    if lifter.free.contains(sym) then
+    if !denot.isInstanceOf[core.SymDenotations.SymDenotation] && lifter.free.contains(sym) then
       tree.qualifier.select(sym).withSpan(tree.span)
     else tree
 
