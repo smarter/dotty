@@ -1061,7 +1061,7 @@ object Denotations {
         derivedSingleDenotation(
           symbol,
           info.asSeenFrom(pre, owner),
-          if (symbol.is(Opaque) || this.prefix != NoPrefix) pre else this.prefix)
+          pre)
 
       // Tt could happen that we see the symbol with prefix `this` as a member a different class
       // through a self type and that it then has a different info. In this case we have to go
