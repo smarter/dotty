@@ -851,7 +851,10 @@ object Denotations {
       else if valid.runId != currentPeriod.runId then
         toNewRun
       else if currentPeriod.code > valid.code then
-        goForward
+        if ctx.erasedTypes && this.isInstanceOf[NonSymSingleDenotation] then
+          symbol.denot.current
+        else
+          goForward
       else
         goBack
     end current

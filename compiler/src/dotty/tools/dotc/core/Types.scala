@@ -2156,11 +2156,20 @@ object Types {
       lastDenotation match {
         case lastd0: SingleDenotation =>
           val lastd = lastd0.skipRemoved
-          if (lastd.validFor.runId == ctx.runId && (checkedPeriod != Nowhere)) finish(lastd.current)
+
+          val needsRecompute =
+            prefix != NoPrefix
+            && lastd.isInstanceOf[SymDenotation]
+            && checkedPeriod.containsPhaseId(erasurePhase.next.id)
+            && !ctx.erasedTypes
+            && ctx.phase.id < checkedPeriod.firstPhaseId
+            && infoDependsOnPrefix(lastd.symbol.denot, prefix)
+
+          if (lastd.validFor.runId == ctx.runId && (checkedPeriod != Nowhere) && !needsRecompute) finish(lastd.current)
           else lastd match {
             case lastd: SymDenotation =>
-              if (stillValid(lastd) && (checkedPeriod != Nowhere)) finish(lastd.current)
-              else finish(memberDenot(lastd.initial.name, allowPrivate = false))
+              if (stillValid(lastd) && (checkedPeriod != Nowhere) && !needsRecompute) finish(lastd.current)
+              else memberDenot(lastd.initial.name, allowPrivate = needsRecompute)
             case _ =>
               fromDesignator
           }
@@ -2299,6 +2308,7 @@ object Types {
      */
     private def infoDependsOnPrefix(symd: SymDenotation, prefix: Type)(using Context): Boolean =
       symd.maybeOwner.membersNeedAsSeenFrom(prefix) && !symd.is(NonMember)
+      || prefix.isInstanceOf[Types.ThisType] && symd.is(Opaque)
 
     /** Is this a reference to a class or object member? */
     def isMemberRef(using Context): Boolean = designator match {
