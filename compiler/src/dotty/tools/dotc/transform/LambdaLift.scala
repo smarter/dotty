@@ -2,6 +2,7 @@ package dotty.tools.dotc
 package transform
 
 import MegaPhase._
+import core.Denotations.NonSymSingleDenotation
 import core.DenotTransformers._
 import core.Symbols._
 import core.Contexts._
@@ -530,7 +531,18 @@ class LambdaLift extends MiniPhase with IdentityDenotTransformer { thisPhase =>
   override def prepareForUnit(tree: Tree)(using Context): Context =
     ctx.fresh.updateStore(Lifter, new Lifter(thisPhase))
 
+  /** The Lifter updates the type of symbols using `installAfter` to give them a
+   *  new `SymDenotation`, but that doesn't affect non-sym denotations, so we
+   *  reload them manually here.
+   */
+  private def reloadDenotation(tp: Type)(using Context): Unit = tp match
+    case tp: NamedType =>
+      if tp.denot.isInstanceOf[NonSymSingleDenotation] && lifter.free.contains(tp.symbol) then
+        tp.recomputeDenot()
+    case _ =>
+
   override def transformIdent(tree: Ident)(using Context): Tree = {
+    reloadDenotation(tree.tpe)
     val sym = tree.symbol
     tree.tpe match {
       case tpe @ TermRef(prefix, _) =>
@@ -550,11 +562,8 @@ class LambdaLift extends MiniPhase with IdentityDenotTransformer { thisPhase =>
   }
 
   override def transformSelect(tree: Select)(using Context): Tree =
-    val denot = tree.denot
-    val sym = tree.symbol
-    if !denot.isInstanceOf[core.SymDenotations.SymDenotation] && lifter.free.contains(sym) then
-      tree.qualifier.select(sym).withSpan(tree.span)
-    else tree
+    reloadDenotation(tree.tpe)
+    tree
 
   override def transformApply(tree: Apply)(using Context): Apply =
     cpy.Apply(tree)(tree.fun, lifter.addFreeArgs(tree.symbol, tree.args)).withSpan(tree.span)
