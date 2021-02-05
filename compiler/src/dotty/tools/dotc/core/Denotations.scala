@@ -1058,7 +1058,8 @@ object Denotations {
         def needsPrefix =
           // For opaque types, the prefix is used in `ElimOpaques#transform`,
           // without this i7159.scala would fail when compiled from tasty.
-          symbol.is(Opaque)
+          symbol.is(Opaque) ||
+          symbol.is(JavaDefined) != pre.classSymbol.is(JavaDefined)
 
         val derivedInfo = info.asSeenFrom(pre, owner)
         if Config.reuseSymDenotations && this.isInstanceOf[SymDenotation]
