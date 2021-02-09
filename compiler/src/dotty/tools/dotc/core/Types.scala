@@ -3364,11 +3364,19 @@ object Types {
     private var myJavaSignature: Signature = _
     private var myJavaSignatureRunId: Int = NoRunId
 
-    /** If `isJava` is false, the Scala signature of this method.
-     *  Otherwise, the signature of this method assuming it is part
-     *  of a Java class. This distinction is needed because
-     *  the same method type might be part of both a Java and Scala
-     *  class and each language has different type erasure rules.
+    /** If `isJava` is false, the Scala signature of this method. Otherwise, its Java signature.
+     *
+     *  This distinction is needed because the same method type
+     *  might be part of both a Java and Scala class and each language has
+     *  different type erasure rules.
+     *
+     *  Invariants:
+     *  - Two distinct method overloads defined in the same _Scala_ class will
+     *    have distinct _Scala_ signatures.
+     *  - Two distinct methods overloads defined in the same _Java_ class will
+     *    have distinct _Java_ signatures.
+     *
+     *  @see SingleDenotation#signature
      */
     def signature(isJava: Boolean)(using Context): Signature =
       def computeSignature(isJava: Boolean)(using Context): Signature =
@@ -3397,12 +3405,12 @@ object Types {
         mySignature
     end signature
 
+    /** The Scala signature of this method. Note that two distinct Java method
+     *  overloads may have the same Scala signature, the other overload of
+     *  `signature` can be used to avoid ambiguity if necessary.
+     */
     final override def signature(using Context): Signature =
-      def isJava(tp: Type): Boolean = tp match
-        case tp: PolyType => isJava(tp.resultType)
-        case tp: MethodType => tp.isJavaMethod
-        case _ => false
-      signature(isJava = isJava(this))
+      signature(isJava = false)
 
     final override def hashCode: Int = System.identityHashCode(this)
 
