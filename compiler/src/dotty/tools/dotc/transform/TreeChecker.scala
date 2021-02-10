@@ -403,6 +403,7 @@ class TreeChecker extends Phase with SymTransformer {
                    |qualifier type      : ${tree.qualifier.typeOpt}
                    |tree type           : ${tree.typeOpt} of class ${tree.typeOpt.getClass}""")
       }
+      assert((tree.qualifier.typeOpt <:< defn.PolyFunctionType) || tree.isType || tree.symbol.exists, i"$tree - ${tree.asInstanceOf[tpd.Select].denot} - ${ctx.source}")
       checkNotRepeated(super.typedSelect(tree, pt))
     }
 

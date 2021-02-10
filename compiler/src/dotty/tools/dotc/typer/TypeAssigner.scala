@@ -186,7 +186,11 @@ trait TypeAssigner {
     tree.withType(tp)
 
   def assignType(tree: untpd.Select, tp: Type)(using Context): Select =
-    ConstFold.Select(tree.withType(tp))
+    val t = tree.withType(tp)
+    println("tree: " + tree.show + " " + tree.denot + " " + tree.tpe)
+    val z = ConstFold.Select(t)
+    println("z: " + z.show + " " + z.denot + " " + z.tpe)
+    z
 
   def assignType(tree: untpd.Select, qual: Tree)(using Context): Select =
     val rawType = selectionType(tree, qual)

@@ -18,12 +18,12 @@ object ConstFold:
 
   import tpd._
 
-  private val foldedBinops = Set[Name](
+  val foldedBinops = Set[Name](
     nme.ZOR, nme.OR, nme.XOR, nme.ZAND, nme.AND, nme.EQ, nme.NE,
     nme.LT, nme.GT, nme.LE, nme.GE, nme.LSL, nme.LSR, nme.ASR,
     nme.ADD, nme.SUB, nme.MUL, nme.DIV, nme.MOD)
 
-  private val foldedUnops = Set[Name](
+  val foldedUnops = Set[Name](
     nme.UNARY_!, nme.UNARY_~, nme.UNARY_+, nme.UNARY_-)
 
   def Apply[T <: Apply](tree: T)(using Context): T =

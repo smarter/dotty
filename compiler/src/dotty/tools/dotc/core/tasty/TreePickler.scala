@@ -409,6 +409,7 @@ class TreePickler(pickler: TastyPickler) {
             case _ =>
               val sig = tree.tpe.signature
               var ename = tree.symbol.targetName
+              assert((qual.tpe <:< defn.PolyFunctionType) || tree.isType || tree.symbol.exists, i"$tree - ${tree.denot} - ${ctx.source}")
               val isAmbiguous =
                 sig != Signature.NotAMethod
                 && qual.tpe.nonPrivateMember(name).match
