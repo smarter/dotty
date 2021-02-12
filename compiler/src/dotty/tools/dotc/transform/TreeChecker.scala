@@ -4,6 +4,7 @@ package transform
 import core.Names.Name
 import core.DenotTransformers._
 import core.SymDenotations._
+import core.Denotations._
 import core.Contexts._
 import core.Symbols._
 import core.Types._
@@ -36,7 +37,7 @@ import scala.util.control.NonFatal
  *   - After typer, identifiers and select nodes refer to terms only (all types should be
  *     represented as TypeTrees then).
  */
-class TreeChecker extends Phase with SymTransformer {
+class TreeChecker extends Phase with DenotTransformer {
   import ast.tpd._
   import TreeChecker._
 
@@ -66,42 +67,45 @@ class TreeChecker extends Phase with SymTransformer {
       assert(cur.exists || prev.is(ConstructorProxy), i"companion disappeared from $symd")
   }
 
-  def transformSym(symd: SymDenotation)(using Context): SymDenotation = {
-    val sym = symd.symbol
+  def transform(ref: SingleDenotation)(using Context): SingleDenotation =
+    ref match
+      case symd: SymDenotation =>
+        val sym = symd.symbol
 
-    if (sym.isClass && !sym.isAbsent()) {
-      val validSuperclass = sym.isPrimitiveValueClass || defn.syntheticCoreClasses.contains(sym) ||
-        (sym eq defn.ObjectClass) || sym.isOneOf(NoSuperClassFlags) || (sym.asClass.superClass.exists) ||
-        sym.isRefinementClass
+        if (sym.isClass && !sym.isAbsent()) {
+          val validSuperclass = sym.isPrimitiveValueClass || defn.syntheticCoreClasses.contains(sym) ||
+            (sym eq defn.ObjectClass) || sym.isOneOf(NoSuperClassFlags) || (sym.asClass.superClass.exists) ||
+            sym.isRefinementClass
 
-      assert(validSuperclass, i"$sym has no superclass set")
-      testDuplicate(sym, seenClasses, "class")
-    }
+          assert(validSuperclass, i"$sym has no superclass set")
+          testDuplicate(sym, seenClasses, "class")
+        }
 
-    val badDeferredAndPrivate =
-      sym.is(Method) && sym.is(Deferred) && sym.is(Private)
-      && !sym.hasAnnotation(defn.NativeAnnot)
-      && !sym.isEffectivelyErased
+        val badDeferredAndPrivate =
+          sym.is(Method) && sym.is(Deferred) && sym.is(Private)
+          && !sym.hasAnnotation(defn.NativeAnnot)
+          && !sym.isEffectivelyErased
 
-    assert(!badDeferredAndPrivate, i"$sym is both Deferred and Private")
+        assert(!badDeferredAndPrivate, i"$sym is both Deferred and Private")
 
-    checkCompanion(symd)
-
+        checkCompanion(symd)
+      case _ =>
+    end match
     // Signatures are used to disambiguate overloads and need to stay stable
     // until erasure, see the comment above `Compiler#phases`.
     if (ctx.phaseId <= erasurePhase.id) {
-      val initial = symd.initial
-      assert(symd.signature == initial.signature,
-        i"""Signature of ${sym.showLocated} changed at phase ${ctx.base.fusedContaining(ctx.phase.prev)}
+      val initial = ref.initial
+      assert(ref.signature == initial.signature,
+        i"""Signature of ${ref} with symbol ${ref.symbol.showLocated} changed at phase ${ctx.base.fusedContaining(ctx.phase.prev)}
            |Initial info: ${initial.info}
            |Init pre: ${initial.prefix.toString}
            |Initial sig : ${initial.signature}
-           |Current info: ${symd.info}
-           |Current sig : ${symd.signature}""")
+           |Current info: ${ref.info}
+           |Current sig : ${ref.signature}""")
     }
 
-    symd
-  }
+    ref
+  end transform
 
   def phaseName: String = "Ycheck"
 
