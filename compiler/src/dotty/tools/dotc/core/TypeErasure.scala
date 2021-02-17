@@ -13,6 +13,7 @@ import transform.ContextFunctionResults._
 import Decorators._
 import Definitions.MaxImplementedFunctionArity
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 
 /** The language in which the definition being erased was written. */
 enum SourceLanguage {
@@ -366,6 +367,7 @@ object TypeErasure {
 
             // Pick the last minimum to prioritise classes over traits
             minimums.lastOption match {
+              // TODO: valueErasure is suspect, should this be in the class and "this(" ?
               case Some(lub) => valueErasure(lub.typeRef)
               case _ => defn.ObjectType
             }
@@ -399,6 +401,200 @@ object TypeErasure {
           else if (tp2.typeSymbol.isRealClass) tp2
           else tp1
       }
+  }
+
+  def intersectionDominator(parents: List[Type])(using Context): Type = {
+    // RefinedType and AndType are both represented in Scala2 by RefinedType
+    type Scala2RefinedType = RefinedType | AndType
+    // Structural refs will never be TermRef since singleton types get widened by `pseudoSymbol`
+    type StructuralRef = TypeRef
+    // When matching on a PseudoSymbol, we can assume that all TypeRef are structural,
+    // because `pseudoSymbol` will map non-structural TypeRefs to Symbol
+    type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
+
+    // ALL LEVEL OF DEALIAS
+    def dealiasSym(psym: PseudoSymbol): PseudoSymbol = psym match {
+      case sym: Symbol =>
+        sym.info match {
+          case TypeAlias(ref) =>
+            pseudoSymbol(ref.dealias)
+          case _ =>
+            sym
+        }
+      case _ =>
+        psym
+    }
+
+    def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
+      case tp: Scala2RefinedType @unchecked =>
+        true
+      case tp: StructuralRef =>
+        false
+      case sym: Symbol =>
+        val sym1 = dealiasSym(sym)
+        if (sym1 ne sym) isPseudoClass(sym1)
+        else sym.isClass
+    }
+
+    def isTrait(psym: PseudoSymbol): Boolean = psym match {
+      case tp: Scala2RefinedType @unchecked =>
+        false
+      case tp: StructuralRef =>
+        false
+      case sym: Symbol =>
+        val sym1 = dealiasSym(sym)
+        if (sym1 ne sym) isTrait(sym1)
+        else sym.is(Trait)
+    }
+
+    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = (psym1, psym2) match {
+      case (psym1: StructuralRef, psym2: StructuralRef) =>
+        // Can't rely on `eq` since the same type member reference can be represented
+        // with different but equivalent prefixes
+
+        (psym1.name eq psym2.name) && sameSymbol(pseudoSymbol(psym1.prefix), pseudoSymbol(psym2.prefix))
+      case _ =>
+        // dealiasSym(psym1) eq dealiasSym(psym2)
+        // one dealiasing to another not enough for same sym, for the same reason nbc returns fale
+        // instead of dealiasing
+        psym1 eq psym2
+    }
+
+    // refined/compound types get their own symbol
+    // type aliases symbol is the symbol of the dealiased type
+    // singleton types get the symbol of their underlying type
+    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen/*Dealias*/ match {
+      case tpw: OrType =>
+        pseudoSymbol(erasure(tpw))
+      case tpw: Scala2RefinedType @unchecked =>
+        tpw
+      case tpw: TypeRef =>
+        val sym = tpw.symbol
+        if !sym.exists then
+          tpw // StructuralRef
+        else
+          sym.info match {
+            case info: AliasingBounds =>
+              // S2RefinedType are not supertype
+              // ... unless behind an alias
+              //     ... unless behind that alias is not normalized (parent is alias or intersection containing alias),
+              //         because uncurry will normalize it
+              def isNormal(tp: Type): Boolean = tp match {
+                case RefinedType(parent, _, _) =>
+                  isNormal(parent)
+                case AndType(tp1, tp2) =>
+                  isNormal(tp1) && isNormal(tp2)
+                case _ =>
+                  tp.dealias eq tp
+              }
+              val keepAlias = info.alias.isInstanceOf[Scala2RefinedType @unchecked] && isNormal(info.alias)
+              if (keepAlias)
+                sym
+              else
+                pseudoSymbol(info.alias)
+            case _ =>
+              sym
+          }
+      case tpw: TypeProxy =>
+        pseudoSymbol(tpw.underlying)
+
+      // XX: maybe replace below with
+      // case tpw =>
+      //   tpw.typeSymbol.orElse(defn.ObjectClass)
+
+      case tpw: JavaArrayType =>
+        defn.ArrayClass
+      case tpw: ErrorType =>
+        defn.ObjectClass
+      case tpw =>
+        assert(false, tpw)
+        ???
+    }
+
+    def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
+      // xx: bottom handling
+      def goUpperBound(psym: Symbol | StructuralRef): Boolean = {
+        val info = psym match {
+          case sym: Symbol => sym.info
+          case tp: StructuralRef => tp.info
+        }
+        info match {
+          case info: TypeBounds =>
+            go(pseudoSymbol(info.hi))
+          case _ =>
+            false
+        }
+      }
+
+      def go(tp1: PseudoSymbol): Boolean =
+        val z = sameSymbol(tp1, tp2) || (tp1, tp2).match {
+        case (sym1: Symbol, sym2: Symbol) =>
+          if (sym1.isClass && sym2.isClass)
+            sym1.derivesFrom(sym2)
+          else if (!sym1.isClass) {
+            // an abstract type is a pseudo-sub of a pseudo-symbol, if its
+            // upper-bound is a pseudo-sub of that pseudo-symbol.
+            goUpperBound(sym1)
+          }
+          else if (sym2.isAliasType) {
+
+            sym2.info match {
+              case TypeAlias(ref2) =>
+                // underlying is always refined so check should always fail
+                val z = isnbc(tp1, pseudoSymbol(ref2))
+                assert(z == false, s"nbc($tp1, $tp2)")
+                z
+              case _ =>
+                false
+            }
+
+          }
+          else
+            // a class C is never considered a pseudo-sub of an abstract type T,
+            // even if it was declared as `type T >: C`
+            false
+        case (_, _: Scala2RefinedType @unchecked) =>
+          // As mentioned above, in Scala 2 these types get their own unique
+          // synthetic class symbol, and are not considered a pseudo-sub of
+          // anything, XX: comment on aliases handled via sym
+          false
+        case (sym1: Symbol, tp: StructuralRef) =>
+          goUpperBound(sym1)
+        case (tp1: StructuralRef, _) =>
+          goUpperBound(tp1)
+        case (tp1: RefinedType, _) =>
+          go(pseudoSymbol(tp1.parent))
+        case (AndType(tp11, tp12), _) =>
+          go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
+        }
+        // println(i"nbc($tp1, $tp2): " + z)
+        z
+
+
+      go(tp1)
+    }
+
+
+    // println("parents: " + parents.map(_.show))
+    val z = {
+      val psyms: List[PseudoSymbol] = parents.map(pseudoSymbol)
+      // println("psyms: " + psyms.map(_.show))
+
+      if (psyms contains defn.ArrayClass) {
+        defn.ArrayOf(
+          intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
+      } else {
+        def isUnshadowed(psym: PseudoSymbol) =
+          !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
+        val cs = parents.iterator.filter { p =>
+          val psym = pseudoSymbol(p)
+          isPseudoClass(psym) && !isTrait(psym) && isUnshadowed(psym)
+        }
+        (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
+      }
+    }
+    // println("z: " + z.show)
+    z
   }
 
   /** Does the (possibly generic) type `tp` have the same erasure in all its
@@ -497,7 +693,29 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
     case tp: TypeProxy =>
       this(tp.underlying)
     case AndType(tp1, tp2) =>
-      erasedGlb(this(tp1), this(tp2), sourceLanguage.isJava)
+      sourceLanguage match
+        case SourceLanguage.Scala3 =>
+          erasedGlb(this(tp1), this(tp2), isJava = false)
+        case _ =>
+          val parents = ListBuffer[Type]()
+          def collectParents(tp: Type, parents: ListBuffer[Type]): Unit = tp.dealiasKeepAnnots match {
+            case AndType(tp1, tp2) =>
+              collectParents(tp1, parents)
+              collectParents(tp2, parents)
+            case _ =>
+              // We intentionally do not dealias the type here, this can impact the result of intersectionDominator
+              parents += tp//.dealiasKeepAnnots
+          }
+          collectParents(tp1, parents)
+          collectParents(tp2, parents)
+    
+          if sourceLanguage.isJava then
+            this(parents.head)
+          else
+            // val old = erasedGlb(this(tp1), this(tp2), isJava)
+            // println("old: " + old.show)
+            val s2 = intersectionDominator(parents.toList)
+            this(s2)
     case OrType(tp1, tp2) =>
       TypeComparer.orType(this(tp1), this(tp2), isErased = true)
     case tp: MethodType =>
