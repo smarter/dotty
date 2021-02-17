@@ -426,7 +426,7 @@ object TypeErasure {
     }
 
     def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
-      case tp: Scala2RefinedType @unchecked =>
+      case tp: Scala2RefinedType =>
         true
       case tp: StructuralRef =>
         false
@@ -437,7 +437,7 @@ object TypeErasure {
     }
 
     def isTrait(psym: PseudoSymbol): Boolean = psym match {
-      case tp: Scala2RefinedType @unchecked =>
+      case tp: Scala2RefinedType =>
         false
       case tp: StructuralRef =>
         false
@@ -466,7 +466,7 @@ object TypeErasure {
     def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen/*Dealias*/ match {
       case tpw: OrType =>
         pseudoSymbol(erasure(tpw))
-      case tpw: Scala2RefinedType @unchecked =>
+      case tpw: Scala2RefinedType =>
         tpw
       case tpw: TypeRef =>
         val sym = tpw.symbol
@@ -487,7 +487,7 @@ object TypeErasure {
                 case _ =>
                   tp.dealias eq tp
               }
-              val keepAlias = info.alias.isInstanceOf[Scala2RefinedType @unchecked] && isNormal(info.alias)
+              val keepAlias = info.alias.isInstanceOf[Scala2RefinedType] && isNormal(info.alias)
               if (keepAlias)
                 sym
               else
@@ -553,7 +553,7 @@ object TypeErasure {
             // a class C is never considered a pseudo-sub of an abstract type T,
             // even if it was declared as `type T >: C`
             false
-        case (_, _: Scala2RefinedType @unchecked) =>
+        case (_, _: Scala2RefinedType) =>
           // As mentioned above, in Scala 2 these types get their own unique
           // synthetic class symbol, and are not considered a pseudo-sub of
           // anything, XX: comment on aliases handled via sym
