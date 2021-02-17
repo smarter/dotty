@@ -10,9 +10,11 @@ import transform.ExplicitOuter._
 import transform.ValueClasses._
 import transform.TypeUtils._
 import transform.ContextFunctionResults._
+import unpickleScala2.Scala2Erasure
 import Decorators._
 import Definitions.MaxImplementedFunctionArity
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 
 /** The language in which the definition being erased was written. */
 enum SourceLanguage:
@@ -372,6 +374,7 @@ object TypeErasure {
 
             // Pick the last minimum to prioritise classes over traits
             minimums.lastOption match {
+              // TODO: valueErasure is suspect, should this be in the class and "this(" ?
               case Some(lub) => valueErasure(lub.typeRef)
               case _ => defn.ObjectType
             }
@@ -406,6 +409,7 @@ object TypeErasure {
           else tp1
       }
   }
+
 
   /** Does the (possibly generic) type `tp` have the same erasure in all its
    *  possible instantiations?
@@ -503,8 +507,11 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
       this(defn.FunctionType(paramss.head.length, isContextual = res.isImplicitMethod, isErased = res.isErasedMethod))
     case tp: TypeProxy =>
       this(tp.underlying)
-    case AndType(tp1, tp2) =>
-      erasedGlb(this(tp1), this(tp2), sourceLanguage.isJava)
+    case tp @ AndType(tp1, tp2) =>
+      if sourceLanguage.isScala2 then
+        this(Scala2Erasure.intersectionDominator(Scala2Erasure.flattenedParents(tp)))
+      else
+        erasedGlb(this(tp1), this(tp2), isJava = sourceLanguage.isJava)
     case OrType(tp1, tp2) =>
       TypeComparer.orType(this(tp1), this(tp2), isErased = true)
     case tp: MethodType =>

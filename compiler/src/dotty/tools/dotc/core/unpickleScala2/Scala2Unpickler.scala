@@ -489,10 +489,13 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
         sym.setFlag(Scala2x)
       if (!(isRefinementClass(sym) || isUnpickleRoot(sym) || sym.is(Scala2Existential))) {
         val owner = sym.owner
-        if (owner.isClass)
-          owner.asClass.enter(sym, symScope(owner))
-        else if (isRefinementClass(owner))
+        if (isRefinementClass(owner))
+          // println("owner: " + owner)
+          // println("sym: " + sym)
+          // Thread.dumpStack
           symScope(owner).openForMutations.enter(sym)
+        else if (owner.isClass)
+          owner.asClass.enter(sym, symScope(owner))
       }
       sym
     }
@@ -532,7 +535,11 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
           newClassSymbol(owner, name.asTypeName, flags, completer, privateWithin, coord = start)
         }
       case VALsym =>
-        newSymbol(owner, name.asTermName, flags, localMemberUnpickler, privateWithin, coord = start)
+        val z = newSymbol(owner, name.asTermName, flags, localMemberUnpickler, privateWithin, coord = start)
+        // if (name.toString.contains("structural1")) {
+        //   println("val: #" + name.toString + "#" + z.is(Method)  + " " + z.info + " owner: " + owner + " " + symScope(owner))
+        // }
+        z
       case MODULEsym =>
         if (isModuleRoot) {
           moduleRoot setFlag flags
@@ -559,6 +566,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
       case _ => Nil
 
     def complete(denot: SymDenotation)(using Context): Unit = try {
+      // println("#complete: " + denot)
       def parseToCompletion(denot: SymDenotation)(using Context) = {
         val tag = readByte()
         val end = readNat() + readIndex
@@ -604,7 +612,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
               if alias.name == denot.name then denot.setFlag(SuperParamAlias)
             }
         }
-        // println(s"unpickled ${denot.debugString}, info = ${denot.info}") !!! DEBUG
+        // println(s"unpickled ${denot.debugString}, info = ${denot.info}")
       }
       atReadPos(startCoord(denot).toIndex,
           () => withMode(Mode.Scala2Unpickling) {
@@ -738,8 +746,14 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
         readSymbolRef().thisType
       case SINGLEtpe =>
         val pre = readPrefix()
-        val sym = readDisambiguatedSymbolRef(_.info.isParameterless)
-        pre.select(sym)
+        val sym = readDisambiguatedSymbolRef { s =>
+          // println("#s: " + s + " " + s.info)
+          s.info.isParameterless
+        }
+        val z = pre.select(sym)
+        // println("z: " + z + " -- " + sym.id + " -- " + sym.showLocated + " " + sym.info)
+        // println("u: " + sym.owner.info.decl(sym.name))
+        z
       case SUPERtpe =>
         val thistpe = readTypeRef()
         val supertpe = readTypeRef()
@@ -770,7 +784,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
             pre = sym.owner.thisType
           case _ =>
         }
-        val tycon = pre.select(sym)
+        val tycon = if !pre.isInstanceOf[ThisType] && isRefinementClass(sym.owner) then pre.select(sym.name)  else pre.select(sym)
         val args = until(end, () => readTypeRef())
         if (sym == defn.ByNameParamClass2x) ExprType(args.head)
         else if (args.nonEmpty) tycon.safeAppliedTo(EtaExpandIfHK(sym.typeParams, args.map(translateTempPoly)))
@@ -780,10 +794,18 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
         TypeBounds(readTypeRef(), readTypeRef())
       case REFINEDtpe =>
         val clazz = readSymbolRef().asClass
+        // println("clazz: " + clazz)
+        // if !clazz.isCompleting then
+        //   println("i: " + clazz.info)
+        // Thread.dumpStack
+        // val d = clazz.denot
+        // if (!d.isCompleting) { println("d: " + d.info) }
         val decls = symScope(clazz)
         symScopes(clazz) = EmptyScope // prevent further additions
         val parents = until(end, () => readTypeRef())
         val parent = parents.reduceLeft(AndType(_, _))
+        // println("parents: " + parents)
+        // println("decls: " + decls.toList)
         if (decls.isEmpty) parent
         else {
           def subst(info: Type, rt: RecType) = info.substThis(clazz.asClass, rt.recThis)
