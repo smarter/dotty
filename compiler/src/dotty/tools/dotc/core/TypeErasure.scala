@@ -34,6 +34,9 @@ object SourceLanguage {
       log2
     else
       log2 + 1
+
+   def commonLanguage(x: SourceLanguage, y: SourceLanguage): SourceLanguage =
+     if x.ordinal > y.ordinal then x else y
 }
 
 /** Erased types are:

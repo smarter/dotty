@@ -595,17 +595,17 @@ object Denotations {
      *    SingleDenotations will have distinct signatures (cf #9050).
      */
     final def signature(using Context): Signature =
-      signature(isJava = !isType && symbol.is(JavaDefined))
+      signature(sourceLanguage = if isType then SourceLanguage.Scala3 else SourceLanguage.ofSymbol(symbol))
 
     /** Overload of `signature` which lets the caller pick between the Java and
      *  Scala signature of the info. Useful to match denotations defined in
      *  different classes (see `matchesLoosely`).
      */
-    def signature(isJava: Boolean)(using Context): Signature =
+    def signature(sourceLanguage: SourceLanguage)(using Context): Signature =
       if (isType) Signature.NotAMethod // don't force info if this is a type denotation
       else info match {
         case info: MethodOrPoly =>
-          try info.signature(isJava)
+          try info.signature(sourceLanguage)
           catch { // !!! DEBUG
             case scala.util.control.NonFatal(ex) =>
               report.echo(s"cannot take signature of $info")
@@ -1022,16 +1022,18 @@ object Denotations {
     def matchesLoosely(other: SingleDenotation)(using Context): Boolean =
       if isType then true
       else
-        val isJava = symbol.is(JavaDefined)
-        val otherIsJava = other.symbol.is(JavaDefined)
-        val useJavaSig = isJava && otherIsJava
-        val sig = signature(isJava = useJavaSig)
-        val otherSig = other.signature(isJava = useJavaSig)
+        val thisLanguage = SourceLanguage.ofSymbol(symbol)
+        val otherLanguage = SourceLanguage.ofSymbol(other.symbol)
+        val commonLanguage = SourceLanguage.commonLanguage(thisLanguage, otherLanguage)
+        val sig = signature(commonLanguage)
+        val otherSig = other.signature(commonLanguage)
         sig.matchDegree(otherSig) match
           case FullMatch =>
             true
           case MethodNotAMethodMatch =>
             !ctx.erasedTypes && {
+              val isJava = thisLanguage.isJava
+              val otherIsJava = otherLanguage.isJava
               // A Scala zero-parameter method and a Scala non-method always match.
               if !isJava && !otherIsJava then
                 true
