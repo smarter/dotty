@@ -4530,9 +4530,10 @@ object Types {
   /** Roughly: the info of a class during a period.
    *  @param prefix       The prefix on which parents, decls, and selfType need to be rebased.
    *  @param cls          The class symbol.
-   *  @param classParents The parent types of this class.
+   *  @param initParents  The parent types of this class.
    *                      These are all normalized to be TypeRefs by moving any refinements
    *                      to be member definitions of the class itself.
+   *                      Unlike `parents`, the types are not seen as seen from `prefix`.
    *  @param decls        The symbols defined directly in this class.
    *  @param selfInfo     The type of `this` in this class, if explicitly given,
    *                      NoType otherwise. If class is compiled from source, can also
@@ -4541,7 +4542,7 @@ object Types {
   abstract case class ClassInfo(
       prefix: Type,
       cls: ClassSymbol,
-      classParents: List[Type],
+      initParents: List[Type],
       decls: Scope,
       selfInfo: TypeOrSymbol) extends CachedGroundType with TypeType {
 
@@ -4577,20 +4578,20 @@ object Types {
 
     override def parents(using Context): List[Type] = {
       if (parentsCache == null)
-        parentsCache = classParents.mapConserve(_.asSeenFrom(prefix, cls.owner))
+        parentsCache = initParents.mapConserve(_.asSeenFrom(prefix, cls.owner))
       parentsCache
     }
 
-    protected def newLikeThis(prefix: Type, classParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol)(using Context): ClassInfo =
-      ClassInfo(prefix, cls, classParents, decls, selfInfo)
+    protected def newLikeThis(prefix: Type, initParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol)(using Context): ClassInfo =
+      ClassInfo(prefix, cls, initParents, decls, selfInfo)
 
     def derivedClassInfo(prefix: Type)(using Context): ClassInfo =
       if (prefix eq this.prefix) this
-      else newLikeThis(prefix, classParents, decls, selfInfo)
+      else newLikeThis(prefix, initParents, decls, selfInfo)
 
-    def derivedClassInfo(prefix: Type = this.prefix, classParents: List[Type] = this.classParents, decls: Scope = this.decls, selfInfo: TypeOrSymbol = this.selfInfo)(using Context): ClassInfo =
-      if ((prefix eq this.prefix) && (classParents eq this.classParents) && (decls eq this.decls) && (selfInfo eq this.selfInfo)) this
-      else newLikeThis(prefix, classParents, decls, selfInfo)
+    def derivedClassInfo(prefix: Type = this.prefix, initParents: List[Type] = this.initParents, decls: Scope = this.decls, selfInfo: TypeOrSymbol = this.selfInfo)(using Context): ClassInfo =
+      if ((prefix eq this.prefix) && (initParents eq this.initParents) && (decls eq this.decls) && (selfInfo eq this.selfInfo)) this
+      else newLikeThis(prefix, initParents, decls, selfInfo)
 
     /** If this class has opaque type alias members, a new class info
      *  with their aliases added as refinements to the self type of the class.
@@ -4626,13 +4627,13 @@ object Types {
       }
 
     override def computeHash(bs: Binders): Int = doHash(bs, cls, prefix)
-    override def hashIsStable: Boolean = prefix.hashIsStable && classParents.hashIsStable
+    override def hashIsStable: Boolean = prefix.hashIsStable && initParents.hashIsStable
 
     override def eql(that: Type): Boolean = that match {
       case that: ClassInfo =>
         prefix.eq(that.prefix) &&
         cls.eq(that.cls) &&
-        classParents.eqElements(that.classParents) &&
+        initParents.eqElements(that.initParents) &&
         decls.eq(that.decls) &&
         selfInfo.eq(that.selfInfo)
       case _ => false
@@ -4644,17 +4645,17 @@ object Types {
       case that: ClassInfo =>
         prefix.equals(that.prefix, bs) &&
         cls.eq(that.cls) &&
-        classParents.equalElements(that.classParents, bs) &&
+        initParents.equalElements(that.initParents, bs) &&
         decls.eq(that.decls) &&
         selfInfo.eq(that.selfInfo)
       case _ => false
     }
 
-    override def toString: String = s"ClassInfo($prefix, $cls, $classParents)"
+    override def toString: String = s"ClassInfo($prefix, $cls, $initParents)"
   }
 
-  class CachedClassInfo(prefix: Type, cls: ClassSymbol, classParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol)
-    extends ClassInfo(prefix, cls, classParents, decls, selfInfo)
+  class CachedClassInfo(prefix: Type, cls: ClassSymbol, initParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol)
+    extends ClassInfo(prefix, cls, initParents, decls, selfInfo)
 
   /** A class for temporary class infos where `parents` are not yet known */
   final class TempClassInfo(prefix: Type, cls: ClassSymbol, decls: Scope, selfInfo: TypeOrSymbol)
@@ -4664,15 +4665,15 @@ object Types {
     def finalized(parents: List[Type])(using Context): ClassInfo =
       ClassInfo(prefix, cls, parents, decls, selfInfo)
 
-    override def newLikeThis(prefix: Type, classParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol)(using Context): ClassInfo =
+    override def newLikeThis(prefix: Type, initParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol)(using Context): ClassInfo =
       TempClassInfo(prefix, cls, decls, selfInfo)
 
     override def toString: String = s"TempClassInfo($prefix, $cls)"
   }
 
   object ClassInfo {
-    def apply(prefix: Type, cls: ClassSymbol, classParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol = NoType)(using Context): ClassInfo =
-      unique(new CachedClassInfo(prefix, cls, classParents, decls, selfInfo))
+    def apply(prefix: Type, cls: ClassSymbol, initParents: List[Type], decls: Scope, selfInfo: TypeOrSymbol = NoType)(using Context): ClassInfo =
+      unique(new CachedClassInfo(prefix, cls, initParents, decls, selfInfo))
   }
 
   /** Type bounds >: lo <: hi */
@@ -5276,7 +5277,7 @@ object Types {
     protected def mapFullClassInfo(tp: ClassInfo): ClassInfo =
       tp.derivedClassInfo(
         prefix = this(tp.prefix),
-        classParents = tp.classParents.mapConserve(this),
+        initParents = tp.initParents.mapConserve(this),
         selfInfo = tp.selfInfo match {
           case tp: Type => this(tp)
           case sym => sym
