@@ -518,6 +518,27 @@ object TypeErasure {
         ???
     }
 
+    /** An emulation of `Symbol#isNonBottomSubClass` from Scala 2
+     *
+     *  The documentation of the original method is:
+     *
+     *  > Is this class symbol a subclass of that symbol,
+     *  > and is this class symbol also different from Null or Nothing?
+     *
+     *  Which sounds fine, except that it is also used with non-class symbols,
+     *  so what does it do then? Its implementation delegates to `Type#baseTypeSeq`
+     *  whose documentation states:
+     *
+     *  > The base type sequence of T is the smallest set of [...] class types Ti, so that [...]
+     *
+     *  But this is also wrong: the sequence returned by `baseTypeSeq` can
+     *  contain non-class symbols.
+     *
+     *  Given that we cannot rely on the documentation and that the
+     *  implementation is extremely complex, this reimplementation is mostly
+     *  based on reverse-engineering rules from the observed behavior of this
+     *  method on various test cases.
+     */
     def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
       // xx: bottom handling
       def goUpperBound(psym: Symbol | StructuralRef): Boolean = {
