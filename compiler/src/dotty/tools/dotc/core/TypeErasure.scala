@@ -487,7 +487,14 @@ object TypeErasure {
                 case _ =>
                   tp.dealias eq tp
               }
+
+              // fails c_49 (get a)
+              // val keepAlias = false
+              // fails a_53 ( get c)
+              // val keepAlias = info.alias.isInstanceOf[Scala2RefinedType]
+
               val keepAlias = info.alias.isInstanceOf[Scala2RefinedType] && isNormal(info.alias)
+
               if (keepAlias)
                 sym
               else
@@ -554,6 +561,20 @@ object TypeErasure {
             // even if it was declared as `type T >: C`
             false
         case (_, _: Scala2RefinedType) =>
+          // XX: what about:
+          // type AA <: A with B
+          // (A with B) with AA
+          // ==> two different tps
+          // type And = A with B
+          // type AA <: And
+          // (And @foo) with AA
+          // ==> in that case we preserve alias symbol (c_49)
+          // type Alias = A
+          // type And = Alias with B
+          // type AA <: And
+          // (And @foo) with AA
+          // ==> in that case we don't preserve alias because of normalization in uncurrying ends up creating a separate type (and class symbol) but does not update the parents of existing symbols (a_53)
+
           // As mentioned above, in Scala 2 these types get their own unique
           // synthetic class symbol, and are not considered a pseudo-sub of
           // anything, XX: comment on aliases handled via sym
@@ -698,6 +719,7 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
           erasedGlb(this(tp1), this(tp2), isJava = false)
         case _ =>
           val parents = ListBuffer[Type]()
+          // keeping annotations is important here to mimic the Scala 2 erasure logic
           def collectParents(tp: Type, parents: ListBuffer[Type]): Unit = tp.dealiasKeepAnnots match {
             case AndType(tp1, tp2) =>
               collectParents(tp1, parents)
