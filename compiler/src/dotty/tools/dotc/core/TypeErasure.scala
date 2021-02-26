@@ -404,15 +404,31 @@ object TypeErasure {
   }
 
   def intersectionDominator(parents: List[Type])(using Context): Type = {
-    // RefinedType and AndType are both represented in Scala2 by RefinedType
+    /** A type that would be represented as a RefinedType in Scala 2.
+     *
+     *  The `RefinedType` of nsc contains both a list of parents
+     *  and a list of refinements, intersections are represented as a RefinedType
+     *  with no refinements.
+     */
     type Scala2RefinedType = RefinedType | AndType
-    // Structural refs will never be TermRef since singleton types get widened by `pseudoSymbol`
+
+    /** A TypeRef that is known to represent a member of a structural type. */
     type StructuralRef = TypeRef
-    // When matching on a PseudoSymbol, we can assume that all TypeRef are structural,
-    // because `pseudoSymbol` will map non-structural TypeRefs to Symbol
+
+    /** The equivalent of a Scala 2 type symbol.
+     *
+     *  In some situations, nsc will create a symbol for a type where we wouldn't:
+     *
+     *  - `A with B with C { ... }` is represented with a RefinedType whose
+     *    symbol is a fresh class symbol whose parents are `A`, `B`, `C`.
+     *  - Structural members also get their own symbols.
+     *
+     *  To emulate this, we simply use the type itself a stand-in for its symbol.
+     *
+     *  @see `sameSymbol` which determines if two pseudo-symbols are really the same.
+     */
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
-    // ALL LEVEL OF DEALIAS
     def dealiasSym(psym: PseudoSymbol): PseudoSymbol = psym match {
       case sym: Symbol =>
         sym.info match {
@@ -447,16 +463,18 @@ object TypeErasure {
         else sym.is(Trait)
     }
 
+    /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
     def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = (psym1, psym2) match {
       case (psym1: StructuralRef, psym2: StructuralRef) =>
-        // Can't rely on `eq` since the same type member reference can be represented
-        // with different but equivalent prefixes
-
+        // Two structural members will have the same Scala 2 symbol if they
+        // point to the same member. We can't just call `=:=` since different
+        // prefixes will still have the same symbol.
         (psym1.name eq psym2.name) && sameSymbol(pseudoSymbol(psym1.prefix), pseudoSymbol(psym2.prefix))
       case _ =>
-        // dealiasSym(psym1) eq dealiasSym(psym2)
-        // one dealiasing to another not enough for same sym, for the same reason nbc returns fale
-        // instead of dealiasing
+        // We intentionally use referential equality here even though we may end
+        // up comparing two equivalent intersection types, because Scala 2 will
+        // create fresh symbols for each appearance of an intersection type in
+        // source code.
         psym1 eq psym2
     }
 
@@ -751,7 +769,7 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
           }
           collectParents(tp1, parents)
           collectParents(tp2, parents)
-    
+
           if sourceLanguage.isJava then
             this(parents.head)
           else
