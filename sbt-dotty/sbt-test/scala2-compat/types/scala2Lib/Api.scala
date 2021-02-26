@@ -121,32 +121,32 @@ class Z {
 
   type Rec1 <: A with B
   type Rec2 <: C with Rec1
-  def c_x1(a: A with B with Rec2): Unit = {}
-  def a_x2(a: (A with B) @foo with Rec2): Unit = {}
+  def c_47(a: A with B with Rec2): Unit = {}
+  def a_48(a: (A with B) @foo with Rec2): Unit = {}
 
   type F1 = A with B
   type F2 = A with B
   type Rec3 <: F1
   type Rec4 <: C with Rec3
-  def c_x3(a: F1 @foo with Rec4): Unit = {}
-  def c_x4(a: F1 with Rec4): Unit = {}
-  def a_x5(a: F2 @foo with Rec4): Unit = {}
-  def c_x6(a: F2 with Rec4): Unit = {}
+  def c_49(a: F1 @foo with Rec4): Unit = {}
+  def c_50(a: F1 with Rec4): Unit = {}
+  def a_51(a: F2 @foo with Rec4): Unit = {}
+  def c_52(a: F2 with Rec4): Unit = {}
 
   type AA = A
   type F3 = AA with B
   type Rec5 <: F3
   type Rec6 <: C with Rec5
-  def a_y3(a: F3 @foo with Rec6): Unit = {}
-  def c_y4(a: F3 with Rec6): Unit = {}
+  def a_53(a: F3 @foo with Rec6): Unit = {}
+  def c_54(a: F3 with Rec6): Unit = {}
 
   val structural4a: { type M[X] <: A } = new { type M[X] <: A }
   val structural4b: { type N <: B with structural4a.M[Int] } = new { type N <: B with structural4a.M[Int] }
-  def b_100(x: structural4a.M[Any] with structural4b.N): Unit = {}
+  def b_55(x: structural4a.M[Any] with structural4b.N): Unit = {}
 
   type Bla = A { type M[X] <: A }
-  def b_101(x: Bla#M[Any] with ({ type N <: B with Bla#M[Int] })#N): Unit = {}
+  def b_56(x: Bla#M[Any] with ({ type N <: B with Bla#M[Int] })#N): Unit = {}
   type AEq = A
   type Bla2 = AEq { type M[X] <: A }
-  def a_102(x: Bla2#M[Any] with ({ type N <: B with Bla2#M[Int] })#N): Unit = {}
+  def a_57(x: Bla2#M[Any] with ({ type N <: B with Bla2#M[Int] })#N): Unit = {}
 }
