@@ -429,58 +429,10 @@ object TypeErasure {
      */
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
-    def dealiasSym(psym: PseudoSymbol): PseudoSymbol = psym match {
-      case sym: Symbol =>
-        sym.info match {
-          case TypeAlias(ref) =>
-            pseudoSymbol(ref.dealias)
-          case _ =>
-            sym
-        }
-      case _ =>
-        psym
-    }
-
-    def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
-      case tp: Scala2RefinedType =>
-        true
-      case tp: StructuralRef =>
-        false
-      case sym: Symbol =>
-        val sym1 = dealiasSym(sym)
-        if (sym1 ne sym) isPseudoClass(sym1)
-        else sym.isClass
-    }
-
-    def isTrait(psym: PseudoSymbol): Boolean = psym match {
-      case tp: Scala2RefinedType =>
-        false
-      case tp: StructuralRef =>
-        false
-      case sym: Symbol =>
-        val sym1 = dealiasSym(sym)
-        if (sym1 ne sym) isTrait(sym1)
-        else sym.is(Trait)
-    }
-
-    /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
-    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = (psym1, psym2) match {
-      case (psym1: StructuralRef, psym2: StructuralRef) =>
-        // Two structural members will have the same Scala 2 symbol if they
-        // point to the same member. We can't just call `=:=` since different
-        // prefixes will still have the same symbol.
-        (psym1.name eq psym2.name) && sameSymbol(pseudoSymbol(psym1.prefix), pseudoSymbol(psym2.prefix))
-      case _ =>
-        // We intentionally use referential equality here even though we may end
-        // up comparing two equivalent intersection types, because Scala 2 will
-        // create fresh symbols for each appearance of an intersection type in
-        // source code.
-        psym1 eq psym2
-    }
-
     // refined/compound types get their own symbol
     // type aliases symbol is the symbol of the dealiased type
     // singleton types get the symbol of their underlying type
+    /** The pseudo symbol of `tp`, aliases are special: ... */
     def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen/*Dealias*/ match {
       case tpw: OrType =>
         pseudoSymbol(erasure(tpw))
@@ -534,6 +486,56 @@ object TypeErasure {
       case tpw =>
         assert(false, tpw)
         ???
+    }
+
+    /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
+    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = (psym1, psym2) match {
+      case (psym1: StructuralRef, psym2: StructuralRef) =>
+        // Two structural members will have the same Scala 2 symbol if they
+        // point to the same member. We can't just call `=:=` since different
+        // prefixes will still have the same symbol.
+        (psym1.name eq psym2.name) && sameSymbol(pseudoSymbol(psym1.prefix), pseudoSymbol(psym2.prefix))
+      case _ =>
+        // We intentionally use referential equality here even though we may end
+        // up comparing two equivalent intersection types, because Scala 2 will
+        // create fresh symbols for each appearance of an intersection type in
+        // source code.
+        psym1 eq psym2
+    }
+
+
+    def dealiasSym(psym: PseudoSymbol): PseudoSymbol = psym match {
+      case sym: Symbol =>
+        sym.info match {
+          case TypeAlias(ref) =>
+            pseudoSymbol(ref.dealias)
+          case _ =>
+            sym
+        }
+      case _ =>
+        psym
+    }
+
+    def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
+      case tp: Scala2RefinedType =>
+        true
+      case tp: StructuralRef =>
+        false
+      case sym: Symbol =>
+        val sym1 = dealiasSym(sym)
+        if (sym1 ne sym) isPseudoClass(sym1)
+        else sym.isClass
+    }
+
+    def isTrait(psym: PseudoSymbol): Boolean = psym match {
+      case tp: Scala2RefinedType =>
+        false
+      case tp: StructuralRef =>
+        false
+      case sym: Symbol =>
+        val sym1 = dealiasSym(sym)
+        if (sym1 ne sym) isTrait(sym1)
+        else sym.is(Trait)
     }
 
     /** An emulation of `Symbol#isNonBottomSubClass` from Scala 2
