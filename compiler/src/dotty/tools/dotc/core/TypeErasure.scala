@@ -429,19 +429,17 @@ object TypeErasure {
      */
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
-    // refined/compound types get their own symbol
-    // type aliases symbol is the symbol of the dealiased type
-    // singleton types get the symbol of their underlying type
     /** The pseudo symbol of `tp`, aliases are special: ... */
-    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen/*Dealias*/ match {
-      case tpw: OrType =>
+    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen match {
+      case tpw: OrType => // Could appear in Scala.js code
         pseudoSymbol(erasure(tpw))
       case tpw: Scala2RefinedType =>
         tpw
       case tpw: TypeRef =>
         val sym = tpw.symbol
         if !sym.exists then
-          tpw // StructuralRef
+          // The pseudo-symbol of a structural member type is the type itself.
+          tpw
         else
           sym.info match {
             case info: AliasingBounds =>
@@ -474,18 +472,12 @@ object TypeErasure {
           }
       case tpw: TypeProxy =>
         pseudoSymbol(tpw.underlying)
-
-      // XX: maybe replace below with
-      // case tpw =>
-      //   tpw.typeSymbol.orElse(defn.ObjectClass)
-
       case tpw: JavaArrayType =>
         defn.ArrayClass
       case tpw: ErrorType =>
         defn.ObjectClass
       case tpw =>
-        assert(false, tpw)
-        ???
+        throw new Error(s"Internal error: unhandled class ${tpw.getClass} for type $tpw in intersectionDominator($parents)")
     }
 
     /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
@@ -502,7 +494,6 @@ object TypeErasure {
         // source code.
         psym1 eq psym2
     }
-
 
     def dealiasSym(psym: PseudoSymbol): PseudoSymbol = psym match {
       case sym: Symbol =>
