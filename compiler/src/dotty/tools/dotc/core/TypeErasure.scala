@@ -575,9 +575,13 @@ object TypeErasure {
      *  based on reverse-engineering rules from the observed behavior of this
      *  method on various test cases.
      */
-    def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
-      def goUpperBound(psym: Symbol | StructuralRef): Boolean = {
-        val info = psym match {
+    def isNonBottomSubClass(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = {
+      /** Recurse on the upper-bound of `psym1`:
+       *  an abstract type or type alias is a sub of a pseudo-symbol, if
+       *  its upper-bound is a sub of that pseudo-symbol.
+       */
+      def goUpperBound(psym1: Symbol | StructuralRef): Boolean = {
+        val info = psym1 match {
           case sym: Symbol => sym.info
           case tp: StructuralRef => tp.info
         }
@@ -589,13 +593,11 @@ object TypeErasure {
         }
       }
 
-      def go(tp1: PseudoSymbol): Boolean = sameSymbol(tp1, tp2) || (tp1, tp2).match {
+      def go(psym1: PseudoSymbol): Boolean = sameSymbol(psym1, psym2) || (psym1, psym2) match {
         case (sym1: Symbol, sym2: Symbol) =>
           if (sym1.isClass && sym2.isClass)
             sym1.derivesFrom(sym2)
           else if (!sym1.isClass) {
-            // an abstract type or type alias is a sub of a pseudo-symbol, if
-            // its upper-bound is a sub of that pseudo-symbol.
             goUpperBound(sym1)
           }
           else
@@ -610,7 +612,7 @@ object TypeErasure {
             //  `type T >: C`.
             false
         case (_, _: Scala2RefinedType) =>
-          // As mentioned in the documentationf of `Scala2RefinedType`, in Scala
+          // As mentioned in the documentation of `Scala2RefinedType`, in Scala
           // 2 these types get their own unique synthetic class symbol, and are
           // not considered a sub of anything. Note that we must return false
           // even if the lhs is a type alias of this refinement, see
@@ -626,30 +628,26 @@ object TypeErasure {
           go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
       }
 
-      go(tp1)
+      go(psym1)
     }
 
 
-    // println("parents: " + parents.map(_.show))
-    val z = {
-      val psyms: List[PseudoSymbol] = parents.map(pseudoSymbol)
-      // println("psyms: " + psyms.map(_.show))
-
-      if (psyms contains defn.ArrayClass) {
-        defn.ArrayOf(
-          intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
-      } else {
-        def isUnshadowed(psym: PseudoSymbol) =
-          !(psyms exists (qsym => !sameSymbol(psym, qsym) && isnbc(qsym, psym)))
-        val cs = parents.iterator.filter { p =>
-          val psym = pseudoSymbol(p)
-          isPseudoClass(psym) && !isTrait(psym) && isUnshadowed(psym)
-        }
-        (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
+    // The body of `intersectionDominator`, intentionally made to look as much
+    // as the Scala 2 version as possible to make them easier to compare, cf:
+    // https://github.com/scala/scala/blob/v2.13.5/src/reflect/scala/reflect/internal/transform/Erasure.scala#L356-L389
+    val psyms = parents.map(pseudoSymbol)
+    if (psyms.contains(defn.ArrayClass)) {
+      defn.ArrayOf(
+        intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
+    } else {
+      def isUnshadowed(psym: PseudoSymbol) =
+        !(psyms.exists(qsym => !sameSymbol(psym, qsym) && isNonBottomSubClass(qsym, psym)))
+      val cs = parents.iterator.filter { p =>
+        val psym = pseudoSymbol(p)
+        isPseudoClass(psym) && !isTrait(psym) && isUnshadowed(psym)
       }
+      (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
     }
-    // println("z: " + z.show)
-    z
   }
 
   /** Does the (possibly generic) type `tp` have the same erasure in all its
