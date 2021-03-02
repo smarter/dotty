@@ -403,7 +403,18 @@ object TypeErasure {
       }
   }
 
-  def intersectionDominator(parents: List[Type])(using Context): Type = {
+  /** An emulation of `Erasure#intersectionDominator` from Scala 2.
+   *
+   *  Accurately reproducing the behavior of this method is extremely difficult
+   *  because it operates on the symbols of the _non-erased_ parent types, an
+   *  implementation detail of the compiler. Furthermore, these non-class
+   *  symbols are passed to methods such as `isNonBottomSubClass` whose behavior
+   *  is only specified for class symbols. Therefore, the accuracy of this
+   *  method cannot be guaranteed, the best we can do is make sure it works on
+   *  as many test cases as possible which can be run from sbt using:
+   *  > sbt-dotty/scripted scala2-compat/types
+   */
+  def intersectionDominator(parents: List[Type])(using Context): Type =
     /** A type that would be represented as a RefinedType in Scala 2.
      *
      *  The `RefinedType` of nsc contains both a list of parents
@@ -425,7 +436,7 @@ object TypeErasure {
      *
      *  To emulate this, we simply use the type itself a stand-in for its symbol.
      *
-     *  @see `sameSymbol` which determines if two pseudo-symbols are really the same.
+     *  See also `sameSymbol` which determines if two pseudo-symbols are really the same.
      */
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
@@ -436,7 +447,7 @@ object TypeErasure {
      *  handling type aliases in a very specific way, see the implementation for
      *  details.
      */
-    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen match {
+    def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen match
       case tpw: OrType => // Could appear in Scala.js code
         pseudoSymbol(erasure(tpw))
       case tpw: Scala2RefinedType =>
@@ -447,19 +458,17 @@ object TypeErasure {
           // The pseudo-symbol of a structural member type is the type itself.
           tpw
         else
-          sym.info match {
+          sym.info match
             case info: AliasingBounds =>
               /** A Scala 2 refinement is considered to be in normal form if none of its parents
-               *  are type aliases.
-               */
-              def isNormalForm(tp: Type): Boolean = tp match {
+               *  are type aliases. */
+              def isNormalForm(tp: Type): Boolean = tp match
                 case RefinedType(parent, _, _) =>
                   isNormalForm(parent)
                 case AndType(tp1, tp2) =>
                   isNormalForm(tp1) && isNormalForm(tp2)
                 case _ =>
                   tp.dealias eq tp
-              }
 
               // For the purpose of implementing `isNonBottomSubClass` one would expect that aliases
               // could always be dealiased, unfortunately this doesn't quite work. In a situation such
@@ -485,16 +494,14 @@ object TypeErasure {
               // This is accomplished here by keeping aliases iff the rhs is a
               // refinement not in normal form, and by having `isNonBottomSubClass` always
               // return false when comparing a refinement type with an alias.
-              //
               val keepAlias = info.alias.isInstanceOf[Scala2RefinedType] && isNormalForm(info.alias)
 
-              if (keepAlias)
+              if keepAlias then
                 sym
               else
                 pseudoSymbol(info.alias)
             case _ =>
               sym
-          }
       case tpw: TypeProxy =>
         pseudoSymbol(tpw.underlying)
       case tpw: JavaArrayType =>
@@ -503,58 +510,61 @@ object TypeErasure {
         defn.ObjectClass
       case tpw =>
         throw new Error(s"Internal error: unhandled class ${tpw.getClass} for type $tpw in intersectionDominator($parents)")
-    }
+    end pseudoSymbol
 
     /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
-    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = (psym1, psym2) match {
-      case (psym1: StructuralRef, psym2: StructuralRef) =>
+    def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean =
+      // Pattern match on (psym1, psym2) desugared by hand to avoid allocating a tuple
+      if psym1.isInstanceOf[StructuralRef] && psym2.isInstanceOf[StructuralRef] then
+        val tp1 = psym1.asInstanceOf[StructuralRef]
+        val tp2 = psym2.asInstanceOf[StructuralRef]
         // Two structural members will have the same Scala 2 symbol if they
         // point to the same member. We can't just call `=:=` since different
         // prefixes will still have the same symbol.
-        (psym1.name eq psym2.name) && sameSymbol(pseudoSymbol(psym1.prefix), pseudoSymbol(psym2.prefix))
-      case _ =>
+        (tp1.name eq tp2.name) && sameSymbol(pseudoSymbol(tp1.prefix), pseudoSymbol(tp2.prefix))
+      else
         // We intentionally use referential equality here even though we may end
         // up comparing two equivalent intersection types, because Scala 2 will
         // create fresh symbols for each appearance of an intersection type in
         // source code.
         psym1 eq psym2
-    }
 
-    def dealiasSym(psym: PseudoSymbol): PseudoSymbol = psym match {
+    /** The dealiased version of this pseudo-symbol, see `pseudoSymboŀ` for details
+     *  on what it means for a pseudo-symbol to be an alias. */
+    def dealias(psym: PseudoSymbol): PseudoSymbol = psym match
       case sym: Symbol =>
-        sym.info match {
+        sym.info match
           case TypeAlias(ref) =>
             pseudoSymbol(ref.dealias)
           case _ =>
             sym
-        }
       case _ =>
         psym
-    }
 
-    def isPseudoClass(psym: PseudoSymbol): Boolean = psym match {
+    /** Is this a class or an alias of a class? Also returns true for refinements
+     *  since they get a class symbol in Scala 2. */
+    def isClass(psym: PseudoSymbol): Boolean = psym match
       case tp: Scala2RefinedType =>
         true
       case tp: StructuralRef =>
         false
       case sym: Symbol =>
-        val sym1 = dealiasSym(sym)
-        if (sym1 ne sym) isPseudoClass(sym1)
+        val sym1 = dealias(sym)
+        if sym1 ne sym then isClass(sym1)
         else sym.isClass
-    }
 
-    def isTrait(psym: PseudoSymbol): Boolean = psym match {
+    /** Is this a trait or an alias of a trait? */
+    def isTrait(psym: PseudoSymbol): Boolean = psym match
       case tp: Scala2RefinedType =>
         false
       case tp: StructuralRef =>
         false
       case sym: Symbol =>
-        val sym1 = dealiasSym(sym)
-        if (sym1 ne sym) isTrait(sym1)
+        val sym1 = dealias(sym)
+        if sym1 ne sym then isTrait(sym1)
         else sym.is(Trait)
-    }
 
-    /** An emulation of `Symbol#isNonBottomSubClass` from Scala 2
+    /** An emulation of `Symbol#isNonBottomSubClass` from Scala 2.
      *
      *  The documentation of the original method is:
      *
@@ -572,8 +582,8 @@ object TypeErasure {
      *
      *  Given that we cannot rely on the documentation and that the
      *  implementation is extremely complex, this reimplementation is mostly
-     *  based on reverse-engineering rules from the observed behavior of this
-     *  method on various test cases.
+     *  based on reverse-engineering rules derived from the observed behavior of
+     *  the original method.
      */
     def isNonBottomSubClass(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean =
       /** Recurse on the upper-bound of `psym1`:
@@ -641,11 +651,11 @@ object TypeErasure {
         !(psyms.exists(qsym => !sameSymbol(psym, qsym) && isNonBottomSubClass(qsym, psym)))
       val cs = parents.iterator.filter { p =>
         val psym = pseudoSymbol(p)
-        isPseudoClass(psym) && !isTrait(psym) && isUnshadowed(psym)
+        isClass(psym) && !isTrait(psym) && isUnshadowed(psym)
       }
       (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
     }
-  }
+  end intersectionDominator
 
   /** Does the (possibly generic) type `tp` have the same erasure in all its
    *  possible instantiations?
