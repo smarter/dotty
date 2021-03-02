@@ -44,22 +44,21 @@ object Main {
     z.f_33(dummy)
     z.f_34(dummy)
 
-    // crash in erasure asInstanceOf due to notype
-    // z.a_35(dummy)
-    // z.d_36(dummy)
-    // z.z_37(dummy)
-    // z.z_38(dummy)
+    z.a_35(dummy)
+    z.d_36(dummy)
+    z.z_37(dummy)
+    z.z_38(dummy)
 
-    // z.c_39(dummy)
-    // z.c_40(dummy)
+    z.c_39(dummy)
+    z.c_40(dummy)
 
-    // z.c_41(dummy)
-    // z.c_42(dummy)
-    // z.b_43(dummy)
-    // z.c_44(dummy)
+    z.c_41(dummy)
+    z.c_42(dummy)
+    z.b_43(dummy)
+    z.c_44(dummy)
 
-    // z.c_45(dummy)
-    // z.b_46(dummy)
+    z.c_45(dummy)
+    z.b_46(dummy)
 
     z.c_47(dummy)
     z.a_48(dummy)
@@ -72,10 +71,10 @@ object Main {
     z.a_53(dummy)
     z.c_54(dummy)
 
-    // same
-    // z.b_55(dummy)
+    z.b_55(dummy)
 
-    // z.b_56(dummy)
+    z.b_56(dummy)
+    // TODO: erase to B
     // z.a_57(dummy)
 
     val methods = classOf[scala2Lib.Z].getDeclaredMethods.toList ++ classOf[dottyApp.Z].getDeclaredMethods.toList

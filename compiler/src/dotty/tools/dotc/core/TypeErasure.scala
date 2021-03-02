@@ -642,7 +642,9 @@ object TypeErasure {
     // The body of `intersectionDominator`, intentionally made to look as much
     // as the Scala 2 version as possible to make them easier to compare, cf:
     // https://github.com/scala/scala/blob/v2.13.5/src/reflect/scala/reflect/internal/transform/Erasure.scala#L356-L389
+    // println("parents: " + parents.map(_.show))
     val psyms = parents.map(pseudoSymbol)
+    // println("psyms: " + psyms)
     if (psyms.contains(defn.ArrayClass)) {
       defn.ArrayOf(
         intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
@@ -653,7 +655,9 @@ object TypeErasure {
         val psym = pseudoSymbol(p)
         isClass(psym) && !isTrait(psym) && isUnshadowed(psym)
       }
-      (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
+      val z = (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
+      // println("z: " + z.show)
+      z
     }
   end intersectionDominator
 
@@ -768,6 +772,7 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
           collectParents(tp1, parents)
           collectParents(tp2, parents)
 
+          // println("tp: " + tp)
           this(intersectionDominator(parents.toList))
         case _ =>
           erasedGlb(this(tp1), this(tp2), isJava = sourceLanguage.isJava)
