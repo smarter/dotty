@@ -429,7 +429,13 @@ object TypeErasure {
      */
     type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
-    /** The pseudo symbol of `tp`, aliases are special: ... */
+    /** The pseudo symbol of `tp`, see `PseudoSymbol`.
+     *
+     *  The pseudo-symbol representation of a given type is chosen such that
+     *  `isNonBottomSubClass` behaves like it would in Scala 2, this requires
+     *  handling type aliases in a very specific way, see the implementation for
+     *  details.
+     */
     def pseudoSymbol(tp: Type): PseudoSymbol = tp.widen match {
       case tpw: OrType => // Could appear in Scala.js code
         pseudoSymbol(erasure(tpw))
@@ -443,25 +449,44 @@ object TypeErasure {
         else
           sym.info match {
             case info: AliasingBounds =>
-              // S2RefinedType are not supertype
-              // ... unless behind an alias
-              //     ... unless behind that alias is not normalized (parent is alias or intersection containing alias),
-              //         because uncurry will normalize it
-              def isNormal(tp: Type): Boolean = tp match {
+              /** A Scala 2 refinement is considered to be in normal form if none of its parents
+               *  are type aliases.
+               */
+              def isNormalForm(tp: Type): Boolean = tp match {
                 case RefinedType(parent, _, _) =>
-                  isNormal(parent)
+                  isNormalForm(parent)
                 case AndType(tp1, tp2) =>
-                  isNormal(tp1) && isNormal(tp2)
+                  isNormalForm(tp1) && isNormalForm(tp2)
                 case _ =>
                   tp.dealias eq tp
               }
 
-              // fails c_49 (get a)
-              // val keepAlias = false
-              // fails a_53 ( get c)
-              // val keepAlias = info.alias.isInstanceOf[Scala2RefinedType]
-
-              val keepAlias = info.alias.isInstanceOf[Scala2RefinedType] && isNormal(info.alias)
+              // For the purpose of implementing `isNonBottomSubClass` one would expect that aliases
+              // could always be dealiased, unfortunately this doesn't quite work. In a situation such
+              // as:
+              //
+              //   trait A; trait B; trait C
+              //   type AA = A
+              //   type F3 = AA with B
+              //   type Rec5 <: F3
+              //   type Rec6 <: C with Rec5
+              //   def a_53(a: F3 @foo with Rec6): Unit = {}
+              //
+              // Because `F3` is not in normal form, it gets normalized by the
+              // `Uncurry` phase in Scala 2 whcih replaces it by a fresh
+              // refinement type `A with B`, but for some reason this
+              // replacement does not occur in the `baseTypeSeq` of `Rec6` which still
+              // contains the original `AA with B` as a base type. Because different refinements
+              // end up with different class symbols, this means that we need:
+              //
+              //   isNonBottomSubClass(pseudoSymbol(`Rec6`), pseudoSymbol(`F3`))` == false
+              //   isNonBottomSubClass(pseudoSymbol(`F3`), pseudoSymbol(`Rec6`))` == false
+              //
+              // This is accomplished here by keeping aliases iff the rhs is a
+              // refinement not in normal form, and by having `isNonBottomSubClass` always
+              // return false when comparing a refinement type with an alias.
+              //
+              val keepAlias = info.alias.isInstanceOf[Scala2RefinedType] && isNormalForm(info.alias)
 
               if (keepAlias)
                 sym
@@ -551,7 +576,6 @@ object TypeErasure {
      *  method on various test cases.
      */
     def isnbc(tp1: PseudoSymbol, tp2: PseudoSymbol): Boolean = {
-      // xx: bottom handling
       def goUpperBound(psym: Symbol | StructuralRef): Boolean = {
         val info = psym match {
           case sym: Symbol => sym.info
@@ -565,51 +589,32 @@ object TypeErasure {
         }
       }
 
-      def go(tp1: PseudoSymbol): Boolean =
-        val z = sameSymbol(tp1, tp2) || (tp1, tp2).match {
+      def go(tp1: PseudoSymbol): Boolean = sameSymbol(tp1, tp2) || (tp1, tp2).match {
         case (sym1: Symbol, sym2: Symbol) =>
           if (sym1.isClass && sym2.isClass)
             sym1.derivesFrom(sym2)
           else if (!sym1.isClass) {
-            // an abstract type is a pseudo-sub of a pseudo-symbol, if its
-            // upper-bound is a pseudo-sub of that pseudo-symbol.
+            // an abstract type or type alias is a sub of a pseudo-symbol, if
+            // its upper-bound is a sub of that pseudo-symbol.
             goUpperBound(sym1)
           }
-          else if (sym2.isAliasType) {
-
-            sym2.info match {
-              case TypeAlias(ref2) =>
-                // underlying is always refined so check should always fail
-                val z = isnbc(tp1, pseudoSymbol(ref2))
-                assert(z == false, s"nbc($tp1, $tp2)")
-                z
-              case _ =>
-                false
-            }
-
-          }
           else
-            // a class C is never considered a pseudo-sub of an abstract type T,
-            // even if it was declared as `type T >: C`
+            // sym2 is either a type alias or an abstract type:
+            // - If it's a type alias, by the definition of `pseudoSymbol` we
+            //   know it must be an alias of a refinement and that it shouldn't
+            //   be considered equal to that refinement for the purpose of
+            //   `isNonBottomSubClass`, so we can return false.
+            // - If it's an abstract type, we can also return false because
+            //   `isNonBottomSubClass` in Scala 2 never considers a class C to be
+            //   a a sub of an abstract type T, even if it was declared as
+            //  `type T >: C`.
             false
         case (_, _: Scala2RefinedType) =>
-          // XX: what about:
-          // type AA <: A with B
-          // (A with B) with AA
-          // ==> two different tps
-          // type And = A with B
-          // type AA <: And
-          // (And @foo) with AA
-          // ==> in that case we preserve alias symbol (c_49)
-          // type Alias = A
-          // type And = Alias with B
-          // type AA <: And
-          // (And @foo) with AA
-          // ==> in that case we don't preserve alias because of normalization in uncurrying ends up creating a separate type (and class symbol) but does not update the parents of existing symbols (a_53)
-
-          // As mentioned above, in Scala 2 these types get their own unique
-          // synthetic class symbol, and are not considered a pseudo-sub of
-          // anything, XX: comment on aliases handled via sym
+          // As mentioned in the documentationf of `Scala2RefinedType`, in Scala
+          // 2 these types get their own unique synthetic class symbol, and are
+          // not considered a sub of anything. Note that we must return false
+          // even if the lhs is a type alias of this refinement, see
+          // the handling of aliases in `pseudoSymbol` for details.
           false
         case (sym1: Symbol, tp: StructuralRef) =>
           goUpperBound(sym1)
@@ -619,10 +624,7 @@ object TypeErasure {
           go(pseudoSymbol(tp1.parent))
         case (AndType(tp11, tp12), _) =>
           go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
-        }
-        // println(i"nbc($tp1, $tp2): " + z)
-        z
-
+      }
 
       go(tp1)
     }
