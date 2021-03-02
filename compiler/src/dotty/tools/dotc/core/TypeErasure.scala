@@ -575,61 +575,58 @@ object TypeErasure {
      *  based on reverse-engineering rules from the observed behavior of this
      *  method on various test cases.
      */
-    def isNonBottomSubClass(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean = {
+    def isNonBottomSubClass(psym1: PseudoSymbol, psym2: PseudoSymbol): Boolean =
       /** Recurse on the upper-bound of `psym1`:
        *  an abstract type or type alias is a sub of a pseudo-symbol, if
        *  its upper-bound is a sub of that pseudo-symbol.
        */
-      def goUpperBound(psym1: Symbol | StructuralRef): Boolean = {
-        val info = psym1 match {
+      def goUpperBound(psym1: Symbol | StructuralRef): Boolean =
+        val info = psym1 match
           case sym: Symbol => sym.info
           case tp: StructuralRef => tp.info
-        }
-        info match {
+        info match
           case info: TypeBounds =>
             go(pseudoSymbol(info.hi))
           case _ =>
             false
-        }
-      }
 
-      def go(psym1: PseudoSymbol): Boolean = sameSymbol(psym1, psym2) || (psym1, psym2) match {
-        case (sym1: Symbol, sym2: Symbol) =>
-          if (sym1.isClass && sym2.isClass)
-            sym1.derivesFrom(sym2)
-          else if (!sym1.isClass) {
-            goUpperBound(sym1)
-          }
-          else
-            // sym2 is either a type alias or an abstract type:
-            // - If it's a type alias, by the definition of `pseudoSymbol` we
-            //   know it must be an alias of a refinement and that it shouldn't
-            //   be considered equal to that refinement for the purpose of
-            //   `isNonBottomSubClass`, so we can return false.
-            // - If it's an abstract type, we can also return false because
-            //   `isNonBottomSubClass` in Scala 2 never considers a class C to be
-            //   a a sub of an abstract type T, even if it was declared as
-            //  `type T >: C`.
-            false
-        case (_, _: Scala2RefinedType) =>
-          // As mentioned in the documentation of `Scala2RefinedType`, in Scala
-          // 2 these types get their own unique synthetic class symbol, and are
-          // not considered a sub of anything. Note that we must return false
-          // even if the lhs is a type alias of this refinement, see
-          // the handling of aliases in `pseudoSymbol` for details.
-          false
-        case (sym1: Symbol, tp: StructuralRef) =>
-          goUpperBound(sym1)
-        case (tp1: StructuralRef, _) =>
-          goUpperBound(tp1)
-        case (tp1: RefinedType, _) =>
-          go(pseudoSymbol(tp1.parent))
-        case (AndType(tp11, tp12), _) =>
-          go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
-      }
+      def go(psym1: PseudoSymbol): Boolean =
+        sameSymbol(psym1, psym2) ||
+        // As mentioned in the documentation of `Scala2RefinedType`, in Scala 2
+        // these types get their own unique synthetic class symbol, therefore
+        // they don't have any sub-class  Note that we must return false
+        // even if the lhs is a type alias of this refinement, see
+        // the handling of aliases in `pseudoSymbol` for details.
+        !psym2.isInstanceOf[Scala2RefinedType] && psym1.match
+          case sym1: Symbol => psym2 match
+            case sym2: Symbol =>
+              if sym1.isClass && sym2.isClass then
+                sym1.derivesFrom(sym2)
+              else if !sym1.isClass then
+                goUpperBound(sym1)
+              else
+                // sym2 is either a type alias or an abstract type:
+                // - If it's a type alias, by the definition of `pseudoSymbol` we
+                //   know it must be an alias of a refinement and that it shouldn't
+                //   be considered equal to that refinement for the purpose of
+                //   `isNonBottomSubClass`, so we can return false.
+                // - If it's an abstract type, we can also return false because
+                //   `isNonBottomSubClass` in Scala 2 never considers a class C to be
+                //   a a sub of an abstract type T, even if it was declared as
+                //  `type T >: C`.
+                false
+            case _ =>
+              goUpperBound(sym1)
+          case tp1: StructuralRef =>
+            goUpperBound(tp1)
+          case tp1: RefinedType =>
+            go(pseudoSymbol(tp1.parent))
+          case AndType(tp11, tp12) =>
+            go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
+      end go
 
       go(psym1)
-    }
+    end isNonBottomSubClass
 
 
     // The body of `intersectionDominator`, intentionally made to look as much
