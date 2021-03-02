@@ -754,29 +754,23 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
       this(tp.underlying)
     case AndType(tp1, tp2) =>
       sourceLanguage match
-        case SourceLanguage.Scala3 =>
-          erasedGlb(this(tp1), this(tp2), isJava = false)
-        case _ =>
+        case SourceLanguage.Scala2 =>
           val parents = ListBuffer[Type]()
-          // keeping annotations is important here to mimic the Scala 2 erasure logic
+          // Mimic what Scala 2 does: intersections are flattened, but a parent which is an annotated alias
+          // is kept as is, this can impact the result of `intersectionDominator`.
           def collectParents(tp: Type, parents: ListBuffer[Type]): Unit = tp.dealiasKeepAnnots match {
             case AndType(tp1, tp2) =>
               collectParents(tp1, parents)
               collectParents(tp2, parents)
             case _ =>
-              // We intentionally do not dealias the type here, this can impact the result of intersectionDominator
-              parents += tp//.dealiasKeepAnnots
+              parents += tp
           }
           collectParents(tp1, parents)
           collectParents(tp2, parents)
 
-          if sourceLanguage.isJava then
-            this(parents.head)
-          else
-            // val old = erasedGlb(this(tp1), this(tp2), isJava)
-            // println("old: " + old.show)
-            val s2 = intersectionDominator(parents.toList)
-            this(s2)
+          this(intersectionDominator(parents.toList))
+        case _ =>
+          erasedGlb(this(tp1), this(tp2), isJava = sourceLanguage.isJava)
     case OrType(tp1, tp2) =>
       TypeComparer.orType(this(tp1), this(tp2), isErased = true)
     case tp: MethodType =>
