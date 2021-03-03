@@ -9,6 +9,31 @@ import scala.collection.mutable.ListBuffer
 
 /** Erasure logic specific to Scala 2 symbols.  */
 object Scala2Erasure:
+  /** Is this a supported Scala 2 refinement or parent of such a type?
+   *
+   *  We do not support types of the form `(A with B) @foo with C`, as it would
+   *  make our implementation of Scala 2 intersection erasure significantly more
+   *  complicated. The problem is that each textual appearance of `A with B` in
+   *  a parent corresponds to a fresh instance of RefinedType (because Scala 2
+   *  does not hash-cons refinements) with a fresh synthetic class symbol, thus
+   *  affecting the result of `isNonBottomSubClass`. To complicate the matter,
+   *  the Scala 2 UnCurry phase will also recursively dealias parent types, thus
+   *  creating distinct class symbols even in situations where the same type
+   *  alias is used to refer to a given refinement. See
+   *  scala2/erasure-unsupported/../Unsupported.scala for examples.
+   *
+   *  @throws TypeError if this type is unsupported.
+   */
+  def supportedType(tp: Type)(using Context): Unit = tp match
+    case AndType(tp1, tp2) =>
+      supportedType(tp1)
+      supportedType(tp2)
+    case RefinedType(parent, _, _) =>
+      supportedType(parent)
+    case AnnotatedType(parent, _) if parent.dealias.isInstanceOf[Scala2RefinedType] =>
+      throw new TypeError(i"Unsupported Scala 2 type: Component $parent of intersection or refinement is annotated.")
+    case _ =>
+
   /** A type that would be represented as a RefinedType in Scala 2.
    *
    *  The `RefinedType` of Scala 2 contains both a list of parents
@@ -34,31 +59,6 @@ object Scala2Erasure:
    */
   type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
-  /** Is this a supported parent type for a Scala 2 intersection or refinement?
-   *
-   *  We do not support types of the form `(A with B) @foo with C`, as it would
-   *  make our implementation of Scala 2 intersection erasure significantly more
-   *  complicated. The problem is that each textual appearance of `A with B` in
-   *  a parent corresponds to a fresh instance of RefinedType (because Scala 2
-   *  does not hash-cons refinements) with a fresh synthetic class symbol, thus
-   *  affecting the result of `isNonBottomSubClass`. To complicate the matter,
-   *  the Scala 2 UnCurry phase will also recursively dealias parent types, thus
-   *  creating distinct class symbols even in situations where the same type
-   *  alias is used to refer to a given refinement. See
-   *  scala2/erasure-unsupported/../Unsupported.scala for examples.
-   *
-   *  @throws TypeError if this type is unsupported.
-   */
-  def checkParents(tp: Type)(using Context): Unit = tp match
-    case AndType(tp1, tp2) =>
-      checkParents(tp1)
-      checkParents(tp2)
-    case RefinedType(parent, _, _) =>
-      checkParents(parent)
-    case AnnotatedType(parent, _) if parent.dealias.isInstanceOf[Scala2RefinedType] =>
-      throw new TypeError(i"Unsupported Scala 2 type: Component $parent of intersection is annotated.")
-    case _ =>
-
   /** The pseudo symbol of `tp`, see `PseudoSymbol`.
    *
    *  The pseudo-symbol representation of a given type is chosen such that
@@ -70,7 +70,7 @@ object Scala2Erasure:
       // pseudoSymbol(erasure(tpw))
       pseudoSymbol(???) // ErasedUnionSymbol
     case tpw: Scala2RefinedType =>
-      checkParents(tpw)
+      supportedType(tpw)
       tpw
     case tpw: TypeRef =>
       val sym = tpw.symbol
@@ -237,7 +237,7 @@ object Scala2Erasure:
         collect(tp1, parents)
         collect(tp2, parents)
       case _ =>
-        checkParents(parent)
+        supportedType(parent)
         parents += parent
 
     collect(tp.tp1, parents)
