@@ -460,16 +460,6 @@ object TypeErasure {
         else
           sym.info match
             case info: AliasingBounds =>
-              /** A Scala 2 refinement is considered to be in normal form if none of its parents
-               *  are type aliases. */
-              def isNormalForm(tp: Type): Boolean = tp match
-                case RefinedType(parent, _, _) =>
-                  isNormalForm(parent)
-                case AndType(tp1, tp2) =>
-                  isNormalForm(tp1) && isNormalForm(tp2)
-                case _ =>
-                  tp.dealias eq tp
-
               // For the purpose of implementing `isNonBottomSubClass` one would expect that aliases
               // could always be dealiased, unfortunately this doesn't quite work. In a situation such
               // as:
@@ -494,9 +484,8 @@ object TypeErasure {
               // This is accomplished here by keeping aliases iff the rhs is a
               // refinement not in normal form, and by having `isNonBottomSubClass` always
               // return false when comparing a refinement type with an alias.
-              val keepAlias = info.alias.isInstanceOf[Scala2RefinedType] && isNormalForm(info.alias)
-
-              if keepAlias then
+              // XXX
+              if info.alias.isInstanceOf[Scala2RefinedType] then
                 sym
               else
                 pseudoSymbol(info.alias)
@@ -605,7 +594,7 @@ object TypeErasure {
         // As mentioned in the documentation of `Scala2RefinedType`, in Scala 2
         // these types get their own unique synthetic class symbol, therefore
         // they don't have any sub-class  Note that we must return false
-        // even if the lhs is a type alias of this refinement, see
+        // even if the lhs is a type alias or abstract type upper-bounded by this refinement, see
         // the handling of aliases in `pseudoSymbol` for details.
         !psym2.isInstanceOf[Scala2RefinedType] && psym1.match
           case sym1: Symbol => psym2 match
@@ -760,14 +749,34 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
       sourceLanguage match
         case SourceLanguage.Scala2 =>
           val parents = ListBuffer[Type]()
-          // Mimic what Scala 2 does: intersections are flattened, but a parent which is an annotated alias
-          // is kept as is, this can impact the result of `intersectionDominator`.
-          def collectParents(tp: Type, parents: ListBuffer[Type]): Unit = tp.dealiasKeepAnnots match {
+          // Mimic what Scala 2 does: intersections like `A with (B with C)` are
+          // flattened to three parents, but `A with ((B with C) @foo)` is kept
+          // as two parents, this can impact the result of `intersectionDominator`.
+          def collectParents(parent: Type, parents: ListBuffer[Type]): Unit = parent.dealiasKeepAnnots match {
             case AndType(tp1, tp2) =>
               collectParents(tp1, parents)
               collectParents(tp2, parents)
             case _ =>
-              parents += tp
+              /** A Scala 2 refinement is considered to be in normal form if none of its flattened parents
+               *  are type aliases. */
+              def isNormalForm(tp: Type): Boolean = tp match
+                case RefinedType(parent, _, _) =>
+                  isNormalForm(parent)
+                case AndType(tp1, tp2) =>
+                  isNormalForm(tp1) && isNormalForm(tp2)
+                case _ =>
+                  tp.dealias eq tp
+
+              val checker = new TypeTraverser {
+                def traverse(part: Type): Unit = part.dealias match
+                  case part: (RefinedType | AndType) =>
+                    if !isNormalForm(part) then
+                      throw new TypeError(i"Could not compute the erasure of the Scala 2 type $tp because its parent $parent contains a non-normal part $part which has an alias...")
+                  case _ =>
+                    traverseChildren(part)
+              }
+              checker.traverse(parent)
+              parents += parent
           }
           collectParents(tp1, parents)
           collectParents(tp2, parents)

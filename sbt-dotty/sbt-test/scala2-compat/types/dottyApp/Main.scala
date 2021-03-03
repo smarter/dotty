@@ -68,13 +68,12 @@ object Main {
     z.a_51(dummy)
     z.c_52(dummy)
 
-    z.a_53(dummy)
+    // z.a_53(dummy)
     z.c_54(dummy)
 
     z.b_55(dummy)
 
-    z.b_56(dummy)
-    // TODO: erase to B
+    // z.b_56(dummy)
     // z.a_57(dummy)
 
     val methods = classOf[scala2Lib.Z].getDeclaredMethods.toList ++ classOf[dottyApp.Z].getDeclaredMethods.toList
