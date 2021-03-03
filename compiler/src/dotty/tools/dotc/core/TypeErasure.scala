@@ -25,7 +25,12 @@ object SourceLanguage {
   /** The language in which `sym` was defined. */
   def ofSymbol(sym: Symbol)(using Context): SourceLanguage =
     if sym.is(JavaDefined) then SourceLanguage.Java
-    else if (sym.isClass && sym.is(Scala2x) || sym.maybeOwner.is(Scala2x)) then SourceLanguage.Scala2
+    else if (sym.isClass && sym.is(Scala2x) || sym.maybeOwner.is(Scala2x)) then {
+      if (sym.maybeOwner eq defn.ScalaPredefModuleClass) && defn.ScalaPredefModuleClassPatch.info.decls.lookupEntry(sym.name) != null then // isPatchedSymbol
+        SourceLanguage.Scala3
+      else
+        SourceLanguage.Scala2
+    }
     else SourceLanguage.Scala3
 
   /** Number of bits needed to represent this enum. */

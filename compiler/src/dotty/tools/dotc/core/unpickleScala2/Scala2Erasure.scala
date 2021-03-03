@@ -68,7 +68,8 @@ object Scala2Erasure:
   def pseudoSymbol(tp: Type)(using Context): PseudoSymbol = tp.widenDealias match
     case tpw: OrType => // Could appear in Scala.js code
       // pseudoSymbol(erasure(tpw))
-      pseudoSymbol(???) // ErasedUnionSymbol
+      throw new TypeError(tpw.show)
+      // pseudoSymbol(???) // ErasedUnionSymbol
     case tpw: Scala2RefinedType =>
       supportedType(tpw)
       tpw
