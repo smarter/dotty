@@ -595,7 +595,7 @@ object Denotations {
      *    SingleDenotations will have distinct signatures (cf #9050).
      */
     final def signature(using Context): Signature =
-      signature(sourceLanguage = if isType then SourceLanguage.Scala3 else SourceLanguage.ofSymbol(symbol))
+      signature(sourceLanguage = if isType || !this.isInstanceOf[SymDenotation] then SourceLanguage.Scala3 else SourceLanguage.ofSymbol(symbol))
 
     /** Overload of `signature` which lets the caller pick between the Java and
      *  Scala signature of the info. Useful to match denotations defined in
