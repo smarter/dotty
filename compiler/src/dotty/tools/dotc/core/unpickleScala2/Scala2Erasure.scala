@@ -75,7 +75,9 @@ object Scala2Erasure:
     case tpw: TypeRef =>
       val sym = tpw.symbol
       if !sym.exists then
-        // The pseudo-symbol of a structural member type is the type itself.
+        // Since we don't have symbols for structural type members we use the
+        // type itself and rely on `sameSymbol` to determine whether two
+        // such types would be represented with the same Scala 2 symbol.
         tpw
       else
         sym
@@ -87,7 +89,6 @@ object Scala2Erasure:
       defn.ObjectClass
     case tpw =>
       throw new Error(s"Internal error: unhandled class ${tpw.getClass} for type $tpw in pseudoSymbol($tp)")
-  end pseudoSymbol
 
   /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
   def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol)(using Context): Boolean =
@@ -230,6 +231,7 @@ object Scala2Erasure:
    */
   def flattenedParents(tp: AndType)(using Context): List[Type] =
     val parents = ListBuffer[Type]()
+
     def collect(parent: Type, parents: ListBuffer[Type]): Unit = parent.dealiasKeepAnnots match
       case AndType(tp1, tp2) =>
         collect(tp1, parents)
@@ -237,7 +239,6 @@ object Scala2Erasure:
       case _ =>
         checkParents(parent)
         parents += parent
-    end collect
 
     collect(tp.tp1, parents)
     collect(tp.tp2, parents)
