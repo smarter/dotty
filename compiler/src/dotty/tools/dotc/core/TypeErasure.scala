@@ -503,7 +503,7 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
     case tp @ AndType(tp1, tp2) =>
       sourceLanguage match
         case SourceLanguage.Scala2 =>
-          this(Scala2Erasure.intersectionDominator(Scala2Erasure.parents(tp)))
+          this(Scala2Erasure.intersectionDominator(Scala2Erasure.flattenedParents(tp)))
         case _ =>
           erasedGlb(this(tp1), this(tp2), isJava = sourceLanguage.isJava)
     case OrType(tp1, tp2) =>

@@ -7,10 +7,11 @@ import Symbols._, Types._, Contexts._, Flags._, Names._, StdNames._, Phases._
 import Decorators._
 import scala.collection.mutable.ListBuffer
 
+/** Erasure logic specific to Scala 2 symbols.  */
 object Scala2Erasure:
   /** A type that would be represented as a RefinedType in Scala 2.
    *
-   *  The `RefinedType` of nsc contains both a list of parents
+   *  The `RefinedType` of Scala 2 contains both a list of parents
    *  and a list of refinements, intersections are represented as a RefinedType
    *  with no refinements.
    */
@@ -54,31 +55,25 @@ object Scala2Erasure:
       else
         sym.info match
           case info: AliasingBounds =>
-            // For the purpose of implementing `isNonBottomSubClass` one would expect that aliases
-            // could always be dealiased, unfortunately this doesn't quite work. In a situation such
-            // as:
+            // For the purpose of implementing `isNonBottomSubClass` one would
+            // expect that aliases could always be dealiased, unfortunately this
+            // doesn't quite work. In a situation such as:
             //
             //   trait A; trait B; trait C
-            //   type AA = A
-            //   type F3 = AA with B
-            //   type Rec5 <: F3
-            //   type Rec6 <: C with Rec5
-            //   def a_53(a: F3 @foo with Rec6): Unit = {}
+            //   type F1 = A with B
+            //   type F2 = A with B
+            //   type Rec3 <: F1
+            //   type Rec4 <: C with Rec3
+            //   def a_51(a: F2 @foo with Rec4): Unit = {}
             //
-            // Because `F3` is not in normal form, it gets normalized by the
-            // `Uncurry` phase in Scala 2 whcih replaces it by a fresh
-            // refinement type `A with B`, but for some reason this
-            // replacement does not occur in the `baseTypeSeq` of `Rec6` which still
-            // contains the original `AA with B` as a base type. Because different refinements
-            // end up with different class symbols, this means that we need:
-            //
-            //   isNonBottomSubClass(pseudoSymbol(`Rec6`), pseudoSymbol(`F3`))` == false
-            //   isNonBottomSubClass(pseudoSymbol(`F3`), pseudoSymbol(`Rec6`))` == false
-            //
-            // This is accomplished here by keeping aliases iff the rhs is a
-            // refinement not in normal form, and by having `isNonBottomSubClass` always
-            // return false when comparing a refinement type with an alias.
-            // XXX
+            // We can't simply dealias `F1` and `F2` to the same `A with B`:
+            // because Scala 2 does not hash-cons refinements, each of these
+            // type aliases points to a different instance of RefinedType and
+            // therefore each one has its own unique class symbol. We represent
+            // this by simply returning the symbol of the alias as its
+            // pseudo-symbol, and by having `isNonBottomSubClass` always return
+            // false when comparing two distinct aliases to the same type, or an
+            // alias to its underlying type.
             if info.alias.isInstanceOf[Scala2RefinedType] then
               sym
             else
@@ -92,7 +87,7 @@ object Scala2Erasure:
     case tpw: ErrorType =>
       defn.ObjectClass
     case tpw =>
-      throw new Error(s"Internal error: unhandled class ${tpw.getClass} for type $tpw in intersectionDominator($parents)")
+      throw new Error(s"Internal error: unhandled class ${tpw.getClass} for type $tpw in pseudoSymbol($tp)")
   end pseudoSymbol
 
   /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
@@ -186,9 +181,9 @@ object Scala2Erasure:
     def go(psym1: PseudoSymbol): Boolean =
       sameSymbol(psym1, psym2) ||
       // As mentioned in the documentation of `Scala2RefinedType`, in Scala 2
-      // these types get their own unique synthetic class symbol, therefore
-      // they don't have any sub-class  Note that we must return false
-      // even if the lhs is a type alias or abstract type upper-bounded by this refinement, see
+      // these types get their own unique synthetic class symbol, therefore they
+      // don't have any sub-class Note that we must return false even if the lhs
+      // is a type alias or abstract type upper-bounded by this refinement, see
       // the handling of aliases in `pseudoSymbol` for details.
       !psym2.isInstanceOf[Scala2RefinedType] && psym1.match
         case sym1: Symbol => psym2 match
@@ -251,40 +246,65 @@ object Scala2Erasure:
       (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
     }
 
-  /** Mimic what Scala 2 does: intersections like `A with (B with C)` are
+  /** A flattened list of parents of this intersection.
+   *
+   *  Mimic what Scala 2 does: intersections like `A with (B with C)` are
    *  flattened to three parents, but `A with ((B with C) @foo)` is kept
    *  as two parents, this can impact the result of `intersectionDominator`.
+   *
+   *  @throws TypeError if our implementation of `intersectionDominator` does
+   *                    not support this type.
    */
-  def parents(tp: AndType)(using Context): List[Type] =
+  def flattenedParents(tp: AndType)(using Context): List[Type] =
     val parents = ListBuffer[Type]()
-    def collectParents(parent: Type, parents: ListBuffer[Type]): Unit = parent.dealiasKeepAnnots match {
+    def collect(parent: Type, parents: ListBuffer[Type]): Unit = parent.dealiasKeepAnnots match
       case AndType(tp1, tp2) =>
-        collectParents(tp1, parents)
-        collectParents(tp2, parents)
-      case _ =>
-        /** A Scala 2 refinement is considered to be in normal form if none of its flattened parents
-         *  are type aliases. */
-        def isNormalForm(tp: Type): Boolean = tp match
+        collect(tp1, parents)
+        collect(tp2, parents)
+      case RefinedType(parent, _) =>
+        collect(parent, parents)
+      case AnnotatedType(parent, _) =>
+        /** A Scala 2 refinement is considered to be in normal form if none of its
+         *  parents are type aliases. */
+        def checkNormalForm(part: Type): Boolean = part match
           case RefinedType(parent, _, _) =>
             isNormalForm(parent)
           case AndType(tp1, tp2) =>
             isNormalForm(tp1) && isNormalForm(tp2)
           case _ =>
-            tp.dealias eq tp
+            if part.dealias ne part then
+              throw new TypeError(i"Unsupported Scala 2 intersection type $tp: one of its parent type is a type alias $part")
 
-        val checker = new TypeTraverser {
+        // Given:
+        //
+        //   trait A; trait B; trait C
+        //   type AA = A
+        //   type F3 = AA with B
+        //   type Rec5 <: F3
+        //   type Rec6 <: C with Rec5
+        //   def a_53(a: F3 @foo with Rec6): Unit = {}
+        //
+        // The Scala 2 UnCurry phase will transform `F3 @foo` to
+        //
+        // `(A with B) @foo`, thus not only dealiasing it but also constructing
+        // a new refinement type with dealiased parent types, this new
+        // refinement type will get its own fresh class symbol and therefore be
+        // 
+        val checkSupported = new TypeTraverser:
           def traverse(part: Type): Unit = part.dealias match
             case part: (RefinedType | AndType) =>
               if !isNormalForm(part) then
-                throw new TypeError(i"Could not compute the erasure of the Scala 2 type $tp because its parent $parent contains a non-normal part $part which has an alias...")
+                throw new TypeError(i"Unsupported Scala 2 type $tp: its parent $parent contains a non-normal part $part which has an alias...")
             case _ =>
               traverseChildren(part)
-        }
-        checker.traverse(parent)
+        checkSupported.traverse(parent)
         parents += parent
-    }
-    collectParents(tp.tp1, parents)
-    collectParents(tp.tp2, parents)
+      case _ =>
+        parents += parent
+    end collect
+
+    collect(tp.tp1, parents)
+    collect(tp.tp2, parents)
     parents.toList
-  end parents
+  end flattenedParents
 end Scala2Erasure
