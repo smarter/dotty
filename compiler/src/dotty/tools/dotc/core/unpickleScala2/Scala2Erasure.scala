@@ -90,109 +90,113 @@ object Scala2Erasure:
     case tpw =>
       throw new Error(s"Internal error: unhandled class ${tpw.getClass} for type $tpw in pseudoSymbol($tp)")
 
-  /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
-  def sameSymbol(psym1: PseudoSymbol, psym2: PseudoSymbol)(using Context): Boolean =
-    // Pattern match on (psym1, psym2) desugared by hand to avoid allocating a tuple
-    if psym1.isInstanceOf[StructuralRef] && psym2.isInstanceOf[StructuralRef] then
-      val tp1 = psym1.asInstanceOf[StructuralRef]
-      val tp2 = psym2.asInstanceOf[StructuralRef]
-      // Two structural members will have the same Scala 2 symbol if they
-      // point to the same member. We can't just call `=:=` since different
-      // prefixes will still have the same symbol.
-      (tp1.name eq tp2.name) && sameSymbol(pseudoSymbol(tp1.prefix), pseudoSymbol(tp2.prefix))
-    else
-      // We intentionally use referential equality here even though we may end
-      // up comparing two equivalent intersection types, because Scala 2 will
-      // create fresh symbols for each appearance of an intersection type in
-      // source code.
-      psym1 eq psym2
-
-  /** Is this a class symbol? Also returns true for refinements
-   *  since they get a class symbol in Scala 2. */
-  def isClass(psym: PseudoSymbol)(using Context): Boolean = psym match
-    case tp: Scala2RefinedType =>
-      true
-    case tp: StructuralRef =>
-      false
-    case sym: Symbol =>
-      sym.isClass
-
-  /** Is this a trait symbol? */
-  def isTrait(psym: PseudoSymbol)(using Context): Boolean = psym match
-    case tp: Scala2RefinedType =>
-      false
-    case tp: StructuralRef =>
-      false
-    case sym: Symbol =>
-      sym.is(Trait)
-
-  /** An emulation of `Symbol#isNonBottomSubClass` from Scala 2.
-   *
-   *  The documentation of the original method is:
-   *
-   *  > Is this class symbol a subclass of that symbol,
-   *  > and is this class symbol also different from Null or Nothing?
-   *
-   *  Which sounds fine, except that it is also used with non-class symbols,
-   *  so what does it do then? Its implementation delegates to `Type#baseTypeSeq`
-   *  whose documentation states:
-   *
-   *  > The base type sequence of T is the smallest set of [...] class types Ti, so that [...]
-   *
-   *  But this is also wrong: the sequence returned by `baseTypeSeq` can
-   *  contain non-class symbols.
-   *
-   *  Given that we cannot rely on the documentation and that the
-   *  implementation is extremely complex, this reimplementation is mostly
-   *  based on reverse-engineering rules derived from the observed behavior of
-   *  the original method.
-   */
-  def isNonBottomSubClass(psym1: PseudoSymbol, psym2: PseudoSymbol)(using Context): Boolean =
-    /** Recurse on the upper-bound of `psym1`: an abstract type is a sub of a
-     *  pseudo-symbol, if its upper-bound is a sub of that pseudo-symbol.
+  extension (psym: PseudoSymbol)(using Context)
+    /** Would these two pseudo-symbols be represented with the same symbol in Scala 2? */
+    def sameSymbol(other: PseudoSymbol): Boolean =
+      // Pattern match on (psym1, psym2) desugared by hand to avoid allocating a tuple
+      if psym.isInstanceOf[StructuralRef] && other.isInstanceOf[StructuralRef] then
+        val tp1 = psym.asInstanceOf[StructuralRef]
+        val tp2 = other.asInstanceOf[StructuralRef]
+        // Two structural members will have the same Scala 2 symbol if they
+        // point to the same member. We can't just call `=:=` since different
+        // prefixes will still have the same symbol.
+        (tp1.name eq tp2.name) && pseudoSymbol(tp1.prefix).sameSymbol(pseudoSymbol(tp2.prefix))
+      else
+        // We intentionally use referential equality here even though we may end
+        // up comparing two equivalent intersection types, because Scala 2 will
+        // create fresh symbols for each appearance of an intersection type in
+        // source code.
+        psym eq other
+  
+    /** Is this a class symbol? Also returns true for refinements
+     *  since they get a class symbol in Scala 2.
      */
-    def goUpperBound(psym1: Symbol | StructuralRef): Boolean =
-      val info = psym1 match
-        case sym: Symbol => sym.info
-        case tp: StructuralRef => tp.info
-      info match
-        case info: TypeBounds =>
-          go(pseudoSymbol(info.hi))
-        case _ =>
-          false
-
-    def go(psym1: PseudoSymbol): Boolean =
-      sameSymbol(psym1, psym2) ||
-      // As mentioned in the documentation of `Scala2RefinedType`, in Scala 2
-      // these types get their own unique synthetic class symbol, therefore they
-      // don't have any sub-class Note that we must return false even if the lhs
-      // is an abstract type upper-bounded by this refinement, since each
-      // textual appearance of a refinement will have its own class symbol.
-      !psym2.isInstanceOf[Scala2RefinedType] && psym1.match
-        case sym1: Symbol => psym2 match
-          case sym2: Symbol =>
-            if sym1.isClass && sym2.isClass then
-              sym1.derivesFrom(sym2)
-            else if !sym1.isClass then
-              goUpperBound(sym1)
-            else
-              // sym2 is an abstract type, return false because
-              // `isNonBottomSubClass` in Scala 2 never considers a class C to
-              // be a a sub of an abstract type T, even if it was declared as
-              // `type T >: C`.
-              false
+    def isClass: Boolean = psym match
+      case tp: Scala2RefinedType =>
+        true
+      case tp: StructuralRef =>
+        false
+      case sym: Symbol =>
+        sym.isClass
+  
+    /** Is this a trait symbol? */
+    def isTrait: Boolean = psym match
+      case tp: Scala2RefinedType =>
+        false
+      case tp: StructuralRef =>
+        false
+      case sym: Symbol =>
+        sym.is(Trait)
+  
+    /** An emulation of `Symbol#isNonBottomSubClass` from Scala 2.
+     *
+     *  The documentation of the original method is:
+     *
+     *  > Is this class symbol a subclass of that symbol,
+     *  > and is this class symbol also different from Null or Nothing?
+     *
+     *  Which sounds fine, except that it is also used with non-class symbols,
+     *  so what does it do then? Its implementation delegates to `Type#baseTypeSeq`
+     *  whose documentation states:
+     *
+     *  > The base type sequence of T is the smallest set of [...] class types Ti, so that [...]
+     *
+     *  But this is also wrong: the sequence returned by `baseTypeSeq` can
+     *  contain non-class symbols.
+     *
+     *  Given that we cannot rely on the documentation and that the
+     *  implementation is extremely complex, this reimplementation is mostly
+     *  based on reverse-engineering rules derived from the observed behavior of
+     *  the original method.
+     */
+    def isNonBottomSubClass(that: PseudoSymbol): Boolean =
+      /** Recurse on the upper-bound of `psym`: an abstract type is a sub of a
+       *  pseudo-symbol, if its upper-bound is a sub of that pseudo-symbol.
+       */
+      def goUpperBound(psym: Symbol | StructuralRef): Boolean =
+        val info = psym match
+          case sym: Symbol => sym.info
+          case tp: StructuralRef => tp.info
+        info match
+          case info: TypeBounds =>
+            go(pseudoSymbol(info.hi))
           case _ =>
-            goUpperBound(sym1)
-        case tp1: StructuralRef =>
-          goUpperBound(tp1)
-        case tp1: RefinedType =>
-          go(pseudoSymbol(tp1.parent))
-        case AndType(tp11, tp12) =>
-          go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
-    end go
-
-    go(psym1)
-  end isNonBottomSubClass
+            false
+  
+      def go(psym: PseudoSymbol): Boolean =
+        psym.sameSymbol(that) ||
+        // As mentioned in the documentation of `Scala2RefinedType`, in Scala 2
+        // these types get their own unique synthetic class symbol, therefore they
+        // don't have any sub-class Note that we must return false even if the lhs
+        // is an abstract type upper-bounded by this refinement, since each
+        // textual appearance of a refinement will have its own class symbol.
+        !that.isInstanceOf[Scala2RefinedType] &&
+        psym.match
+          case sym1: Symbol => that match
+            case sym2: Symbol =>
+              if sym1.isClass && sym2.isClass then
+                sym1.derivesFrom(sym2)
+              else if !sym1.isClass then
+                goUpperBound(sym1)
+              else
+                // sym2 is an abstract type, return false because
+                // `isNonBottomSubClass` in Scala 2 never considers a class C to
+                // be a a sub of an abstract type T, even if it was declared as
+                // `type T >: C`.
+                false
+            case _ =>
+              goUpperBound(sym1)
+          case tp1: StructuralRef =>
+            goUpperBound(tp1)
+          case tp1: RefinedType =>
+            go(pseudoSymbol(tp1.parent))
+          case AndType(tp11, tp12) =>
+            go(pseudoSymbol(tp11)) || go(pseudoSymbol(tp12))
+      end go
+  
+      go(psym)
+    end isNonBottomSubClass
+  end extension
 
   /** An emulation of `Erasure#intersectionDominator` from Scala 2.
    *
@@ -216,10 +220,10 @@ object Scala2Erasure:
         intersectionDominator(parents.collect { case defn.ArrayOf(arg) => arg }))
     } else {
       def isUnshadowed(psym: PseudoSymbol) =
-        !(psyms.exists(qsym => !sameSymbol(psym, qsym) && isNonBottomSubClass(qsym, psym)))
+        !(psyms.exists(qsym => !psym.sameSymbol(qsym) && qsym.isNonBottomSubClass(psym)))
       val cs = parents.iterator.filter { p =>
         val psym = pseudoSymbol(p)
-        isClass(psym) && !isTrait(psym) && isUnshadowed(psym)
+        psym.isClass && !psym.isTrait && isUnshadowed(psym)
       }
       (if (cs.hasNext) cs else parents.iterator.filter(p => isUnshadowed(pseudoSymbol(p)))).next()
     }
