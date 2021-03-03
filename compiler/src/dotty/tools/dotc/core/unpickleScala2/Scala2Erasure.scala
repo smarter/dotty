@@ -249,8 +249,7 @@ object Scala2Erasure:
   /** A flattened list of parents of this intersection.
    *
    *  Mimic what Scala 2 does: intersections like `A with (B with C)` are
-   *  flattened to three parents, but `A with ((B with C) @foo)` is kept
-   *  as two parents, this can impact the result of `intersectionDominator`.
+   *  flattened to three parents.
    *
    *  @throws TypeError if our implementation of `intersectionDominator` does
    *                    not support this type.
@@ -261,44 +260,21 @@ object Scala2Erasure:
       case AndType(tp1, tp2) =>
         collect(tp1, parents)
         collect(tp2, parents)
-      case RefinedType(parent, _) =>
-        collect(parent, parents)
       case AnnotatedType(parent, _) =>
-        /** A Scala 2 refinement is considered to be in normal form if none of its
-         *  parents are type aliases. */
-        def checkNormalForm(part: Type): Boolean = part match
-          case RefinedType(parent, _, _) =>
-            isNormalForm(parent)
-          case AndType(tp1, tp2) =>
-            isNormalForm(tp1) && isNormalForm(tp2)
-          case _ =>
-            if part.dealias ne part then
-              throw new TypeError(i"Unsupported Scala 2 intersection type $tp: one of its parent type is a type alias $part")
-
-        // Given:
-        //
-        //   trait A; trait B; trait C
-        //   type AA = A
-        //   type F3 = AA with B
-        //   type Rec5 <: F3
-        //   type Rec6 <: C with Rec5
-        //   def a_53(a: F3 @foo with Rec6): Unit = {}
-        //
-        // The Scala 2 UnCurry phase will transform `F3 @foo` to
-        //
-        // `(A with B) @foo`, thus not only dealiasing it but also constructing
-        // a new refinement type with dealiased parent types, this new
-        // refinement type will get its own fresh class symbol and therefore be
-        // 
-        val checkSupported = new TypeTraverser:
-          def traverse(part: Type): Unit = part.dealias match
-            case part: (RefinedType | AndType) =>
-              if !isNormalForm(part) then
-                throw new TypeError(i"Unsupported Scala 2 type $tp: its parent $parent contains a non-normal part $part which has an alias...")
-            case _ =>
-              traverseChildren(part)
-        checkSupported.traverse(parent)
-        parents += parent
+        // Don't try to support types of the form `(A with B) @foo with C`, as it
+        // would make the implementation of `intersectionDominator`
+        // significantly more complicated. The problem is that each textual
+        // appearance of `A with B` in a parent corresponds to a fresh instance
+        // of RefinedType (because Scala 2 does not hash-cons refinements) with
+        // a fresh synthetic class symbol, thus affecting the result of
+        // `isNonBottomSubClass`. To complicate the matter, the Scala 2 UnCurry
+        // phase will also recursively dealias parent types, thus creating
+        // distinct class symbols even in situations where the same type alias is
+        // used to refer to a given refinement.
+        // See scala2/erasure-unsupported/../Unsupported.scala for examples.
+        if parent.dealias.isInstanceOf[Scala2RefinedType] then
+          throw new TypeError(i"Unsupported Scala 2 intersection $tp: its component $parent is annotated.")
+        parents += parent.dealias
       case _ =>
         parents += parent
     end collect

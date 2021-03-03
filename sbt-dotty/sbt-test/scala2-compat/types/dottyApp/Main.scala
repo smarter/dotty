@@ -8,9 +8,9 @@ object Main {
     z.a_02(dummy)
     z.b_02X(dummy)
     z.a_03(dummy)
-    z.b_04(dummy)
-    z.b_04X(dummy)
-    z.b_05(dummy)
+    // z.b_04(dummy)
+    // z.b_04X(dummy)
+    // z.b_05(dummy)
     z.a_06(dummy)
     z.a_07(dummy)
     z.b_08(dummy)
@@ -61,11 +61,11 @@ object Main {
     z.b_46(dummy)
 
     z.c_47(dummy)
-    z.a_48(dummy)
+    // z.a_48(dummy)
 
-    z.c_49(dummy)
+    // z.c_49(dummy)
     z.c_50(dummy)
-    z.a_51(dummy)
+    // z.a_51(dummy)
     z.c_52(dummy)
 
     // z.a_53(dummy)
