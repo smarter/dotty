@@ -34,18 +34,43 @@ object Scala2Erasure:
    */
   type PseudoSymbol = Symbol | StructuralRef | Scala2RefinedType
 
+  /** Is this a supported parent type for a Scala 2 intersection or refinement?
+   *
+   *  We do not support types of the form `(A with B) @foo with C`, as it would
+   *  make our implementation of Scala 2 intersection erasure significantly more
+   *  complicated. The problem is that each textual appearance of `A with B` in
+   *  a parent corresponds to a fresh instance of RefinedType (because Scala 2
+   *  does not hash-cons refinements) with a fresh synthetic class symbol, thus
+   *  affecting the result of `isNonBottomSubClass`. To complicate the matter,
+   *  the Scala 2 UnCurry phase will also recursively dealias parent types, thus
+   *  creating distinct class symbols even in situations where the same type
+   *  alias is used to refer to a given refinement. See
+   *  scala2/erasure-unsupported/../Unsupported.scala for examples.
+   *
+   *  @throws TypeError if this type is unsupported.
+   */
+  def checkParents(tp: Type)(using Context): Unit = tp match
+    case AndType(tp1, tp2) =>
+      checkParents(tp1)
+      checkParents(tp2)
+    case RefinedType(parent, _, _) =>
+      checkParents(parent)
+    case AnnotatedType(parent, _) if parent.dealias.isInstanceOf[Scala2RefinedType] =>
+      throw new TypeError(i"Unsupported Scala 2 type: Component $parent of intersection is annotated.")
+    case _ =>
+
   /** The pseudo symbol of `tp`, see `PseudoSymbol`.
    *
    *  The pseudo-symbol representation of a given type is chosen such that
-   *  `isNonBottomSubClass` behaves like it would in Scala 2, this requires
-   *  handling type aliases in a very specific way, see the implementation for
-   *  details.
+   *  `isNonBottomSubClass` behaves like it would in Scala 2, in particular
+   *  this lets us strip all aliases.
    */
-  def pseudoSymbol(tp: Type)(using Context): PseudoSymbol = tp.widen match
+  def pseudoSymbol(tp: Type)(using Context): PseudoSymbol = tp.widenDealias match
     case tpw: OrType => // Could appear in Scala.js code
       // pseudoSymbol(erasure(tpw))
       pseudoSymbol(???) // ErasedUnionSymbol
     case tpw: Scala2RefinedType =>
+      checkParents(tpw)
       tpw
     case tpw: TypeRef =>
       val sym = tpw.symbol
@@ -53,33 +78,7 @@ object Scala2Erasure:
         // The pseudo-symbol of a structural member type is the type itself.
         tpw
       else
-        sym.info match
-          case info: AliasingBounds =>
-            // For the purpose of implementing `isNonBottomSubClass` one would
-            // expect that aliases could always be dealiased, unfortunately this
-            // doesn't quite work. In a situation such as:
-            //
-            //   trait A; trait B; trait C
-            //   type F1 = A with B
-            //   type F2 = A with B
-            //   type Rec3 <: F1
-            //   type Rec4 <: C with Rec3
-            //   def a_51(a: F2 @foo with Rec4): Unit = {}
-            //
-            // We can't simply dealias `F1` and `F2` to the same `A with B`:
-            // because Scala 2 does not hash-cons refinements, each of these
-            // type aliases points to a different instance of RefinedType and
-            // therefore each one has its own unique class symbol. We represent
-            // this by simply returning the symbol of the alias as its
-            // pseudo-symbol, and by having `isNonBottomSubClass` always return
-            // false when comparing two distinct aliases to the same type, or an
-            // alias to its underlying type.
-            if info.alias.isInstanceOf[Scala2RefinedType] then
-              sym
-            else
-              pseudoSymbol(info.alias)
-          case _ =>
-            sym
+        sym
     case tpw: TypeProxy =>
       pseudoSymbol(tpw.underlying)
     case tpw: JavaArrayType =>
@@ -107,19 +106,7 @@ object Scala2Erasure:
       // source code.
       psym1 eq psym2
 
-  /** The dealiased version of this pseudo-symbol, see `pseudoSymboŀ` for details
-   *  on what it means for a pseudo-symbol to be an alias. */
-  def dealias(psym: PseudoSymbol)(using Context): PseudoSymbol = psym match
-    case sym: Symbol =>
-      sym.info match
-        case TypeAlias(ref) =>
-          pseudoSymbol(ref.dealias)
-        case _ =>
-          sym
-    case _ =>
-      psym
-
-  /** Is this a class or an alias of a class? Also returns true for refinements
+  /** Is this a class symbol? Also returns true for refinements
    *  since they get a class symbol in Scala 2. */
   def isClass(psym: PseudoSymbol)(using Context): Boolean = psym match
     case tp: Scala2RefinedType =>
@@ -127,20 +114,16 @@ object Scala2Erasure:
     case tp: StructuralRef =>
       false
     case sym: Symbol =>
-      val sym1 = dealias(sym)
-      if sym1 ne sym then isClass(sym1)
-      else sym.isClass
+      sym.isClass
 
-  /** Is this a trait or an alias of a trait? */
+  /** Is this a trait symbol? */
   def isTrait(psym: PseudoSymbol)(using Context): Boolean = psym match
     case tp: Scala2RefinedType =>
       false
     case tp: StructuralRef =>
       false
     case sym: Symbol =>
-      val sym1 = dealias(sym)
-      if sym1 ne sym then isTrait(sym1)
-      else sym.is(Trait)
+      sym.is(Trait)
 
   /** An emulation of `Symbol#isNonBottomSubClass` from Scala 2.
    *
@@ -164,9 +147,8 @@ object Scala2Erasure:
    *  the original method.
    */
   def isNonBottomSubClass(psym1: PseudoSymbol, psym2: PseudoSymbol)(using Context): Boolean =
-    /** Recurse on the upper-bound of `psym1`:
-     *  an abstract type or type alias is a sub of a pseudo-symbol, if
-     *  its upper-bound is a sub of that pseudo-symbol.
+    /** Recurse on the upper-bound of `psym1`: an abstract type is a sub of a
+     *  pseudo-symbol, if its upper-bound is a sub of that pseudo-symbol.
      */
     def goUpperBound(psym1: Symbol | StructuralRef): Boolean =
       val info = psym1 match
@@ -183,8 +165,8 @@ object Scala2Erasure:
       // As mentioned in the documentation of `Scala2RefinedType`, in Scala 2
       // these types get their own unique synthetic class symbol, therefore they
       // don't have any sub-class Note that we must return false even if the lhs
-      // is a type alias or abstract type upper-bounded by this refinement, see
-      // the handling of aliases in `pseudoSymbol` for details.
+      // is an abstract type upper-bounded by this refinement, since each
+      // textual appearance of a refinement will have its own class symbol.
       !psym2.isInstanceOf[Scala2RefinedType] && psym1.match
         case sym1: Symbol => psym2 match
           case sym2: Symbol =>
@@ -193,15 +175,10 @@ object Scala2Erasure:
             else if !sym1.isClass then
               goUpperBound(sym1)
             else
-              // sym2 is either a type alias or an abstract type:
-              // - If it's a type alias, by the definition of `pseudoSymbol` we
-              //   know it must be an alias of a refinement and that it shouldn't
-              //   be considered equal to that refinement for the purpose of
-              //   `isNonBottomSubClass`, so we can return false.
-              // - If it's an abstract type, we can also return false because
-              //   `isNonBottomSubClass` in Scala 2 never considers a class C to be
-              //   a a sub of an abstract type T, even if it was declared as
-              //  `type T >: C`.
+              // sym2 is an abstract type, return false because
+              // `isNonBottomSubClass` in Scala 2 never considers a class C to
+              // be a a sub of an abstract type T, even if it was declared as
+              // `type T >: C`.
               false
           case _ =>
             goUpperBound(sym1)
@@ -250,9 +227,6 @@ object Scala2Erasure:
    *
    *  Mimic what Scala 2 does: intersections like `A with (B with C)` are
    *  flattened to three parents.
-   *
-   *  @throws TypeError if our implementation of `intersectionDominator` does
-   *                    not support this type.
    */
   def flattenedParents(tp: AndType)(using Context): List[Type] =
     val parents = ListBuffer[Type]()
@@ -260,22 +234,8 @@ object Scala2Erasure:
       case AndType(tp1, tp2) =>
         collect(tp1, parents)
         collect(tp2, parents)
-      case AnnotatedType(parent, _) =>
-        // Don't try to support types of the form `(A with B) @foo with C`, as it
-        // would make the implementation of `intersectionDominator`
-        // significantly more complicated. The problem is that each textual
-        // appearance of `A with B` in a parent corresponds to a fresh instance
-        // of RefinedType (because Scala 2 does not hash-cons refinements) with
-        // a fresh synthetic class symbol, thus affecting the result of
-        // `isNonBottomSubClass`. To complicate the matter, the Scala 2 UnCurry
-        // phase will also recursively dealias parent types, thus creating
-        // distinct class symbols even in situations where the same type alias is
-        // used to refer to a given refinement.
-        // See scala2/erasure-unsupported/../Unsupported.scala for examples.
-        if parent.dealias.isInstanceOf[Scala2RefinedType] then
-          throw new TypeError(i"Unsupported Scala 2 intersection $tp: its component $parent is annotated.")
-        parents += parent.dealias
       case _ =>
+        checkParents(parent)
         parents += parent
     end collect
 
