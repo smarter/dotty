@@ -582,8 +582,9 @@ object Denotations {
      */
     def prefix: Type = NoPrefix
 
-    /** Either the Scala or Java signature of the info, depending on where the
-     *  symbol is defined.
+    /** For SymDenotations, the Scala or Java signature of the info, depending on
+     *  where the symbol is defined. For non-SymDenotations, the Scala
+     *  signature.
      *
      *  Invariants:
      *  - Before erasure, the signature of a denotation is always equal to the
@@ -595,7 +596,7 @@ object Denotations {
      *    SingleDenotations will have distinct signatures (cf #9050).
      */
     final def signature(using Context): Signature =
-      signature(isJava = !isType && symbol.is(JavaDefined))
+      signature(isJava = !isType && this.isInstanceOf[SymDenotation] && symbol.is(JavaDefined))
 
     /** Overload of `signature` which lets the caller pick between the Java and
      *  Scala signature of the info. Useful to match denotations defined in
