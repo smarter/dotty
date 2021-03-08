@@ -47,7 +47,7 @@ private[repl] class Rendering(parentClassLoader: Option[ClassLoader] = None) {
     else {
       val parent = parentClassLoader.getOrElse {
         val compilerClasspath = ctx.platform.classPath(using ctx).asURLs
-        new java.net.URLClassLoader(compilerClasspath.toArray, null)
+        new java.net.URLClassLoader(compilerClasspath.toArray, ClassLoader.getSystemClassLoader)
       }
 
       myClassLoader = new AbstractFileClassLoader(ctx.settings.outputDir.value, parent)
