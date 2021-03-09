@@ -6,6 +6,7 @@ import Symbols._, Types._, Contexts._, Flags._, Names._, StdNames._, Phases._
 import Flags.JavaDefined
 import Uniques.unique
 import TypeOps.makePackageObjPrefixExplicit
+import backend.sjs.JSDefinitions
 import transform.ExplicitOuter._
 import transform.ValueClasses._
 import transform.TypeUtils._
@@ -575,9 +576,22 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
    *  to the underlying type.
    */
   def eraseInfo(tp: Type, sym: Symbol)(using Context): Type =
-    val tp1 = tp match
+    val tp0 = tp match
       case tp: MethodicType => integrateContextResults(tp, contextResultCount(sym))
       case _ => tp
+
+    val tp1 =
+      if sourceLanguage.isScala2 && ctx.settings.scalajs.value then
+        val erasePseudoUnion = new TypeMap:
+          def apply(tp: Type) = tp match
+            case tp: OrType =>
+              JSDefinitions.jsdefn.PseudoUnionType
+            case tp =>
+              mapOver(tp)
+        erasePseudoUnion(tp0)
+      else
+        tp0
+
     tp1 match
       case ExprType(rt) =>
         if sym.is(Param) then apply(tp1)
