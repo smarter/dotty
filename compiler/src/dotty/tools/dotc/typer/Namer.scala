@@ -1398,15 +1398,15 @@ class Namer { typer: Typer =>
               if (idx < params.length) params(idx)
               else paramProto(paramss1, idx - params.length)
             case nil =>
-              NoType
+              WildcardType
           }
           val defaultAlts = meth.altsWith(_.hasDefaultParams)
           if (defaultAlts.length == 1)
             paramProto(defaultAlts.head.info.widen.paramInfoss, idx)
           else
-            NoType
+            WildcardType
         case _ =>
-          NoType
+          WildcardType
       }
 
       /** The proto-type to be used when inferring the result type from
@@ -1415,26 +1415,7 @@ class Namer { typer: Typer =>
        *  the corresponding parameter where bound parameters are replaced by
        *  Wildcards.
        */
-      def rhsProto = sym.asTerm.name collect {
-        case DefaultGetterName(original, idx) =>
-          val meth: Denotation =
-            if (original.isConstructorName && (sym.owner.is(ModuleClass)))
-              sym.owner.companionClass.info.decl(nme.CONSTRUCTOR)
-            else
-              ctx.defContext(sym).denotNamed(original)
-          def paramProto(paramss: List[List[Type]], idx: Int): Type = paramss match {
-            case params :: paramss1 =>
-              if (idx < params.length) wildApprox(params(idx))
-              else paramProto(paramss1, idx - params.length)
-            case nil =>
-              WildcardType
-          }
-          val defaultAlts = meth.altsWith(_.hasDefaultParams)
-          if (defaultAlts.length == 1)
-            paramProto(defaultAlts.head.info.widen.paramInfoss, idx)
-          else
-            WildcardType
-      } getOrElse WildcardType
+      def rhsProto = wildApprox(defaultParamType)
 
       // println(s"final inherited for $sym: ${inherited.toString}") !!!
       // println(s"owner = ${sym.owner}, decls = ${sym.owner.info.decls.show}")
