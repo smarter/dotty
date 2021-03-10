@@ -1386,6 +1386,29 @@ class Namer { typer: Typer =>
           }
       end inherited
 
+      def defaultParamType = sym.asTerm.name match {
+        case DefaultGetterName(original, idx) =>
+          val meth: Denotation =
+            if (original.isConstructorName && (sym.owner.is(ModuleClass)))
+              sym.owner.companionClass.info.decl(nme.CONSTRUCTOR)
+            else
+              ctx.defContext(sym).denotNamed(original)
+          def paramProto(paramss: List[List[Type]], idx: Int): Type = paramss match {
+            case params :: paramss1 =>
+              if (idx < params.length) params(idx)
+              else paramProto(paramss1, idx - params.length)
+            case nil =>
+              NoType
+          }
+          val defaultAlts = meth.altsWith(_.hasDefaultParams)
+          if (defaultAlts.length == 1)
+            paramProto(defaultAlts.head.info.widen.paramInfoss, idx)
+          else
+            NoType
+        case _ =>
+          NoType
+      }
+
       /** The proto-type to be used when inferring the result type from
        *  the right hand side. This is `WildcardType` except if the definition
        *  is a default getter. In that case, the proto-type is the type of
@@ -1426,7 +1449,14 @@ class Namer { typer: Typer =>
       def widenRhs(tp: Type): Type =
         tp.widenTermRefExpr.simplified match
           case ctp: ConstantType if isInlineVal => ctp
-          case tp => TypeComparer.widenInferred(tp, rhsProto)
+          case tp =>
+            val pt = rhsProto
+            val res = TypeComparer.widenInferred(tp, pt)
+            if (pt ne WildcardType) then
+              val w = defaultParamType
+              if res <:< w then
+                return w
+            res
 
       // Replace aliases to Unit by Unit itself. If we leave the alias in
       // it would be erased to BoxedUnit.
