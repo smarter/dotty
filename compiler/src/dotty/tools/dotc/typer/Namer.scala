@@ -1435,7 +1435,7 @@ class Namer { typer: Typer =>
             val res = TypeComparer.widenInferred(tp, pt)
             if (pt ne WildcardType) then
               val w = defaultParamType
-              if res <:< w then
+              if (res frozen_<:< w) && (w eq wildApprox(w)) then
                 return w
             res
 
