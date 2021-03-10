@@ -10,7 +10,7 @@ import core.Flags._
 import core.Names.{DerivedName, Name, SimpleName, TypeName}
 import core.Symbols._
 import core.TypeApplications.TypeParamInfo
-import core.TypeErasure.{erasure, isUnboundedGeneric}
+import core.TypeErasure.{erasedGlb, erasure, isUnboundedGeneric}
 import core.Types._
 import core.classfile.ClassfileConstants
 import ast.Trees._
@@ -19,6 +19,7 @@ import TypeUtils._
 import java.lang.StringBuilder
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 
 /** Helper object to generate generic java signatures, as defined in
  *  the Java Virtual Machine Specification, §4.3.4
@@ -76,6 +77,29 @@ object GenericSignatures {
         boxedSig(tp)
       }
     }
+
+    /** The parents of this intersection where type parameters
+     *  that cannot appear in the signature have been replaced
+     *  by their upper-bound.
+     */
+    def flattenedParents(tp: AndType)(using Context): List[Type] =
+      val parents = ListBuffer[Type]()
+
+      def collect(parent: Type, parents: ListBuffer[Type]): Unit = parent.widenDealias match
+        case AndType(tp1, tp2) =>
+          collect(tp1, parents)
+          collect(tp2, parents)
+        case parent: TypeRef =>
+          if parent.symbol.isClass || isTypeParameterInSig(parent.symbol, sym0) then
+            parents += parent
+          else
+            collect(parent.superType, parents)
+        case parent =>
+          parents += parent
+
+      collect(tp, parents)
+      parents.toList
+    end flattenedParents
 
     def paramSig(param: LambdaParam): Unit = {
       builder.append(sanitizeName(param.paramName))
@@ -263,8 +287,24 @@ object GenericSignatures {
           builder.append(')')
           methodResultSig(restpe)
 
-        case AndType(tp1, tp2) =>
-          jsig(intersectionDominator(tp1 :: tp2 :: Nil), primitiveOK = primitiveOK)
+        case tp: AndType =>
+          // Only intersections appearing as the upper-bound of a type parameter
+          // can be preserved in generic signatures and those are already
+          // handled by `boundsSig`, so here we fallback to picking a parent of
+          // the intersection to determine its overall signature. We must pick a
+          // parent whose erasure matches the erasure of the intersection
+          // because javac relies on the generic signature to determine the
+          // bytecode signature. Additionally, we prefer picking a type
+          // parameter since that will likely lead to a more precise type.
+          val parents = flattenedParents(tp)
+          val erasedParents = parents.map(erasure)
+          val erasedCls = erasedGlb(erasedParents).classSymbol
+          val reprParents = parents.view.zip(erasedParents)
+            .filter((_, erasedParent) => erasedParent.classSymbol eq erasedCls)
+            .map(_._1)
+          val repr =
+            reprParents.find(_.typeSymbol.is(TypeParam)).getOrElse(reprParents.head)
+          jsig(repr, primitiveOK)
 
         case ci: ClassInfo =>
           def polyParamSig(tparams: List[TypeParamInfo]): Unit =

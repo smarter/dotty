@@ -15,6 +15,7 @@ import unpickleScala2.Scala2Erasure
 import Decorators._
 import Definitions.MaxImplementedFunctionArity
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 
 /** The language in which the definition being erased was written. */
 enum SourceLanguage:
@@ -395,31 +396,65 @@ object TypeErasure {
 
   /** The erased greatest lower bound of two erased type picks one of the two argument types.
    *  It prefers, in this order:
+   *  - ErasedValueTypes over non-ErasedValueTypes
    *  - arrays over non-arrays
-   *  - subtypes over supertypes, unless isJava is set
    *  - real classes over traits
+   *  - subtypes over supertypes
+   *
+   *  Lexicographic ordering of the class symbol full name is used as a tie-breaker.
    */
-  def erasedGlb(tp1: Type, tp2: Type, isJava: Boolean)(using Context): Type = tp1 match {
-    case JavaArrayType(elem1) =>
-      tp2 match {
-        case JavaArrayType(elem2) => JavaArrayType(erasedGlb(elem1, elem2, isJava))
-        case _ => tp1
-      }
-    case _ =>
-      tp2 match {
-        case JavaArrayType(_) => tp2
-        case _ =>
-          val tsym1 = tp1.typeSymbol
-          val tsym2 = tp2.typeSymbol
-          if (!tsym2.exists) tp1
-          else if (!tsym1.exists) tp2
-          else if (!isJava && tsym1.derivesFrom(tsym2)) tp1
-          else if (!isJava && tsym2.derivesFrom(tsym1)) tp2
-          else if (tp1.typeSymbol.isRealClass) tp1
-          else if (tp2.typeSymbol.isRealClass) tp2
-          else tp1
-      }
-  }
+  def erasedGlb(tp1: Type, tp2: Type)(using Context): Type =
+    if compareErasedGlb(tp1, tp2) <= 0 then tp1 else tp2
+
+  /** The erasedGlb of a list of types. */
+  def erasedGlb(tps: List[Type])(using Context): Type =
+    tps.min(using (a,b) => compareErasedGlb(a, b))
+
+  def compareErasedGlb(tp1: Type, tp2: Type)(using Context): Int =
+    if tp1 eq tp2 then
+      return 0
+
+    val isEVT1 = tp1.isInstanceOf[ErasedValueType]
+    val isEVT2 = tp2.isInstanceOf[ErasedValueType]
+    if isEVT1 && isEVT2 then
+      return compareErasedGlb(tp1.asInstanceOf[ErasedValueType].tycon, tp2.asInstanceOf[ErasedValueType].tycon)
+    else if isEVT1 then
+      return -1
+    else if isEVT2 then
+      return 1
+
+    val isArray1 = tp1.isInstanceOf[JavaArrayType]
+    val isArray2 = tp2.isInstanceOf[JavaArrayType]
+    if isArray1 && isArray2 then
+      return compareErasedGlb(tp1.asInstanceOf[JavaArrayType].elemType, tp2.asInstanceOf[JavaArrayType].elemType)
+    else if isArray1 then
+      return -1
+    else if isArray2 then
+      return 1
+
+    val sym1 = tp1.classSymbol
+    val sym2 = tp2.classSymbol
+    def compareClasses: Int =
+      if sym1.isSubClass(sym2) then
+        -1
+      else if sym2.isSubClass(sym1) then
+        1
+      // Intentionally compare Strings and not Names, since the ordering on
+      // Names depends on implementation details like `NameKind#tag`.
+      else
+        sym1.fullName.toString.compareTo(sym2.fullName.toString)
+
+    val isRealClass1 = sym1.isRealClass
+    val isRealClass2 = sym2.isRealClass
+    if isRealClass1 && isRealClass2 then
+      return compareClasses
+    else if isRealClass1 then
+      return -1
+    else if isRealClass2 then
+      return 1
+
+    compareClasses
+  end compareErasedGlb
 
   /** Does the (possibly generic) type `tp` have the same erasure in all its
    *  possible instantiations?
@@ -473,7 +508,7 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
    *   - For a typeref P.C where C refers to an abstract type, the erasure of C's upper bound.
    *   - For a this-type C.this, the type itself.
    *   - For all other type proxies: The erasure of the underlying type.
-   *   - For T1 & T2, the erased glb of |T1| and |T2| (see erasedGlb)
+   *   - For T1 & T2, the erased glb of |T1| and |T2| (see erasedGlb) // XX
    *   - For T1 | T2, the first base class in the linearization of T which is also a base class of T2
    *   - For => T, ()T
    *   - For a method type (Fs)scala.Unit, (|Fs|)scala.Unit.
@@ -518,11 +553,11 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
       this(defn.FunctionType(paramss.head.length, isContextual = res.isImplicitMethod, isErased = res.isErasedMethod))
     case tp: TypeProxy =>
       this(tp.underlying)
-    case tp @ AndType(tp1, tp2) =>
+    case tp: AndType =>
       if sourceLanguage.isScala2 then
         this(Scala2Erasure.intersectionDominator(Scala2Erasure.flattenedParents(tp)))
       else
-        erasedGlb(this(tp1), this(tp2), isJava = sourceLanguage.isJava)
+        eraseIntersection(tp)
     case OrType(tp1, tp2) =>
       if isSymbol && sourceLanguage.isScala2 && ctx.settings.scalajs.value then
         // In Scala2Unpickler we unpickle Scala.js pseudo-unions as if they were
@@ -578,6 +613,31 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
     case tp if (tp `eq` NoType) || (tp `eq` NoPrefix) =>
       tp
   }
+
+  /** The erasure of `A & ... & Z`.
+   *
+   *  This operation has the following the properties:
+   *  1) Associativity: `A & (B & C)` is erased like `(A & B) & C`,
+   *     because the list of parent types is flattened.
+   *  2) Commutativity: `A & B` is erased like `B & A`,
+   *     because we use lexicographic ordering of the class names
+   *     as a tie-breaker.
+   *  3) Java compatibility: intersections that would be valid in
+   *     Java code are erased like javac would erase them.
+   */
+  def eraseIntersection(tp: AndType)(using Context): Type =
+    val parents = ListBuffer[Type]()
+    def collect(parent: Type, parents: ListBuffer[Type]): Unit = parent.dealias match
+      case AndType(tp1, tp2) =>
+        collect(tp1, parents)
+        collect(tp2, parents)
+      case _ =>
+        parents += this(parent)
+    collect(tp, parents)
+    if parents.length == 2 then
+      erasedGlb(parents(0), parents(1))
+    else
+      erasedGlb(parents.toList)
 
   private def eraseArray(tp: Type)(using Context) = {
     val defn.ArrayOf(elemtp) = tp
