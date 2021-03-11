@@ -1386,13 +1386,12 @@ class Namer { typer: Typer =>
           }
       end inherited
 
-      /** The proto-type to be used when inferring the result type from
-       *  the right hand side. This is `WildcardType` except if the definition
-       *  is a default getter. In that case, the proto-type is the type of
-       *  the corresponding parameter where bound parameters are replaced by
-       *  Wildcards.
+      /** The proto-type to be used when inferring the result type from the right hand
+       *  side. This is the inherited type if it exists, otherwise for default
+       *  getters it is the type of the corresponding parameter where bound
+       *  parameters are replaced by Wildcards.
        */
-      def rhsProto = sym.asTerm.name collect {
+      def rhsProto = inherited.orElse(sym.name match
         case DefaultGetterName(original, idx) =>
           val meth: Denotation =
             if (original.isConstructorName && (sym.owner.is(ModuleClass)))
@@ -1411,26 +1410,14 @@ class Namer { typer: Typer =>
             paramProto(defaultAlts.head.info.widen.paramInfoss, idx)
           else
             WildcardType
-      } getOrElse WildcardType
+        case _ =>
+          WildcardType
+      ).widenExpr
 
       // println(s"final inherited for $sym: ${inherited.toString}") !!!
       // println(s"owner = ${sym.owner}, decls = ${sym.owner.info.decls.show}")
       // TODO Scala 3.1: only check for inline vals (no final ones)
       def isInlineVal = sym.isOneOf(FinalOrInline, butNot = Method | Mutable)
-
-      // Widen rhs type and eliminate `|' but keep ConstantTypes if
-      // definition is inline (i.e. final in Scala2) and keep module singleton types
-      // instead of widening to the underlying module class types.
-      // We also drop the @Repeated annotation here to avoid leaking it in method result types
-      // (see run/inferred-repeated-result).
-      def widenRhs(tp: Type): Type =
-        tp.widenTermRefExpr.simplified match
-          case ctp: ConstantType if isInlineVal => ctp
-          case tp => TypeComparer.widenInferred(tp, rhsProto)
-
-      // Replace aliases to Unit by Unit itself. If we leave the alias in
-      // it would be erased to BoxedUnit.
-      def dealiasIfUnit(tp: Type) = if (tp.isRef(defn.UnitClass)) defn.UnitType else tp
 
       var rhsCtx = ctx.fresh.addMode(Mode.InferringReturnType)
       if sym.isInlineMethod then rhsCtx = rhsCtx.addMode(Mode.InlineableBody)
@@ -1443,8 +1430,18 @@ class Namer { typer: Typer =>
         rhsCtx.setFreshGADTBounds
         rhsCtx.gadt.addToConstraint(typeParams)
       }
-      def rhsType = PrepareInlineable.dropInlineIfError(sym,
-        typedAheadExpr(mdef.rhs, (inherited orElse rhsProto).widenExpr)(using rhsCtx)).tpe
+
+      def rhsType =
+        val pt = rhsProto
+        val tp = PrepareInlineable.dropInlineIfError(sym,
+          typedAheadExpr(mdef.rhs, pt)(using rhsCtx)).tpe
+        tp.widenTermRefExpr.simplified match
+          case ctp: ConstantType if isInlineVal => ctp
+          case tp => TypeComparer.widenInferred(tp, pt)
+
+      // Replace aliases to Unit by Unit itself. If we leave the alias in
+      // it would be erased to BoxedUnit.
+      def dealiasIfUnit(tp: Type) = if (tp.isRef(defn.UnitClass)) defn.UnitType else tp
 
       // Approximate a type `tp` with a type that does not contain skolem types.
       val deskolemize = new ApproximatingTypeMap {
@@ -1455,7 +1452,7 @@ class Namer { typer: Typer =>
           }
       }
 
-      def cookedRhsType = deskolemize(dealiasIfUnit(widenRhs(rhsType)))
+      def cookedRhsType = deskolemize(dealiasIfUnit(rhsType))
       def lhsType = fullyDefinedType(cookedRhsType, "right-hand side", mdef.span)
       //if (sym.name.toString == "y") println(i"rhs = $rhsType, cooked = $cookedRhsType")
       if (inherited.exists)
