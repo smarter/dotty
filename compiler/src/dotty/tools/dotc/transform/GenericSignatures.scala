@@ -66,13 +66,37 @@ object GenericSignatures {
 
     def boxedSig(tp: Type): Unit = jsig(tp.widenDealias, primitiveOK = false)
 
+    /** The signature of the upper-bound of a type parameter.
+     *
+     *  @pre none of the bounds are themselves type parameters.
+     *       TODO: Remove this restriction so we can support things like:
+     *
+     *           class Foo[A]:
+     *              def foo[S <: A & Object](...): ...
+     *
+     *        Which should emit a signature `S <: A`. See the handling
+     *        of `AndType` in `jsig` which already supports `def foo(x: A & Object)`.
+     */
     def boundsSig(bounds: List[Type]): Unit = {
-      val (isTrait, isClass) = bounds partition (_.typeSymbol.is(Trait))
-      isClass match {
-        case Nil    => builder.append(':') // + boxedSig(ObjectTpe)
-        case x :: _ => builder.append(':'); boxedSig(x)
-      }
-      isTrait.foreach { tp =>
+      val (repr :: _, others) = splitIntersection(bounds)
+      builder.append(':')
+
+      // According to the Java spec
+      // (https://docs.oracle.com/javase/specs/jls/se8/html/jls-4.html#jls-4.4),
+      // intersections erase to their first member and must start with a class.
+      // So, if our intersection erases to a trait, in theory we should emit
+      // just that trait in the generic signature even if the intersection type
+      // is composed of multiple traits. But in practice Scala 2 has always
+      // ignored this restriction as intersections of traits seem to be handled
+      // correctly by javac, we do the same here since type soundness seems
+      // more important than adhering to the spec.
+      if repr.classSymbol.is(Trait) then
+        builder.append(':')
+        boxedSig(repr)
+        // If we wanted to be compliant with the spec, we would `return` here.
+      else
+        boxedSig(repr)
+      others.filter(_.classSymbol.is(Trait)).foreach { tp =>
         builder.append(':')
         boxedSig(tp)
       }
@@ -82,7 +106,7 @@ object GenericSignatures {
      *  that cannot appear in the signature have been replaced
      *  by their upper-bound.
      */
-    def flattenedParents(tp: AndType)(using Context): List[Type] =
+    def flattenedIntersection(tp: AndType)(using Context): List[Type] =
       val parents = ListBuffer[Type]()
 
       def collect(parent: Type, parents: ListBuffer[Type]): Unit = parent.widenDealias match
@@ -99,7 +123,21 @@ object GenericSignatures {
 
       collect(tp, parents)
       parents.toList
-    end flattenedParents
+    end flattenedIntersection
+
+    /** Split the `parents` of an intersection into two subsets:
+     *  those whose individual erasure matches the overall erasure
+     *  of the intersection and the others.
+     */
+    def splitIntersection(parents: List[Type])(using Context): (List[Type], List[Type]) =
+      val erasedParents = parents.map(erasure)
+      val erasedCls = erasedGlb(erasedParents).classSymbol
+      parents.zip(erasedParents)
+        .partitionMap((parent, erasedParent) =>
+          if erasedParent.classSymbol eq erasedCls then
+            Left(parent)
+          else
+            Right(parent))
 
     def paramSig(param: LambdaParam): Unit = {
       builder.append(sanitizeName(param.paramName))
@@ -296,12 +334,8 @@ object GenericSignatures {
           // because javac relies on the generic signature to determine the
           // bytecode signature. Additionally, we prefer picking a type
           // parameter since that will likely lead to a more precise type.
-          val parents = flattenedParents(tp)
-          val erasedParents = parents.map(erasure)
-          val erasedCls = erasedGlb(erasedParents).classSymbol
-          val reprParents = parents.view.zip(erasedParents)
-            .filter((_, erasedParent) => erasedParent.classSymbol eq erasedCls)
-            .map(_._1)
+          val parents = flattenedIntersection(tp)
+          val (reprParents, _) = splitIntersection(parents)
           val repr =
             reprParents.find(_.typeSymbol.is(TypeParam)).getOrElse(reprParents.head)
           jsig(repr, primitiveOK)
