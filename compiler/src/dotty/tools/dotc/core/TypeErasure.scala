@@ -269,42 +269,74 @@ object TypeErasure {
     }
   }
 
-  /** Underlying type that does not contain aliases or abstract types
-   *  at top-level, treating opaque aliases as transparent.
-   */
-  def classify(tp: Type)(using Context): Type =
-    if (tp.typeSymbol.isClass) tp
-    else tp match {
-      case tp: TypeProxy => classify(tp.translucentSuperType)
-      case tp: AndOrType => tp.derivedAndOrType(classify(tp.tp1), classify(tp.tp2))
-      case _ => tp
-    }
-
   /** Is `tp` an abstract type or polymorphic type parameter that has `Any`, `AnyVal`, `Null`,
    *  or a universal trait as upper bound and that is not Java defined? Arrays of such types are
    *  erased to `Object` instead of `Object[]`.
    */
-  def isUnboundedGeneric(tp: Type)(using Context): Boolean = {
-    def isBoundedType(t: Type): Boolean = t match {
-      case t: OrType => isBoundedType(t.tp1) && isBoundedType(t.tp2)
-      case _ => t.derivesFrom(defn.ObjectClass) || t.isNullType
-    }
+  // An Array[T] must be erased to Object if multiple primitive array types or one primitive
+  // array type and a non-primitive array type are subtypes of it
+  def isUnboundedGeneric(tp: Type, isScala2: Boolean)(using Context): Boolean = {
+    def reprSym(t: Type): Symbol = t.widenDealias match
+      case t: TypeRef if t.symbol.isClass =>
+        val sym = t.symbol
+        if (sym eq defn.AnyClass) || (sym eq defn.AnyValClass) || (sym eq defn.MatchableClass)
+           || isScala2 && !(t.derivesFrom(defn.ObjectClass) || t.isNullType) then
+          NoSymbol
+        else if sym.isPrimitiveValueClass then
+          sym
+        else
+          defn.ObjectClass
+      case tp: TypeProxy =>
+        reprSym(tp.translucentSuperType)
+      case OrType(tp1, tp2) =>
+        val repr1 = reprSym(tp1)
+        val repr2 = reprSym(tp2)
+        if repr1 eq repr2 then repr1
+        else NoSymbol
+      case AndType(tp1, tp2) =>
+        val repr1 = reprSym(tp1)
+        val repr2 = reprSym(tp2)
+        // (Int | String) & Int
+        if repr1 eq repr2 then repr1
+        else if repr1.exists && repr2.exists then NoSymbol
+        else repr1.orElse(repr2)
+      case t =>
+        throw new TypeError(t.toString)
+        NoSymbol
+
+    def isBoundedType(t: Type): Boolean =
+      reprSym(t).exists
+      // // case OrNull(t) =>
+      // //   // too restrictive: Array[VC | Null] can erase to Array[VC]
+      // //   // t.derivesFrom(defn.ObjectClass)
+      // //   println("t: " + t.show)
+      // //   println("is: " + isBoundedType(t))
+      // //   isBoundedType(t) && !erasure(t).isPrimitiveValueType
+      // case t: OrType =>
+      //   // println("t: " + t.show +  " " + erasure(t))
+      //   // doesn't work: join of VC | Null is Any.
+      //   // isBoundedType(t.join)
+      //   isBoundedType(t.tp1) && isBoundedType(t.tp2) && compatSym(erasure(t.tp1), erasure(t.tp2))
+      // case _ =>
+      //   if isScala2 then t.derivesFrom(defn.ObjectClass)
+      //   else
+      //     !t.isRef(defn.AnyClass) && !t.isRef(defn.AnyValClass) && !t.isRef(defn.MatchableClass)
 
     tp.dealias match {
       case tp: TypeRef if !tp.symbol.isOpaqueAlias =>
         !tp.symbol.isClass &&
-        !isBoundedType(classify(tp)) &&
-        !tp.symbol.is(JavaDefined)
+        !tp.symbol.is(JavaDefined) && // In Java classes, Array[T] can never erase to Object
+        !isBoundedType(tp)
       case tp: TypeParamRef =>
-        !isBoundedType(classify(tp))
-      case tp: TypeAlias => isUnboundedGeneric(tp.alias)
+        !isBoundedType(tp)
+      case tp: TypeAlias =>
+        isUnboundedGeneric(tp.alias, isScala2)
       case tp: TypeBounds =>
-        val upper = classify(tp.hi)
-        !isBoundedType(upper) &&
-        !upper.isPrimitiveValueType
-      case tp: TypeProxy => isUnboundedGeneric(tp.translucentSuperType)
-      case tp: AndType => isUnboundedGeneric(tp.tp1) && isUnboundedGeneric(tp.tp2)
-      case tp: OrType => isUnboundedGeneric(tp.tp1) || isUnboundedGeneric(tp.tp2)
+        !isBoundedType(tp.hi)
+      case tp: TypeProxy =>
+        isUnboundedGeneric(tp.translucentSuperType, isScala2)
+      case tp: AndType => isUnboundedGeneric(tp.tp1, isScala2) && isUnboundedGeneric(tp.tp2, isScala2)
+      case tp: OrType => isUnboundedGeneric(tp.tp1, isScala2) || isUnboundedGeneric(tp.tp2, isScala2)
       case _ => false
     }
   }
@@ -641,8 +673,7 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
 
   private def eraseArray(tp: Type)(using Context) = {
     val defn.ArrayOf(elemtp) = tp
-    if (classify(elemtp).derivesFrom(defn.NullClass)) JavaArrayType(defn.ObjectType)
-    else if (isUnboundedGeneric(elemtp) && !sourceLanguage.isJava) defn.ObjectType
+    if (isUnboundedGeneric(elemtp, isScala2 = sourceLanguage.isScala2)) defn.ObjectType
     else JavaArrayType(erasureFn(sourceLanguage, semiEraseVCs = false, isConstructor, isSymbol, wildcardOK)(elemtp))
   }
 

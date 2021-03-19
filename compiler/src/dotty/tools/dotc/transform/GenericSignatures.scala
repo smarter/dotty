@@ -246,7 +246,7 @@ object GenericSignatures {
           typeParamSig(ref.paramName.lastPart)
 
         case defn.ArrayOf(elemtp) =>
-          if (isUnboundedGeneric(elemtp))
+          if (isUnboundedGeneric(elemtp, isScala2 = false))
             jsig(defn.ObjectType)
           else
             builder.append(ClassfileConstants.ARRAY_TAG)
