@@ -279,6 +279,7 @@ object TypeErasure {
     def reprSym(t: Type): Symbol = t.widenDealias match
       case t: TypeRef if t.symbol.isClass =>
         val sym = t.symbol
+        // Only a few classes have both primitives and references as subclasses
         if (sym eq defn.AnyClass) || (sym eq defn.AnyValClass) || (sym eq defn.MatchableClass) || (sym eq defn.SingletonClass)
            || isScala2 && !(t.derivesFrom(defn.ObjectClass) || t.isNullType) then
           NoSymbol
