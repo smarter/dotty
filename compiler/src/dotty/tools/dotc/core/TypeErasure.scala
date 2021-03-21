@@ -279,7 +279,7 @@ object TypeErasure {
     def reprSym(t: Type): Symbol = t.widenDealias match
       case t: TypeRef if t.symbol.isClass =>
         val sym = t.symbol
-        if (sym eq defn.AnyClass) || (sym eq defn.AnyValClass) || (sym eq defn.MatchableClass)
+        if (sym eq defn.AnyClass) || (sym eq defn.AnyValClass) || (sym eq defn.MatchableClass) || (sym eq defn.SingletonClass)
            || isScala2 && !(t.derivesFrom(defn.ObjectClass) || t.isNullType) then
           NoSymbol
         else if sym.isPrimitiveValueClass then
@@ -288,18 +288,15 @@ object TypeErasure {
           defn.ObjectClass
       case tp: TypeProxy =>
         reprSym(tp.translucentSuperType)
-      case OrType(tp1, tp2) =>
-        val repr1 = reprSym(tp1)
-        val repr2 = reprSym(tp2)
-        if repr1 eq repr2 then repr1
-        else NoSymbol
-      case AndType(tp1, tp2) =>
-        val repr1 = reprSym(tp1)
-        val repr2 = reprSym(tp2)
-        // (Int | String) & Int
-        if repr1 eq repr2 then repr1
-        else if repr1.exists && repr2.exists then NoSymbol
-        else repr1.orElse(repr2)
+      case tp: AndOrType =>
+        val repr1 = reprSym(tp.tp1)
+        val repr2 = reprSym(tp.tp2)
+        if repr1 eq repr2 then
+          repr1
+        else if tp.isAnd then
+          repr1.orElse(repr2)
+        else
+          NoSymbol
       case t =>
         throw new TypeError(t.toString)
         NoSymbol
