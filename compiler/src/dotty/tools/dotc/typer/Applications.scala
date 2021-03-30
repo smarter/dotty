@@ -316,7 +316,7 @@ trait Applications extends Compatibility {
   abstract class Application[Arg](methRef: TermRef, funType: Type, args: List[Arg], resultType: Type)(using Context) {
 
     /** The type of typed arguments: either tpd.Tree or Type */
-    type TypedArg
+    type TypedArg <: tpd.Tree | Type
 
     /** The kind of application that gets typed */
     def applyKind: ApplyKind
@@ -614,7 +614,8 @@ trait Applications extends Compatibility {
 
   /** The degree to which an argument has to match a formal parameter */
   enum ArgMatch:
-    case SubType       // argument is a relaxed subtype of formal
+    case SubType       // argument is a relaxed subtype of formal, SAM conversions are also allowed
+    case Comparing     // same as compatible, subtyping in one direction disables SAM conversion in the other
     case Compatible    // argument is compatible with formal
     case CompatibleCAP // capture-converted argument is compatible with formal
 
@@ -622,7 +623,7 @@ trait Applications extends Compatibility {
    *  in a "can/cannot apply" answer, without needing to construct trees or
    *  issue error messages.
    */
-  abstract class TestApplication[Arg](methRef: TermRef, funType: Type, args: List[Arg], resultType: Type, argMatch: ArgMatch)(using Context)
+  abstract class TestApplication[Arg <: Tree | Type](methRef: TermRef, funType: Type, args: List[Arg], resultType: Type, argMatch: ArgMatch)(using Context)
   extends Application[Arg](methRef, funType, args, resultType) {
     type TypedArg = Arg
     type Result = Unit
@@ -635,21 +636,51 @@ trait Applications extends Compatibility {
         // matches expected type
         false
       case argtpe =>
-        def SAMargOK = formal match {
-          case SAMType(sam) => argtpe <:< sam.toFunctionType(isJava = formal.classSymbol.is(JavaDefined))
-          case _ => false
-        }
-        if argMatch == ArgMatch.SubType then
-          argtpe relaxed_<:< formal.widenExpr
-        else
-          isCompatible(argtpe, formal)
-          || ctx.mode.is(Mode.ImplicitsEnabled) && SAMargOK
-          || argMatch == ArgMatch.CompatibleCAP
-              && {
-                val argtpe1 = argtpe.widen
-                val captured = captureWildcards(argtpe1)
-                (captured ne argtpe1) && isCompatible(captured, formal.widenExpr)
-              }
+        val argtpe1 = argtpe.widen
+
+        def isSAMargOK: Boolean =
+          // val isClosure = arg match {
+          //   case closure(_) => true
+          //   case Block(_, _: untpd.Function) => true
+          //   // case _: Type => true
+          //   // case _ => false
+          //   // case _: Type => argMatch != ArgMatch.SubType || !formal.isRef(defn.PartialFunctionClass) //false
+          //   case _ => argMatch != ArgMatch.SubType || !formal.isRef(defn.PartialFunctionClass) //false
+          // }
+
+          val isClosure = arg match {
+            case closure(_) => true
+            case Block(_, _: untpd.Function) => true
+            case _ => false
+          }
+          val allowSAM = argMatch != ArgMatch.SubType && argMatch != ArgMatch.Comparing || (isClosure && !formal.isRef(defn.PartialFunctionClass))
+
+
+          // println("arg: " + arg)
+          // println("argtpe: " + argtpe)
+          // println("formal: " + formal)
+          // println("isClosure: " + isClosure)
+          // println("argMatch: " + argMatch)
+          // println("allowSAM: " + allowSAM)
+          val z = allowSAM && defn.isFunctionType(argtpe1)
+            && {
+              formal match
+                case SAMType(sam) => argtpe1 <:< sam.toFunctionType(isJava = formal.classSymbol.is(JavaDefined))
+                case _ => false
+            }
+            // && (/*argMatch != ArgMatch.Comparing ||*/ !(formal.widenExpr relaxed_<:< argtpe1))
+          // println("z: " + z)
+          z
+
+        ( if argMatch == ArgMatch.SubType then (argtpe relaxed_<:< formal.widenExpr)
+          else isCompatible(argtpe, formal) )
+        || isSAMargOK//.showing(i"sam $argtpe, $formal, $argMatch = $result, ${formal.widenExpr relaxed_<:<  argtpe1}")
+        || argMatch == ArgMatch.CompatibleCAP
+            && {
+              val captured = captureWildcards(argtpe1)
+              (captured ne argtpe1) && isCompatible(captured, formal.widenExpr)
+            }
+    end argOK
 
     /** The type of the given argument */
     protected def argType(arg: Arg, formal: Type): Type
@@ -1485,9 +1516,11 @@ trait Applications extends Compatibility {
           || {
             if tp1.isVarArgsMethod then
               tp2.isVarArgsMethod
-              && isApplicableMethodRef(alt2, tp1.paramInfos.map(_.repeatedToSingle), WildcardType, ArgMatch.Compatible)
+              && isApplicableMethodRef(alt2, tp1.paramInfos.map(_.repeatedToSingle), WildcardType, ArgMatch.Comparing)
             else
-              isApplicableMethodRef(alt2, tp1.paramInfos, WildcardType, ArgMatch.Compatible)
+              val z = isApplicableMethodRef(alt2, tp1.paramInfos, WildcardType, ArgMatch.Comparing)
+              // println(i"~~isas $tp1 than $tp2: $z")
+              z
           }
         case tp1: PolyType => // (2)
           inContext(ctx.fresh.setExploreTyperState()) {
@@ -1598,7 +1631,7 @@ trait Applications extends Compatibility {
       def winsType1 = isAsSpecific(alt1, tp1, alt2, tp2)
       def winsType2 = isAsSpecific(alt2, tp2, alt1, tp1)
 
-      overload.println(i"compare($alt1, $alt2)? $tp1 $tp2 $ownerScore $winsType1 $winsType2")
+      // println(i"#compare($alt1, $alt2)? $tp1 $tp2 $ownerScore $winsType1 $winsType2")
       if (ownerScore == 1)
         if (winsType1 || !winsType2) 1 else 0
       else if (ownerScore == -1)
@@ -1877,12 +1910,12 @@ trait Applications extends Compatibility {
 
         record("resolveOverloaded.FunProto", alts.length)
         val alts1 = narrowBySize(alts)
-        //report.log(i"narrowed by size: ${alts1.map(_.symbol.showDcl)}%, %")
+        overload.println(i"narrowed by size: ${alts1.map(_.symbol.showDcl)}%, %")
         if isDetermined(alts1) then alts1
         else
           record("resolveOverloaded.narrowedBySize", alts1.length)
           val alts2 = narrowByShapes(alts1)
-          //report.log(i"narrowed by shape: ${alts2.map(_.symbol.showDcl)}%, %")
+          overload.println(i"narrowed by shape: ${alts2.map(_.symbol.showDcl)}%, %")
           if isDetermined(alts2) then alts2
           else
             record("resolveOverloaded.narrowedByShape", alts2.length)
