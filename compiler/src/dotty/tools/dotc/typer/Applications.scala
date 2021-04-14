@@ -1864,15 +1864,15 @@ trait Applications extends Compatibility {
             alts
 
         def narrowByTrees(alts: List[TermRef], args: List[Tree], resultType: Type): List[TermRef] = {
-          val alts2 = alts.filterConserve(alt =>
-            isApplicableMethodRef(alt, args, resultType, keepConstraint = false, ArgMatch.SubType)
+          // val alts2 = alts.filterConserve(alt =>
+          //   isApplicableMethodRef(alt, args, resultType, keepConstraint = false, ArgMatch.SubType)
+          // )
+          // if (alts2.isEmpty && !ctx.isAfterTyper)
+          alts.filterConserve(alt =>
+            isApplicableMethodRef(alt, args, resultType, keepConstraint = false, ArgMatch.CompatibleCAP)
           )
-          if (alts2.isEmpty && !ctx.isAfterTyper)
-            alts.filterConserve(alt =>
-              isApplicableMethodRef(alt, args, resultType, keepConstraint = false, ArgMatch.CompatibleCAP)
-            )
-          else
-            alts2
+          // else
+          //   alts2
         }
 
         record("resolveOverloaded.FunProto", alts.length)
