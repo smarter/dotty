@@ -614,7 +614,6 @@ trait Applications extends Compatibility {
 
   /** The degree to which an argument has to match a formal parameter */
   enum ArgMatch:
-    case SubType       // argument is a relaxed subtype of formal, SAM conversions are also allowed
     case Comparing     // same as compatible, subtyping in one direction disables SAM conversion in the other
     case Compatible    // argument is compatible with formal
     case CompatibleCAP // capture-converted argument is compatible with formal
@@ -655,7 +654,7 @@ trait Applications extends Compatibility {
               true
             case _ => false
           }
-          val allowSAM = argMatch != ArgMatch.SubType && argMatch != ArgMatch.Comparing || (isClosure && !formal.isRef(defn.PartialFunctionClass))
+          val allowSAM = argMatch != ArgMatch.Comparing || (isClosure && !formal.isRef(defn.PartialFunctionClass))
 
 
           // println("arg: " + arg)
@@ -674,8 +673,7 @@ trait Applications extends Compatibility {
           // println("z: " + z)
           z
 
-        ( if argMatch == ArgMatch.SubType then (argtpe relaxed_<:< formal.widenExpr)
-          else isCompatible(argtpe, formal) )
+        ( isCompatible(argtpe, formal) )
         || isSAMargOK//.showing(i"sam $argtpe, $formal, $argMatch = $result, ${formal.widenExpr relaxed_<:<  argtpe1}")
         || argMatch == ArgMatch.CompatibleCAP
             && {
@@ -1898,17 +1896,10 @@ trait Applications extends Compatibility {
           else
             alts
 
-        def narrowByTrees(alts: List[TermRef], args: List[Tree], resultType: Type): List[TermRef] = {
-          val alts2 = alts.filterConserve(alt =>
-            isApplicableMethodRef(alt, args, resultType, keepConstraint = false, ArgMatch.SubType)
+        def narrowByTrees(alts: List[TermRef], args: List[Tree], resultType: Type): List[TermRef] =
+          alts.filterConserve(alt =>
+            isApplicableMethodRef(alt, args, resultType, keepConstraint = false, ArgMatch.CompatibleCAP)
           )
-          if (alts2.isEmpty && !ctx.isAfterTyper)
-            alts.filterConserve(alt =>
-              isApplicableMethodRef(alt, args, resultType, keepConstraint = false, ArgMatch.CompatibleCAP)
-            )
-          else
-            alts2
-        }
 
         record("resolveOverloaded.FunProto", alts.length)
         val alts1 = narrowBySize(alts)
