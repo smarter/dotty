@@ -652,9 +652,10 @@ trait Applications extends Compatibility {
             case Block(_, _: untpd.Function) =>
               // untpd.isFunctionWithUnknownParamType can be true because of FunProto#cacheTypedArg
               true
+            case _: Type => true
             case _ => false
           }
-          val allowSAM = argMatch != ArgMatch.Comparing || (isClosure && !formal.isRef(defn.PartialFunctionClass))
+          val allowSAM = isClosure && (!formal.isRef(defn.PartialFunctionClass) || ctx.mode.is(Mode.ImplicitsEnabled))
 
 
           // println("arg: " + arg)
