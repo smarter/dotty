@@ -60,7 +60,7 @@ abstract class DottyJSPlugin(settings: Seq[Setting[_]]) extends AutoPlugin {
   )
 }
 object BootstrappedDottyJSPlugin extends DottyJSPlugin(Build.commonBootstrappedSettings)
-object NonBootstrappedDottyJSPlugin extends DottyJSPlugin(Build.commonNonBootstrappedSettings)
+// object NonBootstrappedDottyJSPlugin extends DottyJSPlugin(Build.commonNonBootstrappedSettings)
 
 object Build {
   val referenceVersion = "3.0.0-RC3"
@@ -343,7 +343,7 @@ object Build {
     scalaInstance := {
       val externalLibraryDeps = (`scala3-library` / Compile / externalDependencyClasspath).value.map(_.data).toSet
       val externalCompilerDeps = (`scala3-compiler` / Compile / externalDependencyClasspath).value.map(_.data).toSet
-      val externalScaladocDeps = (`scaladoc-nonBootstrapped` / Compile / externalDependencyClasspath).value.map(_.data).toSet
+      // val externalScaladocDeps = (`scaladoc-nonBootstrapped` / Compile / externalDependencyClasspath).value.map(_.data).toSet
 
       // IMPORTANT: We need to use actual jars to form the ScalaInstance and not
       // just directories containing classfiles because sbt maintains a cache of
@@ -354,11 +354,11 @@ object Build {
       val scala3Library = (`scala3-library` / Compile / packageBin).value
       val scala3Interfaces = (`scala3-interfaces` / Compile / packageBin).value
       val scala3Compiler = (`scala3-compiler` / Compile / packageBin).value
-      val scaladoc = (`scaladoc-nonBootstrapped` / Compile / packageBin).value
+      // val scaladoc = (`scaladoc-nonBootstrapped` / Compile / packageBin).value
 
       val libraryJars = Array(scala3Library) ++ externalLibraryDeps
       val compilerJars = Array(tastyCore, scala3Interfaces, scala3Compiler) ++ (externalCompilerDeps -- externalLibraryDeps)
-      val docJars = Array(scaladoc) ++ (externalScaladocDeps -- externalCompilerDeps)
+      // val docJars = Array(scaladoc) ++ (externalScaladocDeps -- externalCompilerDeps)
 
       // should be replaced by sbt.Defaults.makeScalaInstance when released
       // See https://github.com/sbt/sbt/pull/6480
@@ -367,8 +367,21 @@ object Build {
         scalaVersion.value,
         libraryJars = libraryJars,
         compilerJars = compilerJars,
-        docJars = docJars,
+        // docJars = docJars,
+        docJars = Array(),
         scalaInstanceTopLoader.value
+      )
+    },
+    doc / scalaInstance := {
+      val externalCompilerDeps = (`scala3-compiler` / Compile / externalDependencyClasspath).value.map(_.data).toSet
+      val externalScaladocDeps = (LocalProject("scaladoc") / Compile / externalDependencyClasspath).value.map(_.data).toSet
+      val scaladocJar = (LocalProject("scaladoc") / Compile / packageBin).value
+      val docJars = Array(scaladocJar) ++ (externalScaladocDeps -- externalCompilerDeps)
+
+      Bootstrap.makeDocScalaInstance(
+        state.value,
+        scalaInstance.value,
+        docJars
       )
     },
     Compile / doc / scalacOptions ++= scalacOptionsDocSettings
@@ -709,15 +722,15 @@ object Build {
     case Bootstrapped => `scala3-library-bootstrapped`
   }
 
-  lazy val `scala3-library-js`: Project = project.in(file("library-js")).
-    asDottyLibrary(NonBootstrapped).
-    enablePlugins(NonBootstrappedDottyJSPlugin).
-    settings(
-      libraryDependencies +=
-        ("org.scala-js" %% "scalajs-library" % scalaJSVersion).cross(CrossVersion.for3Use2_13),
-      Compile / unmanagedSourceDirectories :=
-        (`scala3-library` / Compile / unmanagedSourceDirectories).value
-    )
+  // lazy val `scala3-library-js`: Project = project.in(file("library-js")).
+  //   asDottyLibrary(NonBootstrapped).
+  //   enablePlugins(NonBootstrappedDottyJSPlugin).
+  //   settings(
+  //     libraryDependencies +=
+  //       ("org.scala-js" %% "scalajs-library" % scalaJSVersion).cross(CrossVersion.for3Use2_13),
+  //     Compile / unmanagedSourceDirectories :=
+  //       (`scala3-library` / Compile / unmanagedSourceDirectories).value
+  //   )
 
   /** The dotty standard library compiled with the Scala.js back-end, to produce
    *  the corresponding .sjsir files.
@@ -786,16 +799,16 @@ object Build {
       javaOptions := (`scala3-compiler-bootstrapped` / javaOptions).value
     )
 
-  lazy val `scala3-tasty-inspector-nonbootstrapped` = project.in(file("tasty-inspector")).
-    withCommonSettings(NonBootstrapped).
-    // We want the compiler to be present in the compiler classpath when compiling this project but not
-    // when compiling a project that depends on scala3-tasty-inspector (see sbt-test/sbt-dotty/tasty-inspector-example-project),
-    // but we always need it to be present on the JVM classpath at runtime.
-    dependsOn(dottyCompiler(NonBootstrapped) % "provided; compile->runtime; test->test").
-    settings(commonNonBootstrappedSettings).
-    settings(
-      javaOptions := (`scala3-compiler` / javaOptions).value
-    )
+  // lazy val `scala3-tasty-inspector-nonbootstrapped` = project.in(file("tasty-inspector")).
+  //   withCommonSettings(NonBootstrapped).
+  //   // We want the compiler to be present in the compiler classpath when compiling this project but not
+  //   // when compiling a project that depends on scala3-tasty-inspector (see sbt-test/sbt-dotty/tasty-inspector-example-project),
+  //   // but we always need it to be present on the JVM classpath at runtime.
+  //   dependsOn(dottyCompiler(NonBootstrapped) % "provided; compile->runtime; test->test").
+  //   settings(commonNonBootstrappedSettings).
+  //   settings(
+  //     javaOptions := (`scala3-compiler` / javaOptions).value
+  //   )
 
   /** Scala library compiled by dotty using the latest published sources of the library */
   lazy val `stdlib-bootstrapped` = project.in(file("stdlib-bootstrapped")).
@@ -910,7 +923,7 @@ object Build {
   lazy val `scala3-sbt-bridge` = project.in(file("sbt-bridge/src")).
     // We cannot depend on any bootstrapped project to compile the bridge, since the
     // bridge is needed to compile these projects.
-    dependsOn(`scaladoc-nonBootstrapped` % Provided).
+    dependsOn(`scala3-compiler` % Provided).
     settings(commonJavaSettings).
     settings(
       description := "sbt compiler bridge for Dotty",
@@ -1193,30 +1206,30 @@ object Build {
   val generateScalaDocumentation = inputKey[Unit]("Generate documentation for dotty lib")
   val generateTestcasesDocumentation  = taskKey[Unit]("Generate documentation for testcases, usefull for debugging tests")
   lazy val `scaladoc` = project.in(file("scaladoc")).asScaladoc
-  lazy val `scaladoc-nonBootstrapped` = project.in(file("scaladoc")).scaladocBasic(NonBootstrapped).settings(
-    // Unit tests in scaladoc depends on scaladoc-testcases
-    // we do not want to just cross compile them with bootstrapped and unbootstrapped compiler
-    Test / sources := Nil
-  )
+  // lazy val `scaladoc-nonBootstrapped` = project.in(file("scaladoc")).scaladocBasic(NonBootstrapped).settings(
+  //   // Unit tests in scaladoc depends on scaladoc-testcases
+  //   // we do not want to just cross compile them with bootstrapped and unbootstrapped compiler
+  //   Test / sources := Nil
+  // )
 
   def scalaDoc(implicit mode: Mode): Project = mode match {
-    case NonBootstrapped => `scaladoc-nonBootstrapped`
+    case NonBootstrapped => ??? //`scaladoc-nonBootstrapped`
     case Bootstrapped => scaladoc
   }
 
   lazy val `scaladoc-testcases` = project.in(file("scaladoc-testcases")).asScaladocTestcases(Bootstrapped)
-  lazy val `scaladoc-testcases-nonBootstrapped` = project.in(file("scaladoc-testcases")).asScaladocTestcases(NonBootstrapped)
+  // lazy val `scaladoc-testcases-nonBootstrapped` = project.in(file("scaladoc-testcases")).asScaladocTestcases(NonBootstrapped)
 
   def scalaDocTestcases(implicit mode: Mode): Project = mode match {
-    case NonBootstrapped => `scaladoc-testcases-nonBootstrapped`
+    case NonBootstrapped => ??? //`scaladoc-testcases-nonBootstrapped`
     case Bootstrapped => `scaladoc-testcases`
   }
 
   lazy val `scaladoc-js` = project.in(file("scaladoc-js")).asScaladocJs(Bootstrapped)
-  lazy val `scaladoc-js-nonBootstrapped` = project.in(file("scaladoc-js")).asScaladocJs(NonBootstrapped)
+  // lazy val `scaladoc-js-nonBootstrapped` = project.in(file("scaladoc-js")).asScaladocJs(NonBootstrapped)
 
   def scalaDocJs(implicit mode: Mode): Project = mode match {
-    case NonBootstrapped => `scaladoc-js-nonBootstrapped`
+    case NonBootstrapped => ??? //`scaladoc-js-nonBootstrapped`
     case Bootstrapped => `scaladoc-js`
   }
 
@@ -1497,7 +1510,7 @@ object Build {
 
     // FIXME: we do not aggregate `bin` because its tests delete jars, thus breaking other tests
     def asDottyRoot(implicit mode: Mode): Project = project.withCommonSettings.
-      aggregate(`scala3-interfaces`, dottyLibrary, dottyCompiler, tastyCore, `scaladoc-nonBootstrapped`, `scala3-sbt-bridge`).
+      aggregate(`scala3-interfaces`, dottyLibrary, dottyCompiler, tastyCore, `scala3-sbt-bridge`).
       bootstrappedAggregate(`scala3-language-server`, `scala3-staging`, `scala3-tasty-inspector`,
         `scala3-library-bootstrappedJS`, scaladoc).
       dependsOn(tastyCore).
@@ -1564,10 +1577,10 @@ object Build {
         project.settings(commonBootstrappedSettings)
           .dependsOn(`scala3-compiler-bootstrapped`)
           .dependsOn(`scala3-tasty-inspector`)
-      else
-        project.settings(commonNonBootstrappedSettings)
-          .dependsOn(`scala3-compiler`)
-          .dependsOn(`scala3-tasty-inspector-nonbootstrapped`)
+      else ???
+        // project.settings(commonNonBootstrappedSettings)
+        //   .dependsOn(`scala3-compiler`)
+        //   .dependsOn(`scala3-tasty-inspector-nonbootstrapped`)
 
       base.settings(
         Compile / resourceGenerators += Def.task {
@@ -1702,13 +1715,13 @@ object Build {
       if (mode == Bootstrapped)
         project.dependsOn(`scala3-compiler-bootstrapped`).settings(commonBootstrappedSettings)
       else
-        project.dependsOn(`scala3-compiler`).settings(commonNonBootstrappedSettings)
+        ??? //project.dependsOn(`scala3-compiler`).settings(commonNonBootstrappedSettings)
 
     def asScaladocJs(implicit mode: Mode): Project = {
       val pr = if (mode == Bootstrapped)
         project.enablePlugins(BootstrappedDottyJSPlugin).dependsOn(`scala3-library-bootstrappedJS`)
       else
-        project.enablePlugins(NonBootstrappedDottyJSPlugin).dependsOn(`scala3-library-js`)
+        ??? //project.enablePlugins(NonBootstrappedDottyJSPlugin).dependsOn(`scala3-library-js`)
       pr.settings(
         Test / fork := false,
         scalaJSUseMainModuleInitializer := true,

@@ -31,4 +31,25 @@ object Bootstrap {
       explicitActual = Some(version)
     )
   }
+
+  def makeDocScalaInstance(
+    state: State,
+    base: ScalaInstance,
+    docJars: Array[File]
+  ): ScalaInstance = {
+    val cache = state.extendedClassLoaderCache
+
+    val fullLoader = cache(docJars.toList, base.loaderCompilerOnly)
+
+    new ScalaInstance(
+      version = base.version,
+      loader = fullLoader,
+      loaderCompilerOnly = base.loaderCompilerOnly,
+      loaderLibraryOnly = base.loaderLibraryOnly,
+      libraryJars = base.libraryJars,
+      compilerJars = base.compilerJars,
+      allJars = base.allJars ++ docJars,
+      explicitActual = base.explicitActual
+    )
+  }
 }
