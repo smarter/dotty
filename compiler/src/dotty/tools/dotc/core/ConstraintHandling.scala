@@ -337,7 +337,7 @@ trait ConstraintHandling {
     var kept: Set[Type] = Set()      // types to keep since otherwise bound would not fit
     var dropped: List[Type] = List() // the types dropped so far, last one on top
 
-    def dropOneTransparentTrait(tp: Type): Type =
+    def dropOneTransparentTrait(tp: Type)(using Context): Type =
       val tpd = tp.dealias
       if tpd.typeSymbol.isTransparentTrait && !tpd.isLambdaSub && !kept.contains(tpd) then
         dropped = tpd :: dropped
@@ -353,7 +353,7 @@ trait ConstraintHandling {
         case _ =>
           tp
 
-    def recur(tp: Type): Type =
+    def recur(tp: Type)(using Context): Type =
       val tpw = dropOneTransparentTrait(tp)
       if tpw eq tp then tp
       else if tpw <:< bound then recur(tpw)
@@ -362,7 +362,7 @@ trait ConstraintHandling {
         dropped = dropped.tail
         recur(tp)
 
-    val tpw = recur(tp)
+    val tpw = explore(recur(tp))
     if (tpw eq tp) || dropped.forall(_ frozen_<:< tpw) then tp else tpw
   end dropTransparentTraits
 
