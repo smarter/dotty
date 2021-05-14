@@ -4601,15 +4601,15 @@ object Types {
         if (myReduced != null) record("MatchType.reduce cache miss")
         myReduced =
           trace(i"reduce match type $this $hashCode", matchTypes, show = true) {
-            def matchCases(cmp: TrackingTypeComparer): Type =
-              explore(
+            explore {
+              def matchCases(cmp: TrackingTypeComparer): Type =
                 try cmp.matchCases(scrutinee.normalized, cases)
                 catch case ex: Throwable =>
                   handleRecursive("reduce type ", i"$scrutinee match ...", ex)
                 finally
                   updateReductionContext(cmp.footprint)
-              )
-            TypeComparer.tracked(matchCases)
+              TypeComparer.tracked(matchCases)
+            }
           }
       myReduced
     }
