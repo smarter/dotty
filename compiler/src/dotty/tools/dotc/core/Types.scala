@@ -4479,8 +4479,14 @@ object Types {
 
     /** Instantiate variable with given type */
     def instantiateWith(tp: Type)(using Context): Type = {
-      assert(tp ne this, s"self instantiation of ${tp.show}, constraint = ${ctx.typerState.constraint.show}")
-      typr.println(s"instantiating ${this.show} with ${tp.show}")
+      assert(tp ne this, i"self instantiation of $origin, constraint = ${ctx.typerState.constraint}")
+      assert(!myInst.exists, i"$origin is already instantiated to $myInst but we attempted to instantiate it to $tp")
+      typr.println(i"instantiating $this with $tp")
+
+      if Config.checkConstraintsSatisfiable then
+        assert(currentEntry.bounds.contains(tp),
+          i"$origin is constrained to be $currentEntry but attempted to instantiate it to $tp")
+
       if ((ctx.typerState eq owningState.get) && !TypeComparer.subtypeCheckInProgress)
         setInst(tp)
       ctx.typerState.constraint = ctx.typerState.constraint.replace(origin, tp)
@@ -4495,7 +4501,11 @@ object Types {
      *  is also a singleton type.
      */
     def instantiate(fromBelow: Boolean)(using Context): Type =
-      instantiateWith(avoidCaptures(TypeComparer.instanceType(origin, fromBelow)))
+      val tp = avoidCaptures(TypeComparer.instanceType(origin, fromBelow))
+      if myInst.exists then // The line above might have triggered instantiation of the current type variable
+        myInst
+      else
+        instantiateWith(tp)
 
     /** For uninstantiated type variables: the entry in the constraint (either bounds or
      *  provisional instance value)
@@ -5375,7 +5385,12 @@ object Types {
           derivedMatchType(tp, bound1, scrut1, tp.cases.mapConserve(this))
 
         case tp: SkolemType =>
-          derivedSkolemType(tp, this(tp.info))
+          val info1 = this(tp.info)
+          if (info1 ne tp.info) && variance > 0 then
+            // Since we're in a covariant position we can widen instead of making up a new skolem
+            AndType(info1, defn.SingletonClass.typeRef)
+          else
+            derivedSkolemType(tp, info1)
 
         case tp: WildcardType =>
           derivedWildcardType(tp, mapOver(tp.optBounds))
