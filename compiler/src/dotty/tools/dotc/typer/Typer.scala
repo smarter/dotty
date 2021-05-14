@@ -3268,11 +3268,10 @@ class Typer extends Namer
         replaceSingletons(tp)
       }
       wtp.paramInfos.foreach(instantiate)
-      val saved = ctx.typerState.snapshot()
 
       def dummyArg(tp: Type) = untpd.Ident(nme.???).withTypeUnchecked(tp)
 
-      def addImplicitArgs(using Context) = {
+      def addImplicitArgs(using Context) = ctx.typerState.transaction { rollback =>
         def hasDefaultParams = methPart(tree).symbol.hasDefaultParams
         def implicitArgs(formals: List[Type], argIndex: Int, pt: Type): List[Tree] = formals match
           case Nil => Nil
@@ -3370,7 +3369,7 @@ class Typer extends Namer
           // have influenced the context, binding variables, but later ones
           // might fail. In that case the constraint and instantiated variables
           // need to be reset.
-          ctx.typerState.resetTo(saved)
+          rollback()
 
           // If method has default params, fall back to regular application
           // where all inferred implicits are passed as named args.
