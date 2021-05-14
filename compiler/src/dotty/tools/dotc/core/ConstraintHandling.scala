@@ -300,8 +300,15 @@ trait ConstraintHandling {
         dropped = dropped.tail
         recur(tp)
 
+    val saved = ctx.typerState.snapshot()
     val tpw = recur(tp)
-    if (tpw eq tp) || dropped.forall(_ frozen_<:< tpw) then tp else tpw
+    if (tpw eq tp) || dropped.forall(_ frozen_<:< tpw) then
+      // Rollback any constraint change that would lead to `tp` no longer
+      // being a valid solution.
+      ctx.typerState.resetTo(saved)
+      tp
+    else
+      tpw
   end dropTransparentTraits
 
   /** If `tp` is an applied match type alias which is also an unreducible application
@@ -365,9 +372,15 @@ trait ConstraintHandling {
    *  is also a singleton type.
    */
   def instanceType(param: TypeParamRef, fromBelow: Boolean)(using Context): Type = {
-    val approx = approximation(param, fromBelow).simplified
+    // println("ctx: " + ctx.typerState.constraint.show)
+    // println("param: " + param + " fromBelow: " + fromBelow)
+    val approx0 = approximation(param, fromBelow)
+    // println("approx0: " + approx0.show)
+    val approx = approx0.simplified
+    // println("approx: " + approx.show)
     if fromBelow then
       val widened = widenInferred(approx, param)
+      // println("widened: " + widened.show)
       // Widening can add extra constraints, in particular the widened type might
       // be a type variable which is now instantiated to `param`, and therefore
       // cannot be used as an instantiation of `param` without creating a loop.
