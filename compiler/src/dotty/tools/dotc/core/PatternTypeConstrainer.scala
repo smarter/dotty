@@ -249,30 +249,31 @@ trait PatternTypeConstrainer { self: TypeComparer =>
     trace(i"constraining simple pattern type $tp >:< $pt", gadts, res => s"$res\ngadt = ${ctx.gadt.debugBoundsDescription}") {
       (tp, pt) match {
         case (AppliedType(tyconS, argsS), AppliedType(tyconP, argsP)) =>
-          val saved = state.constraint
           val savedGadt = ctx.gadt.fresh
-          val result =
-            tyconS.typeParams.lazyZip(argsS).lazyZip(argsP).forall { (param, argS, argP) =>
-              val variance = param.paramVarianceSign
-              if variance != 0 && !assumeInvariantRefinement then true
-              else if argS.isInstanceOf[TypeBounds] || argP.isInstanceOf[TypeBounds] then
-                // Passing TypeBounds to isSubType on LHS or RHS does the
-                // incorrect thing and infers unsound constraints, while simply
-                // returning true is sound. However, I believe that it should
-                // still be possible to extract useful constraints here.
-                // TODO extract GADT information out of wildcard type arguments
-                true
-              else {
-                var res = true
-                if variance <  1 then res &&= isSubType(argS, argP)
-                if variance > -1 then res &&= isSubType(argP, argS)
-                res
+          ctx.typerState.transaction(rollback =>
+            val result =
+              tyconS.typeParams.lazyZip(argsS).lazyZip(argsP).forall { (param, argS, argP) =>
+                val variance = param.paramVarianceSign
+                if variance != 0 && !assumeInvariantRefinement then true
+                else if argS.isInstanceOf[TypeBounds] || argP.isInstanceOf[TypeBounds] then
+                  // Passing TypeBounds to isSubType on LHS or RHS does the
+                  // incorrect thing and infers unsound constraints, while simply
+                  // returning true is sound. However, I believe that it should
+                  // still be possible to extract useful constraints here.
+                  // TODO extract GADT information out of wildcard type arguments
+                  true
+                else {
+                  var res = true
+                  if variance <  1 then res &&= isSubType(argS, argP)
+                  if variance > -1 then res &&= isSubType(argP, argS)
+                  res
+                }
               }
-            }
-          if !result then
-            constraint = saved
-            ctx.gadt.restore(savedGadt)
-          result
+            if !result then
+              rollback()
+              ctx.gadt.restore(savedGadt)
+            result
+          )
         case _ =>
           // Give up if we don't get AppliedType, e.g. if we upcasted to Any.
           // Note that this doesn't mean that patternTp, scrutineeTp cannot possibly
