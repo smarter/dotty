@@ -2181,13 +2181,14 @@ trait Applications extends Compatibility {
    *  Test cases where this matters are in pos/harmomize.scala.
    */
   def harmonic[T](harmonize: List[T] => List[T], pt: Type)(op: => List[T])(using Context): List[T] =
-    if (!isFullyDefined(pt, ForceDegree.none)) {
-      val origConstraint = ctx.typerState.constraint
-      val origElems = op
-      val harmonizedElems = harmonize(origElems)
-      if (harmonizedElems ne origElems) ctx.typerState.constraint = origConstraint
-      harmonizedElems
-    }
+    if !isFullyDefined(pt, ForceDegree.none) then
+      ctx.typerState.transaction(rollback =>
+        val origElems = op
+        val harmonizedElems = harmonize(origElems)
+        if (harmonizedElems ne origElems)
+          rollback()
+        harmonizedElems
+      )
     else op
 
   /** If all `types` are numeric value types, and they are not all the same type,
