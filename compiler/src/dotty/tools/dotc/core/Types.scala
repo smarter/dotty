@@ -4473,7 +4473,7 @@ object Types {
     def instantiate(fromBelow: Boolean)(using Context): Type =
       val tp = avoidCaptures(TypeComparer.instanceType(origin, fromBelow))
       if myInst.exists then
-        assert(myInst eq tp, s"myInst: $myInst -- tp: $tp")
+        assert(myInst.dealias eq tp.dealias, s"myInst: ${myInst.dealias} -- tp: ${tp.dealias}")
         myInst
       else
         instantiateWith(tp)
