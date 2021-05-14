@@ -778,9 +778,8 @@ trait Implicits:
     && ctx.mode.is(Mode.ImplicitsEnabled)
     && from.isValueType
     && (  from.isValueSubType(to)
-       || inferView(dummyTreeOfType(from), to)
-            (using ctx.fresh.addMode(Mode.ImplicitExploration).setExploreTyperState()).isSuccess
-          // TODO: investigate why we can't TyperState#test here
+       || exploreInFreshCtx(fctx ?=>
+           inferView(dummyTreeOfType(from), to)(using fctx.addMode(Mode.ImplicitExploration)).isSuccess)
        )
 
   /** Find an implicit conversion to apply to given tree `from` so that the
