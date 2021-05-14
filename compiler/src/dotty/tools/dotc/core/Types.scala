@@ -4408,10 +4408,6 @@ object Types {
           owningState1.ownedVars -= this
           owningState = null // no longer needed; null out to avoid a memory leak
 
-    private[core] def resetInst(ts: TyperState): Unit =
-      myInst = NoType
-      owningState = new WeakReference(ts)
-
     /** The state owning the variable. This is at first `creatorState`, but it can
      *  be changed to an enclosing state on a commit.
      */
@@ -4461,7 +4457,7 @@ object Types {
     def instantiateWith(tp: Type)(using Context): Type = {
       assert(tp ne this, s"self instantiation of ${tp.show}, constraint = ${ctx.typerState.constraint.show}")
       typr.println(s"instantiating ${this.show} with ${tp.show}")
-      if ((ctx.typerState eq owningState.get) && !TypeComparer.subtypeCheckInProgress)
+      if !ctx.typerState.canRollback && (ctx.typerState eq owningState.get) then
         setInst(tp)
       ctx.typerState.constraint = ctx.typerState.constraint.replace(origin, tp)
       tp
@@ -4475,7 +4471,16 @@ object Types {
      *  is also a singleton type.
      */
     def instantiate(fromBelow: Boolean)(using Context): Type =
-      instantiateWith(avoidCaptures(TypeComparer.instanceType(origin, fromBelow)))
+      if myInst.exists then
+        myInst
+      else
+        val tp = avoidCaptures(TypeComparer.instanceType(origin, fromBelow))
+        if myInst.exists then
+          // eq fail due to alias, intersection with self, ...
+          assert(myInst frozen_=:= tp, s"myInst: ${myInst} -- tp: ${tp}")
+          myInst
+        else
+          instantiateWith(tp)
 
     /** For uninstantiated type variables: the entry in the constraint (either bounds or
      *  provisional instance value)
@@ -4600,18 +4605,16 @@ object Types {
         if (myReduced != null) record("MatchType.reduce cache miss")
         myReduced =
           trace(i"reduce match type $this $hashCode", matchTypes, show = true) {
-            def matchCases(cmp: TrackingTypeComparer): Type =
-              val saved = ctx.typerState.snapshot()
-              try cmp.matchCases(scrutinee.normalized, cases)
-              catch case ex: Throwable =>
-                handleRecursive("reduce type ", i"$scrutinee match ...", ex)
-              finally
-                updateReductionContext(cmp.footprint)
-                ctx.typerState.resetTo(saved)
-                  // this drops caseLambdas in constraint and undoes any typevar
-                  // instantiations during matchtype reduction
-
-            TypeComparer.tracked(matchCases)
+            explore {
+              // XXX: check that cache still works
+              def matchCases(cmp: TrackingTypeComparer): Type =
+                try cmp.matchCases(scrutinee.normalized, cases)
+                catch case ex: Throwable =>
+                  handleRecursive("reduce type ", i"$scrutinee match ...", ex)
+                finally
+                  updateReductionContext(cmp.footprint)
+              TypeComparer.tracked(matchCases)
+            }
           }
       myReduced
     }

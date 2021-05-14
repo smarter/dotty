@@ -14,6 +14,7 @@ import util.Stats
 import Decorators._
 
 import scala.annotation.internal.sharable
+import scala.util.control.NonFatal
 
 object TyperState {
   @sharable private var nextId: Int = 0
@@ -22,22 +23,6 @@ object TyperState {
       .init(null, OrderingConstraint.empty)
       .setReporter(new ConsoleReporter())
       .setCommittable(true)
-
-  opaque type Snapshot = (Constraint, TypeVars, TypeVars)
-
-  extension (ts: TyperState)
-    def snapshot()(using Context): Snapshot =
-      var previouslyInstantiated: TypeVars = SimpleIdentitySet.empty
-      for tv <- ts.ownedVars do if tv.inst.exists then previouslyInstantiated += tv
-      (ts.constraint, ts.ownedVars, previouslyInstantiated)
-
-    def resetTo(state: Snapshot)(using Context): Unit =
-      val (c, tvs, previouslyInstantiated) = state
-      for tv <- tvs do
-        if tv.inst.exists && !previouslyInstantiated.contains(tv) then
-          tv.resetInst(ts)
-      ts.ownedVars = tvs
-      ts.constraint = c
 }
 
 class TyperState() {
@@ -89,6 +74,26 @@ class TyperState() {
   def ownedVars: TypeVars = myOwnedVars
   def ownedVars_=(vs: TypeVars): Unit = myOwnedVars = vs
 
+
+  private var myCanRollback: Boolean = _
+  def canRollback: Boolean = myCanRollback
+
+  inline def transaction[T](inline op: (() => Unit) => T)(using Context): T =
+    val savedCanRollback = canRollback
+    myCanRollback = true
+
+    val savedConstraint = constraint
+    def rollbackConstraint() = constraint = savedConstraint
+
+    try op(() => rollbackConstraint())
+    catch case NonFatal(ex) =>
+      rollbackConstraint()
+      throw ex
+    finally
+      myCanRollback = savedCanRollback
+      if isCommittable then gc()
+  end transaction
+
   /** Initializes all fields except reporter, isCommittable, which need to be
    *  set separately.
    */
@@ -100,6 +105,10 @@ class TyperState() {
     this.previousConstraint = constraint
     this.myOwnedVars = SimpleIdentitySet.empty
     this.isCommitted = false
+    this.myCanRollback = false
+      //does this need to be previous.myCanRollback? No: tvar created in nested TS can be instantiated,
+      //but that's ok, transaction is just about tvars in current TS still being in the same state
+      //when rolling back that transaction
     this
 
   /** A fresh typer state with the same constraint as this one. */
@@ -203,7 +212,7 @@ class TyperState() {
    *  no-longer needed constraint entries.
    */
   def gc()(using Context): Unit =
-    if !ownedVars.isEmpty then
+    if !canRollback && !ownedVars.isEmpty then
       Stats.record("typerState.gc")
       val toCollect = new mutable.ListBuffer[TypeLambda]
       for tvar <- ownedVars do
