@@ -2182,10 +2182,10 @@ trait Applications extends Compatibility {
    */
   def harmonic[T](harmonize: List[T] => List[T], pt: Type)(op: => List[T])(using Context): List[T] =
     if (!isFullyDefined(pt, ForceDegree.none)) {
-      val origConstraint = ctx.typerState.constraint
+      val saved = ctx.typerState.snapshot()
       val origElems = op
       val harmonizedElems = harmonize(origElems)
-      if (harmonizedElems ne origElems) ctx.typerState.constraint = origConstraint
+      if (harmonizedElems ne origElems) ctx.typerState.resetTo(saved)
       harmonizedElems
     }
     else op

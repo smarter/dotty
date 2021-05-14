@@ -46,14 +46,11 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     monitored = false
     GADTused = false
     recCount = 0
-    needsGc = false
     if Config.checkTypeComparerReset then checkReset()
 
   private var pendingSubTypes: util.MutableSet[(Type, Type)] = null
   private var recCount = 0
   private var monitored = false
-
-  private var needsGc = false
 
   private var canCompareAtoms: Boolean = true // used for internal consistency checking
 
@@ -64,20 +61,6 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
   def currentInstance: TypeComparer = myInstance
 
   private var useNecessaryEither = false
-
-  /** Is a subtype check in progress? In that case we may not
-   *  permanently instantiate type variables, because the corresponding
-   *  constraint might still be retracted and the instantiation should
-   *  then be reversed.
-   */
-  def subtypeCheckInProgress: Boolean = {
-    val result = recCount > 0
-    if (result) {
-      constr.println("*** needsGC ***")
-      needsGc = true
-    }
-    result
-  }
 
   /** For statistics: count how many isSubTypes are part of successful comparisons */
   private var successCount = 0
@@ -1284,10 +1267,10 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     if tp2 eq NoType then false
     else if tp1 eq tp2 then true
     else
-      val saved = constraint
+      val saved = state.snapshot()
       val savedGadt = ctx.gadt.fresh
       inline def restore() =
-        state.constraint = saved
+        state.resetTo(saved)
         ctx.gadt.restore(savedGadt)
       val savedSuccessCount = successCount
       try
@@ -1296,9 +1279,6 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
         val result = if monitored then monitoredIsSubType else firstTry
         recCount -= 1
         if !result then restore()
-        else if recCount == 0 && needsGc then
-          state.gc()
-          needsGc = false
         if (Stats.monitored) recordStatistics(result, savedSuccessCount)
         result
       catch case NonFatal(ex) =>
@@ -2754,9 +2734,6 @@ object TypeComparer {
 
   def constValue(tp: Type)(using Context): Option[Constant] =
     comparing(_.constValue(tp))
-
-  def subtypeCheckInProgress(using Context): Boolean =
-    comparing(_.subtypeCheckInProgress)
 
   def instanceType(param: TypeParamRef, fromBelow: Boolean)(using Context): Type =
     comparing(_.instanceType(param, fromBelow))

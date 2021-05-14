@@ -4487,7 +4487,7 @@ object Types {
         assert(currentEntry.bounds.contains(tp),
           i"$origin is constrained to be $currentEntry but attempted to instantiate it to $tp")
 
-      if ((ctx.typerState eq owningState.get) && !TypeComparer.subtypeCheckInProgress)
+      if ctx.typerState eq owningState.get then
         setInst(tp)
       ctx.typerState.constraint = ctx.typerState.constraint.replace(origin, tp)
       tp

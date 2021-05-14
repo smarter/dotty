@@ -89,7 +89,7 @@ object ProtoTypes {
      *  fits the given expected result type.
      */
     def constrainResult(mt: Type, pt: Type)(using Context): Boolean =
-      val savedConstraint = ctx.typerState.constraint
+      val saved = ctx.typerState.snapshot()
       val res = pt.widenExpr match {
         case pt: FunProto =>
           mt match
@@ -111,7 +111,7 @@ object ProtoTypes {
         case _ =>
           true
       }
-      if !res then ctx.typerState.constraint = savedConstraint
+      if !res then ctx.typerState.resetTo(saved)
       res
 
     /** Constrain result with special case if `meth` is an inlineable method in an inlineable context.

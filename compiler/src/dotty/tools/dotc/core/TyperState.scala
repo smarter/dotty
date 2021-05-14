@@ -14,6 +14,7 @@ import util.Stats
 import Decorators._
 
 import scala.annotation.internal.sharable
+import scala.util.control.NonFatal
 
 object TyperState {
   @sharable private var nextId: Int = 0
