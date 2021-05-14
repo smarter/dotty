@@ -171,7 +171,8 @@ class TyperState() {
       for case (tvar: TypeVar, pref1) <- tl.paramRefs.map(constraint.typeVarOfParam).lazyZip(tl1.paramRefs) do
         tvar.setOrigin(pref1)
       var ts = this
-      while ts.constraint.domainLambdas.contains(tl) do
+      // The other constraint might be a predecessor of this constraint, in that case make sure we don't ...
+      while ts.constraint != other && ts.constraint.domainLambdas.contains(tl) do
         ts.constraint = ts.constraint.subst(tl, tl1)
         ts = ts.previous
 
