@@ -418,6 +418,13 @@ object ProtoTypes {
             args1.foreach(arg => Inferencing.instantiateSelected(arg.tpe, tvars))
             // XX: won't setInst tvars in parent of protoCtx.typerState which might not be a parent of ctx.typerState?
 
+            // i7438.scala: tvar not in tree (because of error), still instantiate to deal with assert below.
+            tvars.foreach {
+              case tvar: TypeVar if !tvar.isInstantiated =>
+                tvar.instantiate(fromBelow = true)
+              case _ =>
+            }
+
             args1
           }
         finally
