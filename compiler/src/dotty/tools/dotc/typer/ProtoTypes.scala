@@ -369,6 +369,7 @@ object ProtoTypes {
           case _ =>
             targ = typerFn(arg)
             if (!ctx.reporter.hasUnreportedErrors)
+              Inferencing.fullyDefinedType(targ.tpe, targ.show, arg.span)
               state.typedArg = state.typedArg.updated(arg, targ)
         }
       targ
