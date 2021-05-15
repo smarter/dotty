@@ -369,7 +369,6 @@ object ProtoTypes {
           case _ =>
             targ = typerFn(arg)
             if (!ctx.reporter.hasUnreportedErrors)
-              Inferencing.fullyDefinedType(targ.tpe, targ.show, arg.span)
               state.typedArg = state.typedArg.updated(arg, targ)
         }
       targ
@@ -388,18 +387,42 @@ object ProtoTypes {
     def typedArgs(norm: (untpd.Tree, Int) => untpd.Tree = sameTree)(using Context): List[Tree] =
       if (state.typedArgs.size == args.length) state.typedArgs
       else {
+        val outerConstraint = ctx.typerState.constraint
         val prevConstraint = protoCtx.typerState.constraint
 
-        // try
+        try
           inContext(protoCtx) {
             val args1 = args.mapWithIndexConserve((arg, idx) =>
               cacheTypedArg(arg, arg => typer.typed(norm(arg, idx)), force = false))
             if !args1.exists(arg => isUndefined(arg.tpe)) then state.typedArgs = args1
+
+            val protoConstraint = protoCtx.typerState.constraint
+
+            def hasConflictingTypeVarsFor(tl: TypeLambda) =
+              outerConstraint.typeVarOfParam(tl.paramRefs(0)) ne protoConstraint.typeVarOfParam(tl.paramRefs(0))
+
+            val toReplace = protoConstraint.domainLambdas.filter(tl =>
+              !outerConstraint.contains(tl) || hasConflictingTypeVarsFor(tl))
+            // TODO: copy of the constraint with all lambdas replaced and all tvars pointing to them too
+            // println("toReplace: " + toReplace)
+
+            val tvars = toReplace.flatMap(_.paramRefs).map(protoConstraint.typeVarOfParam)
+
+            // val tm = new TypeTraverser:
+            //   def traverse(tp: Type): Unit = tp match
+            //     case tp: TypeVar if !tp.isInstantiated && !outerConstraint.contains(tp) =>
+                  
+            //     case tp =>
+            //       traverseChildren(tp)
+
+            args1.foreach(arg => Inferencing.instantiateSelected(arg.tpe, tvars))
+            // XX: won't setInst tvars in parent of protoCtx.typerState which might not be a parent of ctx.typerState?
+
             args1
           }
-        // finally
-          // if (protoCtx.typerState.constraint ne prevConstraint)
-          //   ctx.typerState.mergeConstraintWith(protoCtx.typerState)
+        finally
+          if (protoCtx.typerState.constraint ne prevConstraint)
+            ctx.typerState.mergeConstraintWith(protoCtx.typerState, canConsume = false)
       }
 
     /** Type single argument and remember the unadapted result in `myTypedArg`.

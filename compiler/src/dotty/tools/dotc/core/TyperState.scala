@@ -172,11 +172,15 @@ class TyperState() {
         ts.constraint = ts.constraint.subst(tl, tl1)
         ts = ts.previous
 
-  def mergeConstraintWith(that: TyperState)(using Context): Unit =
+  def mergeConstraintWith(that: TyperState, canConsume: Boolean = true)(using Context): Unit =
+    val tc0 = that.constraint
     that.ensureNotConflicting(constraint)
+    assert(canConsume || (that.constraint eq tc0), i"tc0: $tc0 \n tc1: ${that.constraint}")
     constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
     for tvar <- constraint.uninstVars do
-      if !isOwnedAnywhere(this, tvar) then ownedVars += tvar
+      if !isOwnedAnywhere(this, tvar) then
+        assert(canConsume, "not owned: " + tvar)
+        ownedVars += tvar
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
 
