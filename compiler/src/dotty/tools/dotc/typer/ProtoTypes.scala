@@ -400,7 +400,7 @@ object ProtoTypes {
               cacheTypedArg(arg, arg => typer.typed(norm(arg, idx)), force = false))
             if !args1.exists(arg => isUndefined(arg.tpe)) then state.typedArgs = args1
 
-            if needsMerge then
+            if needsMerge && (protoCtx.typerState.constraint ne prevConstraint) then
               // println("args1: " + args1.map(x => (x.show, x.tpe.show)))
               // println("proto1: " + protoCtx.typerState.constraint.show)
   

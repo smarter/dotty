@@ -176,7 +176,13 @@ class TyperState() {
     val tc0 = that.constraint
     that.ensureNotConflicting(constraint)
     assert(canConsume || (that.constraint eq tc0), i"tc0: $tc0 \n tc1: ${that.constraint}")
+    // println("this: " + this)
+    // println("that: " + that)
+    // println("that: " + that.constraint.show)
+    // println("that.uv: " + that.constraint.uninstVars)
     constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
+    // println("c: " + constraint.show)
+    // println("uv: " + constraint.uninstVars)
     for tvar <- constraint.uninstVars do
       if !isOwnedAnywhere(this, tvar) then
         assert(canConsume, "not owned: " + tvar)
