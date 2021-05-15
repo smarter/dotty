@@ -389,46 +389,61 @@ object ProtoTypes {
       else {
         val outerConstraint = ctx.typerState.constraint
         val prevConstraint = protoCtx.typerState.constraint
+        val needsMerge = outerConstraint ne prevConstraint
+        // if needsMerge then println("outer: " + outerConstraint.show)
 
         try
           inContext(protoCtx) {
+            // if needsMerge then println("proto: " + protoCtx.typerState.constraint.show)
+
             val args1 = args.mapWithIndexConserve((arg, idx) =>
               cacheTypedArg(arg, arg => typer.typed(norm(arg, idx)), force = false))
             if !args1.exists(arg => isUndefined(arg.tpe)) then state.typedArgs = args1
 
-            val protoConstraint = protoCtx.typerState.constraint
-
-            def hasConflictingTypeVarsFor(tl: TypeLambda) =
-              outerConstraint.typeVarOfParam(tl.paramRefs(0)) ne protoConstraint.typeVarOfParam(tl.paramRefs(0))
-
-            val toReplace = protoConstraint.domainLambdas.filter(tl =>
-              !outerConstraint.contains(tl) || hasConflictingTypeVarsFor(tl))
-            // TODO: copy of the constraint with all lambdas replaced and all tvars pointing to them too
-            // println("toReplace: " + toReplace)
-
-            val tvars = toReplace.flatMap(_.paramRefs).map(protoConstraint.typeVarOfParam)
-
-            // val tm = new TypeTraverser:
-            //   def traverse(tp: Type): Unit = tp match
-            //     case tp: TypeVar if !tp.isInstantiated && !outerConstraint.contains(tp) =>
-                  
-            //     case tp =>
-            //       traverseChildren(tp)
-
-            args1.foreach(arg => Inferencing.instantiateSelected(arg.tpe, tvars))
-            // XX: won't setInst tvars in parent of protoCtx.typerState which might not be a parent of ctx.typerState?
-
-            // i7438.scala: tvar not in tree (because of error), still instantiate to deal with assert below.
-            tvars.foreach {
-              case tvar: TypeVar if !tvar.isInstantiated =>
-                tvar.instantiate(fromBelow = true)
-              case _ =>
-            }
+            if needsMerge then
+              // println("args1: " + args1.map(x => (x.show, x.tpe.show)))
+              // println("proto1: " + protoCtx.typerState.constraint.show)
+  
+              val protoConstraint = protoCtx.typerState.constraint
+  
+              def hasConflictingTypeVarsFor(tl: TypeLambda) =
+                outerConstraint.typeVarOfParam(tl.paramRefs(0)) ne protoConstraint.typeVarOfParam(tl.paramRefs(0))
+  
+              val toReplace = protoConstraint.domainLambdas.filter(tl =>
+                !outerConstraint.contains(tl) || hasConflictingTypeVarsFor(tl))
+              // TODO: copy of the constraint with all lambdas replaced and all tvars pointing to them too
+              // println("toReplace: " + toReplace)
+  
+              val tvars = toReplace.flatMap(_.paramRefs).map(protoConstraint.typeVarOfParam)
+  
+              // val tm = new TypeTraverser:
+              //   def traverse(tp: Type): Unit = tp match
+              //     case tp: TypeVar if !tp.isInstantiated && !outerConstraint.contains(tp) =>
+                    
+              //     case tp =>
+              //       traverseChildren(tp)
+  
+              // println("tvars: " + tvars)
+              args1.foreach(arg => Inferencing.instantiateSelected(arg.tpe, tvars))
+              // XX: won't setInst tvars in parent of protoCtx.typerState which might not be a parent of ctx.typerState?
+  
+              // println("proto2: " + protoCtx.typerState.constraint.show)
+              // Thread.dumpStack
+  
+              // i7438.scala: tvar not in tree (because of error), still instantiate to deal with assert below.
+              tvars.foreach {
+                case tvar: TypeVar if !tvar.isInstantiated =>
+                  tvar.instantiate(fromBelow = true)
+                case _ =>
+              }
+  
+              // println("proto3: " + protoCtx.typerState.constraint.show)
+            end if
 
             args1
           }
         finally
-          if (protoCtx.typerState.constraint ne prevConstraint)
+          if (needsMerge && (protoCtx.typerState.constraint ne prevConstraint))
             ctx.typerState.mergeConstraintWith(protoCtx.typerState, canConsume = false)
       }
 
