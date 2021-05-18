@@ -89,30 +89,31 @@ object ProtoTypes {
      *  fits the given expected result type.
      */
     def constrainResult(mt: Type, pt: Type)(using Context): Boolean =
-      val savedConstraint = ctx.typerState.constraint
-      val res = pt.widenExpr match {
-        case pt: FunProto =>
-          mt match
-            case mt: MethodType =>
-              constrainResult(resultTypeApprox(mt), pt.resultType)
-              && {
-                if pt.constrainResultDeep
-                   && mt.isImplicitMethod == (pt.applyKind == ApplyKind.Using)
-                then
-                  pt.args.lazyZip(mt.paramInfos).forall((arg, paramInfo) =>
-                    pt.typedArg(arg, paramInfo).tpe <:< paramInfo)
-                else true
-              }
-            case _ => true
-        case _: ValueTypeOrProto if !disregardProto(pt) =>
-          necessarilyCompatible(mt, pt)
-        case pt: WildcardType if pt.optBounds.exists =>
-          necessarilyCompatible(mt, pt)
-        case _ =>
-          true
-      }
-      if !res then ctx.typerState.constraint = savedConstraint
-      res
+      ctx.typerState.transaction(rollback =>
+        val res = pt.widenExpr match {
+          case pt: FunProto =>
+            mt match
+              case mt: MethodType =>
+                constrainResult(resultTypeApprox(mt), pt.resultType)
+                && {
+                  if pt.constrainResultDeep
+                     && mt.isImplicitMethod == (pt.applyKind == ApplyKind.Using)
+                  then
+                    pt.args.lazyZip(mt.paramInfos).forall((arg, paramInfo) =>
+                      pt.typedArg(arg, paramInfo).tpe <:< paramInfo)
+                  else true
+                }
+              case _ => true
+          case _: ValueTypeOrProto if !disregardProto(pt) =>
+            necessarilyCompatible(mt, pt)
+          case pt: WildcardType if pt.optBounds.exists =>
+            necessarilyCompatible(mt, pt)
+          case _ =>
+            true
+        }
+        if !res then rollback()
+        res
+      )
 
     /** Constrain result with special case if `meth` is an inlineable method in an inlineable context.
      *  In that case, we should always succeed and not constrain type parameters in the expected type,
