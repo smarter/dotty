@@ -186,7 +186,8 @@ class TyperState() {
     for tvar <- constraint.uninstVars do
       if !isOwnedAnywhere(this, tvar) then
         assert(canConsume, "not owned: " + tvar)
-        ownedVars += tvar
+        // ownedVars += tvar
+        includeVar(tvar)
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
 
