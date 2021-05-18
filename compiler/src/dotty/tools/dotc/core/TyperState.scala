@@ -206,6 +206,7 @@ class TyperState() {
       Stats.record("typerState.gc")
       val toCollect = new mutable.ListBuffer[TypeLambda]
       for tvar <- ownedVars do
+        assert(!tvar.inst.exists, s"$tvar - ${tvar.inst}")
         if !tvar.inst.exists then // See comment of `ownedVars` for why this test is necessary
           val inst = constraint.instType(tvar)
           if inst.exists then
