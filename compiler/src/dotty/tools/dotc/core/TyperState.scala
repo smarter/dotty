@@ -176,7 +176,7 @@ class TyperState() {
     that.ensureNotConflicting(constraint)
     constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
     for tvar <- constraint.uninstVars do
-      if !isOwnedAnywhere(this, tvar) then ownedVars += tvar
+      if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
 
