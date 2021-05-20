@@ -1267,7 +1267,26 @@ trait Implicits:
         val arity2 = sym2.info.firstParamTypes.length
         if arity1 < arity2 then return true
         if arity1 > arity2 then return false
-        compareOwner(sym1.owner, sym2.owner) == 1
+        val cmpOwner = compareOwner(sym1.owner, sym2.owner)
+        // if cmpOwner != 0 then return cmpOwner
+        cmpOwner == 1
+
+      def compareCandidates(cand1: Candidate, cand2: Candidate): Int =
+        if cand1 eq cand2 then return 0
+        val cmpLevel = cand1.level - cand2.level
+        if cmpLevel != 0 then return -cmpLevel // 1.
+        val sym1 = cand1.ref.symbol
+        val sym2 = cand2.ref.symbol
+        val arity1 = sym1.info.firstParamTypes.length
+        val arity2 = sym2.info.firstParamTypes.length
+        val cmpArity = arity1 - arity2
+        if cmpArity != 0 then return cmpArity // 2.
+        val cmpOwner = compareOwner(sym1.owner, sym2.owner)
+        if cmpOwner != 0 then return -cmpOwner // 3.
+        cmpOwner
+        // val cmpName = NameOrdering.compare(sym1.fullName, sym2.fullName)
+        // assert(cmpName != 0, s"Cannot establish a preference between $cand1 (${sym1.showLocated}) and $cand2 (${sym2.showLocated})")
+        // cmpName
 
       /** Sort list of implicit references according to `prefer`.
        *  This is just an optimization that aims at reducing the average
@@ -1277,10 +1296,17 @@ trait Implicits:
         case Nil => eligible
         case e1 :: Nil => eligible
         case e1 :: e2 :: Nil =>
+          if (prefer(e2, e1)) assert(compareCandidates(e2, e1) < 0, s"e1: $e1 -- e2: $e2")
+          else if (prefer(e1, e2)) assert(compareCandidates(e1, e2) < 0, s"e1: $e1 -- e2: $e2")
+          else assert(compareCandidates(e1, e2) == 0, s"e1: $e1 -- e2: $e2")
           if (prefer(e2, e1)) e2 :: e1 :: Nil
           else eligible
         case _ =>
-          try eligible.sortWith(prefer)
+          try
+            val s1 = eligible.sortWith(prefer)
+            val s2 = eligible.sorted(using (a, b) => compareCandidates(a, b))
+            assert(s1 == s2, s"s1 = $s1\ns2 = $s2")
+            s1
           catch case ex: IllegalArgumentException =>
             // diagnostic to see what went wrong
             for
