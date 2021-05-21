@@ -1279,7 +1279,7 @@ trait Implicits:
        */
       def compareBaseClassesLength(sym1: Symbol, sym2: Symbol): Int =
         def len(sym: Symbol) =
-          if sym.is(ModuleClass) then
+          if sym.is(ModuleClass) && sym.companionClass.exists then
             Math.max(sym.asClass.baseClassesLength, sym.companionClass.asClass.baseClassesLength)
           else if sym.isClass then
             sym.asClass.baseClassesLength
@@ -1298,13 +1298,15 @@ trait Implicits:
         val cmpArity = arity1 - arity2
         if cmpArity != 0 then return cmpArity // 2.
         val cmpOwner = compareBaseClassesLength(sym1.owner, sym2.owner)
-        if cmpOwner != 0 then return -cmpOwner // 3.
-        // -cmpOwner
-        val cmpName = NameOrdering.compare(sym1.name, sym2.name)
-        if cmpName != 0 then return cmpName
-        val cmpFullName = NameOrdering.compare(sym1.fullName, sym2.fullName)
-        assert(cmpFullName != 0, s"Cannot establish a preference between $cand1 (${sym1.showLocated}) and $cand2 (${sym2.showLocated})")
-        cmpFullName
+        -cmpOwner // 3.
+
+        // if cmpOwner != 0 then return -cmpOwner // 3.
+        // // -cmpOwner
+        // val cmpName = NameOrdering.compare(sym1.name, sym2.name)
+        // if cmpName != 0 then return cmpName
+        // val cmpFullName = NameOrdering.compare(sym1.fullName, sym2.fullName)
+        // assert(cmpFullName != 0, s"Cannot establish a preference between $cand1 (${sym1.showLocated}) and $cand2 (${sym2.showLocated})")
+        // cmpFullName
 
       /** Sort list of implicit references according to `prefer`.
        *  This is just an optimization that aims at reducing the average
