@@ -1247,15 +1247,6 @@ trait Implicits:
              |Consider using the scala.util.NotGiven class to implement similar functionality.""",
              ctx.source.atSpan(span))
 
-      /** A relation that influences the order in which implicits are tried.
-       *  We prefer (in order of importance)
-       *   1. more deeply nested definitions
-       *   2. definitions with fewer implicit parameters
-       *   3. definitions in subclasses
-       *  The reason for (2) is that we want to fail fast if the search type
-       *  is underconstrained. So we look for "small" goals first, because that
-       *  will give an ambiguity quickly.
-       */
       def prefer(cand1: Candidate, cand2: Candidate): Boolean =
         val level1 = cand1.level
         val level2 = cand2.level
@@ -1273,9 +1264,10 @@ trait Implicits:
 
       /** Compare the length of the baseClasses of two symbols.
        *
-       *  This relation is meant to approximate `Applications#compareOwner` while
-       *  inducing a total ordering (`compareOwner` returns `0` for unrelated symbols
-       *  and therefore can only induce a partial ordering).
+       *  This relation is meant to approximate `Applications#compareOwner` while also
+       *  inducing a total ordering: `compareOwner` returns `0` for unrelated symbols
+       *  and therefore only induces a partial ordering, meaning it cannot be used
+       *  as a sorting function.
        */
       def compareBaseClassesLength(sym1: Symbol, sym2: Symbol): Int =
         def len(sym: Symbol) =
@@ -1287,6 +1279,16 @@ trait Implicits:
             0
         len(sym1) - len(sym2)
 
+      /** A relation that influences the order in which implicits are tried.
+        *
+       *  We prefer (in order of importance)
+       *   1. more deeply nested definitions
+       *   2. definitions with fewer implicit parameters
+       *   3. definitions with more base classes (see `compareBaseClassesLength`)
+       *  The reason for (2) is that we want to fail fast if the search type
+       *  is underconstrained. So we look for "small" goals first, because that
+       *  will give an ambiguity quickly.
+       */
       def compareCandidates(cand1: Candidate, cand2: Candidate): Int =
         if cand1 eq cand2 then return 0
         val cmpLevel = cand1.level - cand2.level
@@ -1297,56 +1299,107 @@ trait Implicits:
         val arity2 = sym2.info.firstParamTypes.length
         val cmpArity = arity1 - arity2
         if cmpArity != 0 then return cmpArity // 2.
-        val cmpOwner = compareBaseClassesLength(sym1.owner, sym2.owner)
-        -cmpOwner // 3.
-
-        // if cmpOwner != 0 then return -cmpOwner // 3.
-        // // -cmpOwner
-        // val cmpName = NameOrdering.compare(sym1.name, sym2.name)
-        // if cmpName != 0 then return cmpName
-        // val cmpFullName = NameOrdering.compare(sym1.fullName, sym2.fullName)
-        // assert(cmpFullName != 0, s"Cannot establish a preference between $cand1 (${sym1.showLocated}) and $cand2 (${sym2.showLocated})")
-        // cmpFullName
+        val cmpBaseClasses = compareBaseClassesLength(sym1.owner, sym2.owner)
+        -cmpBaseClasses // 3.
 
       /** Sort list of implicit references according to `prefer`.
        *  This is just an optimization that aims at reducing the average
        *  number of candidates to be tested.
        */
-      def sort(eligible: List[Candidate]) = eligible match {
+      def sort(eligible: List[Candidate]) = eligible match
         case Nil => eligible
         case e1 :: Nil => eligible
         case e1 :: e2 :: Nil =>
           if (compareCandidates(e2, e1) < 0) e2 :: e1 :: Nil
           else eligible
         case _ =>
-            for
-              e1 <- eligible
-              e2 <- eligible
-              cmp12 = Integer.signum(compareCandidates(e1, e2))
-              e3 <- eligible
-              cmp13 = Integer.signum(compareCandidates(e1, e3))
-              cmp23 = Integer.signum(compareCandidates(e2, e3))
-              if cmp12 != 0 && cmp12 == cmp23 && cmp13 != cmp12 ||
-                 cmp12 == 0 && cmp13 != cmp23
-            do
-              val es = List(e1, e2, e3)
-              println("cmp(e1, e2):" + compareCandidates(e1, e2))
-              println("cmp(e2, e3):" + compareCandidates(e2, e3))
-              println("cmp(e1, e3):" + compareCandidates(e1, e3))
-              val e1n = e1.ref.symbol.fullName
-              val e2n = e2.ref.symbol.fullName
-              val e3n = e3.ref.symbol.fullName
-              // println("e1n: " + e1n.debugString)
-              // println("e2n: " + e2n.debugString)
-              // println("e3n: " + e3n.debugString)
-              // println("#cmp(e1n, e2n):" + NameOrdering.compare(e1n, e2n))
-              // println("#cmp(e2n, e3n):" + NameOrdering.compare(e2n, e3n))
-              // println("#cmp(e1n, e3n):" + NameOrdering.compare(e1n, e3n))
-              
-              println(i"transitivity violated for $es%, %\n ${es.map(_.implicitRef.underlyingRef.symbol.showLocated)}%, %")
+            // println(i"transitivity violated for $es%, %\n ${es.map(_.implicitRef.underlyingRef.symbol.showLocated)}%, %")
 
-            eligible.sorted(using (a, b) => compareCandidates(a, b))
-      }
+          for
+            x <- eligible
+            y <- eligible
+            cmpXY = Integer.signum(compareCandidates(x, y))
+            cmpYX = Integer.signum(compareCandidates(y, x))
+            z <- eligible
+            cmpXZ = Integer.signum(compareCandidates(x, z))
+            cmpYZ = Integer.signum(compareCandidates(y, z))
+          do
+            def reportViolation(msg: String): Unit =
+              Console.err.println(s"Internal error: comparison function violated ${msg.stripMargin}")
+            def showCandidate(c: Candidate): String =
+              s"$c (${c.ref.symbol.showLocated})"
+
+            if cmpXY != -cmpYX then
+              reportViolation(
+                s"""signum(cmp(x, y)) == -signum(cmp(y, x)) given:
+                   |x = ${showCandidate(x)}
+                   |y = ${showCandidate(y)}
+                   |cmpXY = $cmpXY
+                   |cmpYX = $cmpYX""")
+            if cmpXY != 0 && cmpXY == cmpYZ && cmpXZ != cmpXY then
+              reportViolation(
+                s"""transitivity given:
+                   |x = ${showCandidate(x)}
+                   |y = ${showCandidate(y)}
+                   |z = ${showCandidate(z)}
+                   |cmpXY = $cmpXY
+                   |cmpXZ = $cmpXZ
+                   |cmpYZ = $cmpYZ""")
+            if cmpXY == 0 && cmpXZ != cmpYZ then
+              reportViolation(
+                s"""cmp(x, y) == 0 implies that signum(cmp(x, z)) == signum(cmp(y, z)) given:
+                   |x = ${showCandidate(x)}
+                   |y = ${showCandidate(y)}
+                   |z = ${showCandidate(z)}
+                   |cmpXY = $cmpXY
+                   |cmpXZ = $cmpXZ
+                   |cmpYZ = $cmpYZ""")
+          end for
+
+          try eligible.sorted(using (a, b) => compareCandidates(a, b))
+          catch case ex: IllegalArgumentException =>
+            // Check if we violated the contract of java.util.Comparator#compare
+            for
+              x <- eligible
+              y <- eligible
+              cmpXY = Integer.signum(compareCandidates(x, y))
+              cmpYX = Integer.signum(compareCandidates(y, x))
+              z <- eligible
+              cmpXZ = Integer.signum(compareCandidates(x, z))
+              cmpYZ = Integer.signum(compareCandidates(y, z))
+            do
+              def reportViolation(msg: String): Unit =
+                Console.err.println(s"Internal error: comparison function violated ${msg.stripMargin}")
+              def showCandidate(c: Candidate): String =
+                s"$c (${c.ref.symbol.showLocated})"
+
+              if cmpXY != -cmpYX then
+                reportViolation(
+                  s"""signum(cmp(x, y)) == -signum(cmp(y, x)) given:
+                     |x = ${showCandidate(x)}
+                     |y = ${showCandidate(y)}
+                     |cmpXY = $cmpXY
+                     |cmpYX = $cmpYX""")
+              if cmpXY != 0 && cmpXY == cmpYZ && cmpXZ != cmpXY then
+                reportViolation(
+                  s"""transitivity given:
+                     |x = ${showCandidate(x)}
+                     |y = ${showCandidate(y)}
+                     |z = ${showCandidate(z)}
+                     |cmpXY = $cmpXY
+                     |cmpXZ = $cmpXZ
+                     |cmpYZ = $cmpYZ""")
+              if cmpXY == 0 && cmpXZ != cmpYZ then
+                reportViolation(
+                  s"""cmp(x, y) == 0 implies that signum(cmp(x, z)) == signum(cmp(y, z)) given:
+                     |x = ${showCandidate(x)}
+                     |y = ${showCandidate(y)}
+                     |z = ${showCandidate(z)}
+                     |cmpXY = $cmpXY
+                     |cmpXZ = $cmpXZ
+                     |cmpYZ = $cmpYZ""")
+            end for
+            throw ex
 
       rank(sort(eligible), NoMatchingImplicitsFailure, Nil)
     end searchImplicit
