@@ -1271,6 +1271,22 @@ trait Implicits:
         // if cmpOwner != 0 then return cmpOwner
         cmpOwner == 1
 
+      /** Compare the length of the baseClasses of two symbols.
+       *
+       *  This relation is meant to approximate `Applications#compareOwner` while
+       *  inducing a total ordering (`compareOwner` returns `0` for unrelated symbols
+       *  and therefore can only induce a partial ordering).
+       */
+      def compareBaseClassesLength(sym1: Symbol, sym2: Symbol): Int =
+        def len(sym: Symbol) =
+          if sym.is(ModuleClass) then
+            Math.max(sym.asClass.baseClassesLength, sym.companionClass.asClass.baseClassesLength)
+          else if sym.isClass then
+            sym.asClass.baseClassesLength
+          else
+            0
+        len(sym1) - len(sym2)
+
       def compareCandidates(cand1: Candidate, cand2: Candidate): Int =
         if cand1 eq cand2 then return 0
         val cmpLevel = cand1.level - cand2.level
@@ -1281,12 +1297,14 @@ trait Implicits:
         val arity2 = sym2.info.firstParamTypes.length
         val cmpArity = arity1 - arity2
         if cmpArity != 0 then return cmpArity // 2.
-        val cmpOwner = compareOwner(sym1.owner, sym2.owner)
+        val cmpOwner = compareBaseClassesLength(sym1.owner, sym2.owner)
         if cmpOwner != 0 then return -cmpOwner // 3.
-        cmpOwner
-        // val cmpName = NameOrdering.compare(sym1.fullName, sym2.fullName)
-        // assert(cmpName != 0, s"Cannot establish a preference between $cand1 (${sym1.showLocated}) and $cand2 (${sym2.showLocated})")
-        // cmpName
+        // -cmpOwner
+        val cmpName = NameOrdering.compare(sym1.name, sym2.name)
+        if cmpName != 0 then return cmpName
+        val cmpFullName = NameOrdering.compare(sym1.fullName, sym2.fullName)
+        assert(cmpFullName != 0, s"Cannot establish a preference between $cand1 (${sym1.showLocated}) and $cand2 (${sym2.showLocated})")
+        cmpFullName
 
       /** Sort list of implicit references according to `prefer`.
        *  This is just an optimization that aims at reducing the average
@@ -1296,29 +1314,36 @@ trait Implicits:
         case Nil => eligible
         case e1 :: Nil => eligible
         case e1 :: e2 :: Nil =>
-          if (prefer(e2, e1)) assert(compareCandidates(e2, e1) < 0, s"e1: $e1 -- e2: $e2")
-          else if (prefer(e1, e2)) assert(compareCandidates(e1, e2) < 0, s"e1: $e1 -- e2: $e2")
-          else assert(compareCandidates(e1, e2) == 0, s"e1: $e1 -- e2: $e2")
-          if (prefer(e2, e1)) e2 :: e1 :: Nil
+          if (compareCandidates(e2, e1) < 0) e2 :: e1 :: Nil
           else eligible
         case _ =>
-          try
-            val s1 = eligible.sortWith(prefer)
-            val s2 = eligible.sorted(using (a, b) => compareCandidates(a, b))
-            assert(s1 == s2, s"s1 = $s1\ns2 = $s2")
-            s1
-          catch case ex: IllegalArgumentException =>
-            // diagnostic to see what went wrong
             for
               e1 <- eligible
               e2 <- eligible
-              if prefer(e1, e2)
+              cmp12 = Integer.signum(compareCandidates(e1, e2))
               e3 <- eligible
-              if prefer(e2, e3) && !prefer(e1, e3)
+              cmp13 = Integer.signum(compareCandidates(e1, e3))
+              cmp23 = Integer.signum(compareCandidates(e2, e3))
+              if cmp12 != 0 && cmp12 == cmp23 && cmp13 != cmp12 ||
+                 cmp12 == 0 && cmp13 != cmp23
             do
               val es = List(e1, e2, e3)
+              println("cmp(e1, e2):" + compareCandidates(e1, e2))
+              println("cmp(e2, e3):" + compareCandidates(e2, e3))
+              println("cmp(e1, e3):" + compareCandidates(e1, e3))
+              val e1n = e1.ref.symbol.fullName
+              val e2n = e2.ref.symbol.fullName
+              val e3n = e3.ref.symbol.fullName
+              // println("e1n: " + e1n.debugString)
+              // println("e2n: " + e2n.debugString)
+              // println("e3n: " + e3n.debugString)
+              // println("#cmp(e1n, e2n):" + NameOrdering.compare(e1n, e2n))
+              // println("#cmp(e2n, e3n):" + NameOrdering.compare(e2n, e3n))
+              // println("#cmp(e1n, e3n):" + NameOrdering.compare(e1n, e3n))
+              
               println(i"transitivity violated for $es%, %\n ${es.map(_.implicitRef.underlyingRef.symbol.showLocated)}%, %")
-            throw ex
+
+            eligible.sorted(using (a, b) => compareCandidates(a, b))
       }
 
       rank(sort(eligible), NoMatchingImplicitsFailure, Nil)
