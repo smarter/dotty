@@ -358,7 +358,8 @@ object desugar {
       case Nil =>
         meth
       case evidenceParams =>
-        val paramss1: List[dotty.tools.dotc.ast.untpd.ParamClause] = meth.paramss.reverse match
+        // val paramss1: List[dotty.tools.dotc.ast.untpd.ParamClause] = meth.paramss.reverse match
+        val paramss1/*: List[List[dotty.tools.dotc.ast.untpd.ValDef] | List[dotty.tools.dotc.ast.untpd.TypeDef]]*/ = meth.paramss.reverse match
           case ValDefs(vparams @ (vparam :: _)) :: rparamss if vparam.mods.isOneOf(GivenOrImplicit) =>
             ((evidenceParams ++ vparams) :: rparamss).reverse
           case _ =>
