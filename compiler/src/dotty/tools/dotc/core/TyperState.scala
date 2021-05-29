@@ -75,10 +75,12 @@ class TyperState() {
   def ownedVars_=(vs: TypeVars): Unit = myOwnedVars = vs
 
 
-  var canRollback: Boolean = false
+  private var myCanRollback: Boolean = _
+  def canRollback: Boolean = myCanRollback
+
   inline def transaction[T](inline op: (() => Unit) => T)(using Context): T =
     val savedCanRollback = canRollback
-    canRollback = true
+    myCanRollback = true
 
     val savedConstraint = constraint
     def rollbackConstraint() = constraint = savedConstraint
@@ -88,7 +90,7 @@ class TyperState() {
       rollbackConstraint()
       throw ex
     finally
-      canRollback = savedCanRollback
+      myCanRollback = savedCanRollback
       if isCommittable then gc()
   end transaction
 
@@ -103,6 +105,10 @@ class TyperState() {
     this.previousConstraint = constraint
     this.myOwnedVars = SimpleIdentitySet.empty
     this.isCommitted = false
+    this.myCanRollback = false
+      //does this need to be previous.myCanRollback? No: tvar created in nested TS can be instantiated,
+      //but that's ok, transaction is just about tvars in current TS still being in the same state
+      //when rolling back that transaction
     this
 
   /** A fresh typer state with the same constraint as this one. */
