@@ -495,7 +495,16 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
         sym.setFlag(Scala2x)
       if (!(isRefinementClass(sym) || isUnpickleRoot(sym) || sym.is(Scala2Existential))) {
         val owner = sym.owner
-        if (owner.isClass)
+        val canEnter =
+          owner.isClass &&
+          (!sym.is(TypeParam) ||
+            owner.infoOrCompleter.match
+              case completer: ClassUnpickler =>
+                !completer.isInitialized
+              case _ =>
+                true)
+
+        if (canEnter)
           owner.asClass.enter(sym, symScope(owner))
       }
       sym
@@ -625,23 +634,30 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   object localMemberUnpickler extends LocalUnpickler
 
   class ClassUnpickler(infoRef: Int) extends LocalUnpickler with TypeParamsCompleter {
-    private def readTypeParams()(using Context): List[TypeSymbol] = {
+    private var myTypeParams: List[TypeSymbol] = null
+
+    private def readTypeParams()(using Context): Unit = {
       val tag = readByte()
       val end = readNat() + readIndex
-      if (tag == POLYtpe) {
-        val unusedRestpeRef = readNat()
-        until(end, () => readSymbolRef()(using ctx)).asInstanceOf[List[TypeSymbol]]
-      }
-      else Nil
+      myTypeParams =
+        if (tag == POLYtpe) {
+          val unusedRestpeRef = readNat()
+          until(end, () => readSymbolRef()(using ctx)).asInstanceOf[List[TypeSymbol]]
+        } else Nil
     }
-    private def loadTypeParams(using Context) =
+    private def loadTypeParams()(using Context) =
       atReadPos(index(infoRef), () => readTypeParams()(using ctx))
 
+    /** Have the type params of this class already been unpickled? */
+    def isInitialized: Boolean = myTypeParams ne null
+
     /** Force reading type params early, we need them in setClassInfo of subclasses. */
-    def init()(using Context): List[TypeSymbol] = loadTypeParams
+    def init()(using Context): List[TypeSymbol] =
+      if !isInitialized then loadTypeParams()
+      myTypeParams
 
     override def completerTypeParams(sym: Symbol)(using Context): List[TypeSymbol] =
-      loadTypeParams
+      init()
   }
 
   def rootClassUnpickler(start: Coord, cls: Symbol, module: Symbol, infoRef: Int): ClassUnpickler =
