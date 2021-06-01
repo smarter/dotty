@@ -655,13 +655,16 @@ trait Inferencing { this: Typer =>
             while buf.nonEmpty do
               val first @ (tvar, fromBelow) = buf.head
               buf.dropInPlace(1)
-              val suspend = buf.exists{ (following, _) =>
-                if fromBelow then
-                  constraint.isLess(following.origin, tvar.origin)
-                else
-                  constraint.isLess(tvar.origin, following.origin)
-              }
-              if suspend then suspended += first else tvar.instantiate(fromBelow)
+              if !tvar.isInstantiated then
+                val suspend = buf.exists{ (following, _) =>
+                  if fromBelow then
+                    constraint.isLess(following.origin, tvar.origin)
+                  else
+                    constraint.isLess(tvar.origin, following.origin)
+                }
+                if suspend then suspended += first else tvar.instantiate(fromBelow)
+              end if
+            end while
             doInstantiate(suspended)
         end doInstantiate
         doInstantiate(toInstantiate)

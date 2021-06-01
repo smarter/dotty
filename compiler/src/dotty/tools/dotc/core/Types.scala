@@ -4472,12 +4472,13 @@ object Types {
      */
     def instantiate(fromBelow: Boolean)(using Context): Type =
       if myInst.exists then
+        assert(false, s"myInst: ${myInst}")
         myInst
       else
         val tp = avoidCaptures(TypeComparer.instanceType(origin, fromBelow))
         if myInst.exists then
           // eq fail due to alias, intersection with self, ...
-          assert(myInst frozen_=:= tp, s"myInst: ${myInst} -- tp: ${tp}")
+          // assert(myInst frozen_=:= tp, s"myInst: ${myInst} -- tp: ${tp}")
           myInst
         else
           instantiateWith(tp)
