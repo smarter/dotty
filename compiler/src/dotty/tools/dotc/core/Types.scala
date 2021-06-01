@@ -4475,7 +4475,17 @@ object Types {
      *  is also a singleton type.
      */
     def instantiate(fromBelow: Boolean)(using Context): Type =
-      instantiateWith(avoidCaptures(TypeComparer.instanceType(origin, fromBelow)))
+      if myInst.exists then
+        assert(false, s"myInst: ${myInst}")
+        myInst
+      else
+        val tp = avoidCaptures(TypeComparer.instanceType(origin, fromBelow))
+        if myInst.exists then
+          // eq fail due to alias, intersection with self, ...
+          // assert(myInst frozen_=:= tp, s"myInst: ${myInst} -- tp: ${tp}")
+          myInst
+        else
+          instantiateWith(tp)
 
     /** For uninstantiated type variables: the entry in the constraint (either bounds or
      *  provisional instance value)
