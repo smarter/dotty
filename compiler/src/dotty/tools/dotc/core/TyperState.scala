@@ -91,7 +91,7 @@ class TyperState() {
       throw ex
     finally
       myCanRollback = savedCanRollback
-      if isCommittable then gc()
+      if isCommittable && !canRollback && (constraint ne savedConstraint) then gc()
   end transaction
 
   /** Initializes all fields except reporter, isCommittable, which need to be
