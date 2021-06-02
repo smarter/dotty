@@ -4483,7 +4483,7 @@ object Types {
       assert(!myInst.exists, i"$origin is already instantiated to $myInst but we attempted to instantiate it to $tp")
       typr.println(i"instantiating $this with $tp")
 
-      if Config.checkConstraintsSatisfiable then
+      if Config.checkConstraintsSatisfiable || true then
         assert(currentEntry.bounds.contains(tp),
           i"$origin is constrained to be $currentEntry but attempted to instantiate it to $tp")
 
@@ -4503,6 +4503,7 @@ object Types {
     def instantiate(fromBelow: Boolean)(using Context): Type =
       val tp = avoidCaptures(TypeComparer.instanceType(origin, fromBelow))
       if myInst.exists then // The line above might have triggered instantiation of the current type variable
+        assert(myInst frozen_=:= tp, i"While instantiating $origin to $tp we ended up instantiating it to $myInst instead.")
         myInst
       else
         instantiateWith(tp)
