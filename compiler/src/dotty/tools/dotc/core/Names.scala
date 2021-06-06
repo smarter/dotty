@@ -341,9 +341,7 @@ object Names {
     override def split: (TermName, SimpleName, String) = (EmptyTermName, this, "")
 
     override def encode: SimpleName = {
-      val dontEncode =
-        length >= 3 &&
-        head == '<' && last == '>' && isIdentifierStart(apply(1))
+      val dontEncode = (this eq StdNames.nme.CONSTRUCTOR) || (this eq StdNames.nme.STATIC_CONSTRUCTOR)
       if (dontEncode) this else NameTransformer.encode(this)
     }
 
