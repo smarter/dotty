@@ -79,19 +79,28 @@ class TyperState() {
   def canRollback: Boolean = myCanRollback
 
   inline def transaction[T](inline op: (() => Unit) => T)(using Context): T =
-    val savedCanRollback = canRollback
-    myCanRollback = true
-
     val savedConstraint = constraint
-    def rollbackConstraint() = constraint = savedConstraint
+    val savedOwnedVars = ownedVars
+    // val savedUninstVars = uninstVars
+
+    var previouslyInstantiated: TypeVars = SimpleIdentitySet.empty
+    for tv <- ownedVars do if tv.inst.exists then previouslyInstantiated += tv
+
+    def rollbackConstraint() =
+      constraint = savedConstraint
+      ownedVars = savedOwnedVars
+      for tv <- ownedVars do
+        if tv.inst.exists && !previouslyInstantiated.contains(tv) then
+          tv.resetInst(this)
+      // assert(savedUninstVars.toSet == uninstVars.toSet, s"saved: $savedUninstVars\nnew: $uninstVars")
 
     try op(() => rollbackConstraint())
     catch case NonFatal(ex) =>
       rollbackConstraint()
       throw ex
-    finally
-      myCanRollback = savedCanRollback
-      if isCommittable && !canRollback && (constraint ne savedConstraint) then gc()
+    // finally
+      // myCanRollback = savedCanRollback
+      // if isCommittable && !canRollback && (constraint ne savedConstraint) then gc()
   end transaction
 
   /** Initializes all fields except reporter, isCommittable, which need to be
@@ -212,7 +221,7 @@ class TyperState() {
    *  no-longer needed constraint entries.
    */
   def gc()(using Context): Unit =
-    if !canRollback && !ownedVars.isEmpty then
+    if /*!canRollback &&*/ !ownedVars.isEmpty then
       Stats.record("typerState.gc")
       val toCollect = new mutable.ListBuffer[TypeLambda]
       for tvar <- ownedVars do

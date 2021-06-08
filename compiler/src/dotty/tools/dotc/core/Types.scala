@@ -4428,6 +4428,10 @@ object Types {
           owningState1.ownedVars -= this
           owningState = null // no longer needed; null out to avoid a memory leak
 
+    private[core] def resetInst(ts: TyperState): Unit =
+      myInst = NoType
+      owningState = new WeakReference(ts)
+
     /** The state owning the variable. This is at first `creatorState`, but it can
      *  be changed to an enclosing state on a commit.
      */
@@ -4483,7 +4487,7 @@ object Types {
         assert(currentEntry.bounds.contains(tp),
           i"$origin is constrained to be $currentEntry but attempted to instantiate it to $tp")
 
-      if (ctx.typerState eq owningState.get) && !ctx.typerState.canRollback then
+      if (ctx.typerState eq owningState.get) /*&& !ctx.typerState.canRollback*/ then
         setInst(tp)
       ctx.typerState.constraint = ctx.typerState.constraint.replace(origin, tp)
       tp
