@@ -5386,12 +5386,7 @@ object Types {
           derivedMatchType(tp, bound1, scrut1, tp.cases.mapConserve(this))
 
         case tp: SkolemType =>
-          val info1 = this(tp.info)
-          if (info1 ne tp.info) && variance > 0 then
-            // Since we're in a covariant position we can widen instead of making up a new skolem
-            AndType(info1, defn.SingletonClass.typeRef)
-          else
-            derivedSkolemType(tp, info1)
+          derivedSkolemType(tp, this(tp.info))
 
         case tp: WildcardType =>
           derivedWildcardType(tp, mapOver(tp.optBounds))
