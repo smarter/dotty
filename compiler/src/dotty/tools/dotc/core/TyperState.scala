@@ -79,11 +79,15 @@ class TyperState() {
   def canRollback: Boolean = myCanRollback
 
   inline def transaction[T](inline op: (() => Unit) => T)(using Context): T =
+    val savedOwnedVars = ownedVars
     val savedCanRollback = canRollback
     myCanRollback = true
 
     val savedConstraint = constraint
-    def rollbackConstraint() = constraint = savedConstraint
+    def rollbackConstraint() =
+      val localVars = ownedVars -- savedOwnedVars
+      gc(localVars)
+      constraint = savedConstraint
 
     try op(() => rollbackConstraint())
     catch case NonFatal(ex) =>
@@ -214,17 +218,21 @@ class TyperState() {
   def gc()(using Context): Unit =
     if !canRollback && !ownedVars.isEmpty then
       Stats.record("typerState.gc")
-      val toCollect = new mutable.ListBuffer[TypeLambda]
-      for tvar <- ownedVars do
-        assert(tvar.owningState.get eq this, s"Inconsistent state in $this: it owns $tvar whose owningState is ${tvar.owningState.get}")
-        assert(!tvar.inst.exists, s"Inconsistent state in $this: it owns $tvar which is already instantiated")
-        val inst = constraint.instType(tvar)
-        if inst.exists then
-          tvar.setInst(inst)
-          val tl = tvar.origin.binder
-          if constraint.isRemovable(tl) then toCollect += tl
-      for tl <- toCollect do
-        constraint = constraint.remove(tl)
+      gc(ownedVars)
+
+  def gc(gcVars: TypeVars)(using Context): Unit =
+    Stats.record("typerState.gc")
+    val toCollect = new mutable.ListBuffer[TypeLambda]
+    for tvar <- gcVars do
+      assert(tvar.owningState.get eq this, s"Inconsistent state in $this: it owns $tvar whose owningState is ${tvar.owningState.get}")
+      assert(!tvar.inst.exists, s"Inconsistent state in $this: it owns $tvar which is already instantiated")
+      val inst = constraint.instType(tvar)
+      if inst.exists then
+        tvar.setInst(inst)
+        val tl = tvar.origin.binder
+        if constraint.isRemovable(tl) then toCollect += tl
+    for tl <- toCollect do
+      constraint = constraint.remove(tl)
 
   override def toString: String = {
     def ids(state: TyperState): List[String] =
