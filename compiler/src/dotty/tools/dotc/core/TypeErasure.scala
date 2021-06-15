@@ -696,8 +696,12 @@ class TypeErasure(sourceLanguage: SourceLanguage, semiEraseVCs: Boolean, isConst
             // forwarders to mixin methods.
             // See doc comment for ElimByName for speculation how we could improve this.
         else
+          val a = eraseResult(rt.translateFromRepeated(toArray = sourceLanguage.isJava))
+          val b = eraseResult(sym.info.finalResultType.translateFromRepeated(toArray = sourceLanguage.isJava))
+          assert((a =:= b), i"a: $a\nb: $b")
+          assert((a.signature == b.signature), i"a.si: ${a.signature}\nb.sig: ${b.signature}")
           MethodType(Nil, Nil,
-            eraseResult(sym.info.finalResultType.translateFromRepeated(toArray = sourceLanguage.isJava)))
+            a)
       case tp1: PolyType =>
         eraseResult(tp1.resultType) match
           case rt: MethodType => rt
