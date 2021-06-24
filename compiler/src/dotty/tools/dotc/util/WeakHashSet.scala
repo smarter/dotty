@@ -139,7 +139,7 @@ abstract class WeakHashSet[A <: AnyRef](initialCapacity: Int = 16, loadFactor: D
         case null                    => null.asInstanceOf[A]
         case _                       =>
           val entryElem = entry.get
-          if (elem.equals(entryElem)) entryElem
+          if (isEqual(elem, entryElem)) entryElem
           else linkedListLoop(entry.tail)
       }
 
@@ -166,7 +166,7 @@ abstract class WeakHashSet[A <: AnyRef](initialCapacity: Int = 16, loadFactor: D
         case null                    => add()
         case _                       =>
           val entryElem = entry.get
-          if (elem.equals(entryElem)) entryElem
+          if (isEqual(elem, entryElem)) entryElem
           else linkedListLoop(entry.tail)
       }
 
@@ -186,7 +186,7 @@ abstract class WeakHashSet[A <: AnyRef](initialCapacity: Int = 16, loadFactor: D
       @tailrec
       def linkedListLoop(prevEntry: Entry[A], entry: Entry[A]): Unit = entry match {
         case null => ()
-        case _ if elem.equals(entry.get) => remove(bucket, prevEntry, entry)
+        case _ if isEqual(elem, entry.get) => remove(bucket, prevEntry, entry)
         case _ => linkedListLoop(entry, entry.tail)
       }
 
