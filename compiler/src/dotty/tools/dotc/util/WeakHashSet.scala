@@ -76,6 +76,8 @@ abstract class WeakHashSet[A <: AnyRef](initialCapacity: Int = 16, loadFactor: D
     count -= 1
   }
 
+  private var counter: Long = 0
+
   /**
    * remove entries associated with elements that have been gc'ed
    */
@@ -97,6 +99,12 @@ abstract class WeakHashSet[A <: AnyRef](initialCapacity: Int = 16, loadFactor: D
         queueLoop()
       }
     }
+
+    if counter % 50000 == 0 then
+      System.gc()
+      System.gc()
+
+    counter += 1
 
     queueLoop()
   }
