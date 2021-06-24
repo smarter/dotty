@@ -1161,7 +1161,7 @@ trait Implicits:
        *           0              if neither alternative is preferred over the other
        */
       def compareAlternatives(alt1: RefAndLevel, alt2: RefAndLevel): Int =
-        if alt1.ref frozen_=:= alt2.ref then 0
+        if alt1.ref eq alt2.ref then 0
         else if alt1.level != alt2.level then alt1.level - alt2.level
         else explore(compare(alt1.ref, alt2.ref))(using nestedContext())
 
@@ -1467,7 +1467,7 @@ trait Implicits:
       def loop(history: SearchHistory, belowByname: Boolean): Boolean =
         history match
           case prev @ OpenSearch(cand1, tp, outer) =>
-            if cand1.ref frozen_=:= cand.ref then
+            if cand1.ref eq cand.ref then
               lazy val wildTp = wildApprox(tp.widenExpr)
               if belowByname && (wildTp <:< wildPt) then
                 fullyDefinedType(tp, "by-name implicit parameter", span)
