@@ -537,17 +537,36 @@ trait ConstraintHandling {
   end addConstraint
 
   def mergeConstraints(other: Constraint)(using Context): Boolean =
-    assert(constraint.domainLambdas.toSet == other.domainLambdas.toSet, i"this: $constraint\nthat: $constraint")
-    println(i"this: $constraint\nthat: $constraint")
+    // assert(constraint.domainLambdas.toSet == other.domainLambdas.toSet, i"this: $constraint\nthat: $constraint")
+    // println(i"before: $constraint")
+    other.domainLambdas.foreach(tl =>
+      if !constraint.contains(tl) then
+        val tvars = tl.paramRefs.map(other.typeVarOfParam).asInstanceOf[List[TypeVar]]
+        addToConstraint(tl, tvars)
+    )
     other.domainParams.forall { p =>
-      println("p: " + p)
-      println("constraint: " + constraint.entry(p).show)
-      println("constraint.l: " + constraint.lower(p).map(_.show))
-      println("constraint.u: " + constraint.upper(p).map(_.show))
-      println("other: " + other.entry(p).show)
-      println("other.l: " + other.lower(p).map(_.show))
-      println("other.u: " + other.upper(p).map(_.show))
-      true
+      // println("p: " + p)
+      other.lower(p).forall(otherLo =>
+        constraint.isLess(otherLo, p) || addLess(otherLo, p)
+      ) &&
+      other.upper(p).forall(otherHi =>
+        constraint.isLess(p, otherHi) || addLess(p, otherHi)
+      ) &&
+      other.entry(p).match
+        case NoType =>
+          true
+        case TypeBounds(lo, hi) =>
+          lo <:< p && p <:< hi
+        case tp =>
+          p =:= tp
+      
+      // println("constraint: " + constraint.entry(p))
+      // println("other: " + other.entry(p))
+      // println("constraint.l: " + constraint.lower(p))
+      // println("other.l: " + other.lower(p))
+      // println("constraint.u: " + constraint.upper(p))
+      // println("other.u: " + other.upper(p))
+      // true
     }
 
   /** Check that constraint is fully propagated. See comment in Config.checkConstraintsPropagated */

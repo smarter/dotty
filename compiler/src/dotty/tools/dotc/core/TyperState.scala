@@ -189,10 +189,13 @@ class TyperState() {
     that.ensureNotConflicting(constraint)
 
     assert(ctx.typerState == this, s"this: $this\nctx: ${ctx.typerState}")
-    println(s"this: ${this.constraint}\nctx: ${ctx.typerState}")
-    comparing(_.mergeConstraints(that.constraint))
+    // println(s"this: ${this}\tthat: ${that}")
+    // println(i"before: $constraint")
+    val res = comparing(_.mergeConstraints(that.constraint))
+    assert(res, s"cannot merge $constraint with ${that.constraint}")
+    // println(i"after: $constraint")
 
-    constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
+    // constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
     for tvar <- constraint.uninstVars do
       if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
     for tl <- constraint.domainLambdas do

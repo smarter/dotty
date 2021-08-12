@@ -376,6 +376,7 @@ object ProtoTypes {
     def typedArgs(norm: (untpd.Tree, Int) => untpd.Tree = sameTree)(using Context): List[Tree] =
       if state.typedArgs.size == args.length then state.typedArgs
       else
+        val origCtx = ctx
         val passedTyperState = ctx.typerState
         inContext(protoCtx.withUncommittedTyperState) {
           val protoTyperState = ctx.typerState
@@ -409,8 +410,9 @@ object ProtoTypes {
                   tvar.instantiate(fromBelow = false)
                 case _ =>
               }
-
-            passedTyperState.mergeConstraintWith(protoTyperState)
+            inContext(origCtx) {
+              passedTyperState.mergeConstraintWith(protoTyperState)
+            }
           end if
           args1
         }
