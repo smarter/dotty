@@ -187,6 +187,11 @@ class TyperState() {
    */
   def mergeConstraintWith(that: TyperState)(using Context): Unit =
     that.ensureNotConflicting(constraint)
+
+    assert(ctx.typerState == this, s"this: $this\nctx: ${ctx.typerState}")
+    println(s"this: ${this.constraint}\nctx: ${ctx.typerState}")
+    comparing(_.mergeConstraints(that.constraint))
+
     constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
     for tvar <- constraint.uninstVars do
       if !isOwnedAnywhere(this, tvar) then includeVar(tvar)

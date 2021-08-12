@@ -536,6 +536,20 @@ trait ConstraintHandling {
     }
   end addConstraint
 
+  def mergeConstraints(other: Constraint)(using Context): Boolean =
+    assert(constraint.domainLambdas.toSet == other.domainLambdas.toSet, i"this: $constraint\nthat: $constraint")
+    println(i"this: $constraint\nthat: $constraint")
+    other.domainParams.forall { p =>
+      println("p: " + p)
+      println("constraint: " + constraint.entry(p).show)
+      println("constraint.l: " + constraint.lower(p).map(_.show))
+      println("constraint.u: " + constraint.upper(p).map(_.show))
+      println("other: " + other.entry(p).show)
+      println("other.l: " + other.lower(p).map(_.show))
+      println("other.u: " + other.upper(p).map(_.show))
+      true
+    }
+
   /** Check that constraint is fully propagated. See comment in Config.checkConstraintsPropagated */
   def checkPropagated(msg: => String)(result: Boolean)(using Context): Boolean = {
     if (Config.checkConstraintsPropagated && result && addConstraintInvocations == 0)
