@@ -539,12 +539,16 @@ trait ConstraintHandling {
   def mergeConstraints(other: Constraint)(using Context): Boolean =
     // assert(constraint.domainLambdas.toSet == other.domainLambdas.toSet, i"this: $constraint\nthat: $constraint")
     // println(i"before: $constraint")
+    // println(i"other: $other")
+    // println("this: " + constraint.domainLambdas)
+    // println("other: " + other.domainLambdas)
     other.domainLambdas.foreach(tl =>
-      if !constraint.contains(tl) then
+      if !constraint.contains(tl) && !other.isRemovable(tl) then
         val tvars = tl.paramRefs.map(other.typeVarOfParam).asInstanceOf[List[TypeVar]]
+        // println("adding: " + tl)
         addToConstraint(tl, tvars)
     )
-    other.domainParams.forall { p =>
+    val z = other.domainParams.forall { p =>
       // println("p: " + p)
       other.lower(p).forall(otherLo =>
         constraint.isLess(otherLo, p) || addLess(otherLo, p)
@@ -568,6 +572,15 @@ trait ConstraintHandling {
       // println("other.u: " + other.upper(p))
       // true
     }
+    // constraint.domainLambdas.foreach(tl =>
+    //   if constraint.isRemovable(tl) then
+    //     println("##remove: " + tl)
+    //     constraint = constraint.remove(tl)
+    //   else
+    //     println("keep: " + tl)
+    // )
+    // println(i"after: $constraint")
+    z
 
   /** Check that constraint is fully propagated. See comment in Config.checkConstraintsPropagated */
   def checkPropagated(msg: => String)(result: Boolean)(using Context): Boolean = {

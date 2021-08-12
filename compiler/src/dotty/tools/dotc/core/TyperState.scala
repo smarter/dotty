@@ -191,15 +191,22 @@ class TyperState() {
     assert(ctx.typerState == this, s"this: $this\nctx: ${ctx.typerState}")
     // println(s"this: ${this}\tthat: ${that}")
     // println(i"before: $constraint")
+    // println(s"this.o: " + this.ownedVars)
+    // println(s"other.o: " + that.ownedVars)
     val res = comparing(_.mergeConstraints(that.constraint))
     assert(res, s"cannot merge $constraint with ${that.constraint}")
     // println(i"after: $constraint")
 
     // constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
-    for tvar <- constraint.uninstVars do
+    // for tvar <- constraint.uninstVars do
+    //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
+    for tvar <- constraint.domainLambdas.flatMap(_.paramRefs).map(x => constraint.typeVarOfParam(x)).collect{ case tv: TypeVar => tv} do
       if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
+    // println(s"after.o: " + this.ownedVars)
+    // gc()
+    // println(i"after: $constraint")
 
   /** Take ownership of `tvar`.
    *

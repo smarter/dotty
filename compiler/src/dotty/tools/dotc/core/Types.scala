@@ -4512,7 +4512,7 @@ object Types {
     /** The state owning the variable. This is at first `creatorState`, but it can
      *  be changed to an enclosing state on a commit.
      */
-    private[core] var owningState: WeakReference[TyperState] =
+    /*private[core]*/ var owningState: WeakReference[TyperState] =
       if (creatorState == null) null else new WeakReference(creatorState)
 
     /** The instance type of this variable, or NoType if the variable is currently
