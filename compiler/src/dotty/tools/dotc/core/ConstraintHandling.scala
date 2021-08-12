@@ -546,10 +546,13 @@ trait ConstraintHandling {
       if !constraint.contains(tl) && !other.isRemovable(tl) then
         val tvars = tl.paramRefs.map(other.typeVarOfParam).asInstanceOf[List[TypeVar]]
         // println("adding: " + tl)
-        addToConstraint(tl, tvars)
+        val z = addToConstraint(tl, tvars)
+        // println("z: " + z)
     )
-    val z = other.domainParams.forall { p =>
-      // println("p: " + p)
+    // println("c: " + constraint.show)
+    val z = constraint.uninstVars.forall { tv =>
+      // println("tv: " + tv)
+      val p = tv.origin
       other.lower(p).forall(otherLo =>
         constraint.isLess(otherLo, p) || addLess(otherLo, p)
       ) &&
@@ -560,9 +563,9 @@ trait ConstraintHandling {
         case NoType =>
           true
         case TypeBounds(lo, hi) =>
-          lo <:< p && p <:< hi
+          lo <:< tv && tv <:< hi
         case tp =>
-          p =:= tp
+          tv =:= tp
       
       // println("constraint: " + constraint.entry(p))
       // println("other: " + other.entry(p))

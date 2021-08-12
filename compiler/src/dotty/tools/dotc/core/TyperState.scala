@@ -194,13 +194,24 @@ class TyperState() {
     // println(s"this.o: " + this.ownedVars)
     // println(s"other.o: " + that.ownedVars)
     val res = comparing(_.mergeConstraints(that.constraint))
-    assert(res, s"cannot merge $constraint with ${that.constraint}")
+    // println(i"after: $constraint")
+    if !res then {
+      val c = constraint.show
+      val o =
+        val savedConstraint = ctx.typerState.constraint
+        try
+          ctx.typerState.constraint = that.constraint
+          that.constraint.show
+        finally
+          ctx.typerState.constraint = savedConstraint
+      assert(false, s"cannot merge $c with $o")
+    }
     // println(i"after: $constraint")
 
     // constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
     // for tvar <- constraint.uninstVars do
     //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
-    for tvar <- constraint.domainLambdas.flatMap(_.paramRefs).map(x => constraint.typeVarOfParam(x)).collect{ case tv: TypeVar => tv} do
+    for tvar <- constraint.domainLambdas.flatMap(_.paramRefs).map(x => constraint.typeVarOfParam(x)).collect{ case tv: TypeVar => tv}.filter(!_.inst.exists) do
       if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
