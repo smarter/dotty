@@ -188,7 +188,7 @@ class TyperState() {
   def mergeConstraintWith(that: TyperState)(using Context): Unit =
     that.ensureNotConflicting(constraint)
 
-    assert(ctx.typerState == this, s"this: $this\nctx: ${ctx.typerState}")
+    // assert(ctx.typerState == this, s"this: $this\nctx: ${ctx.typerState}")
     // println(s"this: ${this}\tthat: ${that}")
     // println(i"before: $constraint")
     // println(s"this.o: " + this.ownedVars)
@@ -196,6 +196,9 @@ class TyperState() {
     // for tvar <- that.constraint.uninstVars do
     //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
 
+    val comparingCtx =
+      if ctx.typerState == this then ctx
+      else ctx.fresh.setTyperState(this)
     val other = that.constraint
     val res = comparing(tcmp =>
       other.domainLambdas.foreach(tl =>
@@ -205,7 +208,7 @@ class TyperState() {
           tcmp.addToConstraint(tl, tvars)
       )
       tcmp.mergeConstraints(that.constraint)
-    )
+    )(using comparingCtx)
     // println(i"after: $constraint")
     if !res then {
       val c = constraint.show
