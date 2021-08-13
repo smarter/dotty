@@ -191,33 +191,30 @@ class TyperState() {
       if ctx.typerState == this then ctx
       else ctx.fresh.setTyperState(this)
     val other = that.constraint
-    comparing(tcmp =>
+    val res = comparing(tcmp =>
       other.domainLambdas.foreach(tl =>
         if !constraint.contains(tl) && !other.isRemovable(tl) then
           val tvars = tl.paramRefs.map(other.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
           tvars.foreach(tvar => if !isOwnedAnywhere(this, tvar) then includeVar(tvar))
           tcmp.addToConstraint(tl, tvars) // ignore failures, could happen with bad bounds?
       )
-      // tcmp.mergeConstraints(that.constraint)
+      constraint.uninstVars.forall(tv =>
+        val p = tv.origin
+        val otherLos = other.lower(p)
+        val otherHis = other.upper(p)
+        val otherEntry = other.entry(p)
+        (  (otherLos eq constraint.lower(p)) || otherLos.forall(_ <:< p)) &&
+        (  (otherHis eq constraint.upper(p)) || otherHis.forall(p <:< _)) &&
+        ((otherEntry eq constraint.entry(p)) || otherEntry.match
+          case NoType =>
+            true
+          case tp: TypeBounds =>
+            tp.contains(tv)
+          case tp =>
+            tv =:= tp
+          )
+      )
     )(using comparingCtx)
-    val res = constraint.uninstVars.forall(tv =>
-      // println("tv: " + tv)
-      val p = tv.origin
-      // TODO: if other.lower(p) != constraint.lower(p) then ...
-      other.lower(p).forall(otherLo =>
-        /*constraint.isLess(otherLo, p) ||*/ otherLo <:< p
-      ) &&
-      other.upper(p).forall(otherHi =>
-        /*constraint.isLess(p, otherHi) ||*/ p <:< otherHi
-      ) &&
-      other.entry(p).match
-        case NoType =>
-          true
-        case tp: TypeBounds =>
-          tp.contains(tv)
-        case tp =>
-          tv =:= tp
-    )
 
     // println(i"after: $constraint")
     if !res then {
