@@ -187,28 +187,38 @@ class TyperState() {
    */
   def mergeConstraintWith(that: TyperState)(using Context): Unit =
     that.ensureNotConflicting(constraint)
-
-    // assert(ctx.typerState == this, s"this: $this\nctx: ${ctx.typerState}")
-    // println(s"this: ${this}\tthat: ${that}")
-    // println(i"before: $constraint")
-    // println(s"this.o: " + this.ownedVars)
-    // println(s"other.o: " + that.ownedVars)
-    // for tvar <- that.constraint.uninstVars do
-    //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
-
     val comparingCtx =
       if ctx.typerState == this then ctx
       else ctx.fresh.setTyperState(this)
     val other = that.constraint
-    val res = comparing(tcmp =>
+    comparing(tcmp =>
       other.domainLambdas.foreach(tl =>
         if !constraint.contains(tl) && !other.isRemovable(tl) then
           val tvars = tl.paramRefs.map(other.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
           tvars.foreach(tvar => if !isOwnedAnywhere(this, tvar) then includeVar(tvar))
-          tcmp.addToConstraint(tl, tvars)
+          tcmp.addToConstraint(tl, tvars) // ignore failures, could happen with bad bounds?
       )
-      tcmp.mergeConstraints(that.constraint)
+      // tcmp.mergeConstraints(that.constraint)
     )(using comparingCtx)
+    val res = constraint.uninstVars.forall(tv =>
+      // println("tv: " + tv)
+      val p = tv.origin
+      // TODO: if other.lower(p) != constraint.lower(p) then ...
+      other.lower(p).forall(otherLo =>
+        /*constraint.isLess(otherLo, p) ||*/ otherLo <:< p
+      ) &&
+      other.upper(p).forall(otherHi =>
+        /*constraint.isLess(p, otherHi) ||*/ p <:< otherHi
+      ) &&
+      other.entry(p).match
+        case NoType =>
+          true
+        case tp: TypeBounds =>
+          tp.contains(tv)
+        case tp =>
+          tv =:= tp
+    )
+
     // println(i"after: $constraint")
     if !res then {
       val c = constraint.show
@@ -221,20 +231,9 @@ class TyperState() {
           ctx.typerState.constraint = savedConstraint
       assert(false, s"cannot merge $c with $o")
     }
-    // println(i"after: $constraint")
-
-    // constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
-    // for tvar <- constraint.uninstVars do
-    //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
-    // for tvar <- constraint.domainLambdas.flatMap(_.paramRefs).map(x => constraint.typeVarOfParam(x)).collect{ case tv: TypeVar => tv}.filter(!_.inst.exists) do
-    //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
-
+    // TODO: useful?
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
-
-    // println(s"after.o: " + this.ownedVars)
-    // gc()
-    // println(i"after: $constraint")
 
   /** Take ownership of `tvar`.
    *

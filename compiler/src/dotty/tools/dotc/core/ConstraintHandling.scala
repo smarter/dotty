@@ -536,55 +536,6 @@ trait ConstraintHandling {
     }
   end addConstraint
 
-  def mergeConstraints(other: Constraint)(using Context): Boolean =
-    // assert(constraint.domainLambdas.toSet == other.domainLambdas.toSet, i"this: $constraint\nthat: $constraint")
-    // println(i"before: $constraint")
-    // println(i"other: $other")
-    // println("this: " + constraint.domainLambdas)
-    // println("other: " + other.domainLambdas)
-    // other.domainLambdas.foreach(tl =>
-    //   if !constraint.contains(tl) && !other.isRemovable(tl) then
-    //     val tvars = tl.paramRefs.map(other.typeVarOfParam).asInstanceOf[List[TypeVar]]
-    //     // println("adding: " + tl)
-    //     val z = addToConstraint(tl, tvars)
-    //     // println("z: " + z)
-    // )
-    // println("c: " + constraint.show)
-    val z = constraint.uninstVars.forall { tv =>
-      // println("tv: " + tv)
-      val p = tv.origin
-      other.lower(p).forall(otherLo =>
-        constraint.isLess(otherLo, p) || addLess(otherLo, p)
-      ) &&
-      other.upper(p).forall(otherHi =>
-        constraint.isLess(p, otherHi) || addLess(p, otherHi)
-      ) &&
-      other.entry(p).match
-        case NoType =>
-          true
-        case TypeBounds(lo, hi) =>
-          lo <:< tv && tv <:< hi
-        case tp =>
-          tv =:= tp
-      
-      // println("constraint: " + constraint.entry(p))
-      // println("other: " + other.entry(p))
-      // println("constraint.l: " + constraint.lower(p))
-      // println("other.l: " + other.lower(p))
-      // println("constraint.u: " + constraint.upper(p))
-      // println("other.u: " + other.upper(p))
-      // true
-    }
-    // constraint.domainLambdas.foreach(tl =>
-    //   if constraint.isRemovable(tl) then
-    //     println("##remove: " + tl)
-    //     constraint = constraint.remove(tl)
-    //   else
-    //     println("keep: " + tl)
-    // )
-    // println(i"after: $constraint")
-    z
-
   /** Check that constraint is fully propagated. See comment in Config.checkConstraintsPropagated */
   def checkPropagated(msg: => String)(result: Boolean)(using Context): Boolean = {
     if (Config.checkConstraintsPropagated && result && addConstraintInvocations == 0)
