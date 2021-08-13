@@ -193,7 +193,19 @@ class TyperState() {
     // println(i"before: $constraint")
     // println(s"this.o: " + this.ownedVars)
     // println(s"other.o: " + that.ownedVars)
-    val res = comparing(_.mergeConstraints(that.constraint))
+    // for tvar <- that.constraint.uninstVars do
+    //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
+
+    val other = that.constraint
+    val res = comparing(tcmp =>
+      other.domainLambdas.foreach(tl =>
+        if !constraint.contains(tl) && !other.isRemovable(tl) then
+          val tvars = tl.paramRefs.map(other.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
+          tvars.foreach(tvar => if !isOwnedAnywhere(this, tvar) then includeVar(tvar))
+          tcmp.addToConstraint(tl, tvars)
+      )
+      tcmp.mergeConstraints(that.constraint)
+    )
     // println(i"after: $constraint")
     if !res then {
       val c = constraint.show
@@ -211,10 +223,12 @@ class TyperState() {
     // constraint = constraint & (that.constraint, otherHasErrors = that.reporter.errorsReported)
     // for tvar <- constraint.uninstVars do
     //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
-    for tvar <- constraint.domainLambdas.flatMap(_.paramRefs).map(x => constraint.typeVarOfParam(x)).collect{ case tv: TypeVar => tv}.filter(!_.inst.exists) do
-      if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
+    // for tvar <- constraint.domainLambdas.flatMap(_.paramRefs).map(x => constraint.typeVarOfParam(x)).collect{ case tv: TypeVar => tv}.filter(!_.inst.exists) do
+    //   if !isOwnedAnywhere(this, tvar) then includeVar(tvar)
+
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
+
     // println(s"after.o: " + this.ownedVars)
     // gc()
     // println(i"after: $constraint")

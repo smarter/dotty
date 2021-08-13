@@ -542,13 +542,13 @@ trait ConstraintHandling {
     // println(i"other: $other")
     // println("this: " + constraint.domainLambdas)
     // println("other: " + other.domainLambdas)
-    other.domainLambdas.foreach(tl =>
-      if !constraint.contains(tl) && !other.isRemovable(tl) then
-        val tvars = tl.paramRefs.map(other.typeVarOfParam).asInstanceOf[List[TypeVar]]
-        // println("adding: " + tl)
-        val z = addToConstraint(tl, tvars)
-        // println("z: " + z)
-    )
+    // other.domainLambdas.foreach(tl =>
+    //   if !constraint.contains(tl) && !other.isRemovable(tl) then
+    //     val tvars = tl.paramRefs.map(other.typeVarOfParam).asInstanceOf[List[TypeVar]]
+    //     // println("adding: " + tl)
+    //     val z = addToConstraint(tl, tvars)
+    //     // println("z: " + z)
+    // )
     // println("c: " + constraint.show)
     val z = constraint.uninstVars.forall { tv =>
       // println("tv: " + tv)
