@@ -193,11 +193,10 @@ class TyperState() {
     val other = that.constraint
     // TODO: check for merge with empty constraint?
     val res = comparing(tcmp =>
-
       other.domainLambdas.forall(tl =>
         constraint.contains(tl) || other.isRemovable(tl) || {
           val tvars = tl.paramRefs.map(other.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
-          tvars.foreach(tvar => if !isOwnedAnywhere(this, tvar) then includeVar(tvar))
+          tvars.foreach(tvar => if !tvar.inst.exists && !isOwnedAnywhere(this, tvar) then includeVar(tvar))
           tcmp.addToConstraint(tl, tvars)
         }
       ) &&
