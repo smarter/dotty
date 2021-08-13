@@ -193,6 +193,7 @@ class TyperState() {
     val other = that.constraint
     // TODO: check for merge with empty constraint?
     val res = comparing(tcmp =>
+
       other.domainLambdas.forall(tl =>
         constraint.contains(tl) || other.isRemovable(tl) || {
           val tvars = tl.paramRefs.map(other.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
@@ -218,18 +219,7 @@ class TyperState() {
       )
     )(using comparingCtx)
 
-    // println(i"after: $constraint")
-    if !res then {
-      val c = constraint.show
-      val o =
-        val savedConstraint = ctx.typerState.constraint
-        try
-          ctx.typerState.constraint = that.constraint
-          that.constraint.show
-        finally
-          ctx.typerState.constraint = savedConstraint
-      assert(false, s"cannot merge $c with $o")
-    }
+    assert(res, i"cannot merge $constraint with $other.")
     // TODO: useful?
     for tl <- constraint.domainLambdas do
       if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
