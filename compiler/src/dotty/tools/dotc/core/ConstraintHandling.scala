@@ -84,6 +84,8 @@ trait ConstraintHandling {
    */
   protected def approximateWildcards: Boolean = true
 
+  protected def flipVariance: Boolean// = false
+
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
     if !constraint.contains(param) then true
     else if !isUpper && param.occursIn(rawBound) then
@@ -92,21 +94,22 @@ trait ConstraintHandling {
       false
     else
       val dropWildcards = new AvoidWildcardsMap:
-        if !isUpper then variance = -1
+        if isUpper then variance = -1
+        if flipVariance then variance = -variance
         // if isUpper then variance = -1
 
-        override def apply(t: Type): Type = t match
-          case t: WildcardType => mapWild(t)
-          case _ =>
-            println(s"mapping[$variance]: " + t.show)
-            mapOver(t)
+        // override def apply(t: Type): Type = t match
+        //   case t: WildcardType => mapWild(t)
+        //   case _ =>
+        //     println(s"mapping[$variance]: " + t.show)
+        //     mapOver(t)
 
         override def mapWild(t: WildcardType) =
           if approximateWildcards then super.mapWild(t)
           else newTypeVar(apply(t.effectiveBounds).toBounds)
-      println("b: " + rawBound.show)
+      // println("b: " + rawBound.show)
       val bound = dropWildcards(rawBound)
-      println("a: " + bound.show)
+      // println("a: " + bound.show)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound
       if equalBounds && !bound.existsPart(_ eq param, StopAt.Static) then

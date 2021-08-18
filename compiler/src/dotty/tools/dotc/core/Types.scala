@@ -5842,10 +5842,10 @@ object Types {
       val savedVariance = variance
       // variance = -variance
       // atVariance(-v)(range(atVariance(v)(apply(bounds.lo)), apply(bounds.hi)))
-      println("v: " + variance)
-      println("t: " + t.show)
+      // println("v: " + variance)
+      // println("t: " + t.show)
       val z = range(atVariance(-variance)(apply(bounds.lo)), apply(bounds.hi))
-      println("z: " + z.show)
+      // println("z: " + z.show)
       variance = savedVariance
       z
     def apply(t: Type): Type = t match

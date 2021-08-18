@@ -149,6 +149,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
   override protected def approximateWildcards: Boolean =
     useNecessaryEither || ctx.mode.is(Mode.TypevarsMissContext)
 
+  protected def flipVariance: Boolean =
+    useNecessaryEither
+
   def testSubType(tp1: Type, tp2: Type): CompareResult =
     GADTused = false
     if !topLevelSubType(tp1, tp2) then CompareResult.Fail
