@@ -1094,7 +1094,11 @@ class Typer extends Namer
     if (noLeaks(tree)) tree
     else {
       fullyDefinedType(tree.tpe, "block", tree.span)
+      // println("tree: " + tree.show)
+      // println("tree.tp: " + tree.tpe.show)
       var avoidingType = TypeOps.avoid(tree.tpe, localSyms)
+      // println("local: " + localSyms)
+      // println("av: " + avoidingType.show)
       val ptDefined = isFullyDefined(pt, ForceDegree.none)
       if (ptDefined && !(avoidingType.widenExpr <:< pt)) avoidingType = pt
       val tree1 = ascribeType(tree, avoidingType)
