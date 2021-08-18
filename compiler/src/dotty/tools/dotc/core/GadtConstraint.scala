@@ -70,6 +70,8 @@ final class ProperGadtConstraint private(
     reverseMapping = SimpleIdentityMap.empty
   )
 
+  protected def flipVariance: Boolean = true
+
   /** Exposes ConstraintHandling.subsumes */
   def subsumes(left: GadtConstraint, right: GadtConstraint, pre: GadtConstraint)(using Context): Boolean = {
     def extractConstraint(g: GadtConstraint) = g match {
