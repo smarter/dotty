@@ -129,9 +129,7 @@ trait ConstraintHandling {
           case tv: TypeVar => tv.nestingLevel
           case _ => Int.MaxValue
         override def apply(tp: Type): Type = tp match
-          case tp: NamedType if /*false &&*/ !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
-            // println("tp: " + tp)
-            // println("param: " + param + " bound: " + rawBound.show)
+          case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
             // Adapted from avoid
             tp match
               case tp: TermRef =>
