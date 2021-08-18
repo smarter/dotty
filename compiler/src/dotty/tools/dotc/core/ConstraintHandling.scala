@@ -112,6 +112,18 @@ trait ConstraintHandling {
             val sym = pre.currentSymbol
             sym.is(Package) || sym.isStatic && isStaticPrefix(pre.prefix)
           case _ => true
+        // copy from avoid, TODO: is this enough to avoid realizability check? same Q for regular avoid
+        override def derivedSelect(tp: NamedType, pre: Type) =
+          if (pre eq tp.prefix)
+            tp
+          else tryWiden(tp, tp.prefix).orElse {
+            if (tp.isTerm && variance > 0 && !pre.isSingleton)
+              apply(tp.info.widenExpr)
+            else if (upper(pre).member(tp.name).exists)
+              super.derivedSelect(tp, pre)
+            else
+              range(defn.NothingType, defn.AnyType)
+          }
 
         override def apply(tp: Type): Type = tp match
           case tp: NamedType if /*false &&*/ !tp.symbol.isStatic && tp.symbol.id > constraint.typeVarOfParam(param).asInstanceOf[TypeVar].nestingLevel =>
