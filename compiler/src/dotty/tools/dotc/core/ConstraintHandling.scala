@@ -106,8 +106,15 @@ trait ConstraintHandling {
         //     println(s"mapping[$variance]: " + t.show)
         //     mapOver(t)
 
+        // copy from avoid
+        override def isStaticPrefix(pre: Type)(using Context): Boolean = pre match
+          case pre: NamedType =>
+            val sym = pre.currentSymbol
+            sym.is(Package) || sym.isStatic && isStaticPrefix(pre.prefix)
+          case _ => true
+
         override def apply(tp: Type): Type = tp match
-          case tp: NamedType if /*false &&*/ !tp.symbol.isStatic && tp.uniqId > constraint.typeVarOfParam(param).uniqId =>
+          case tp: NamedType if /*false &&*/ !tp.symbol.isStatic && tp.symbol.id > constraint.typeVarOfParam(param).asInstanceOf[TypeVar].nestingLevel =>
             // println("tp: " + tp)
             // println("param: " + param + " bound: " + rawBound.show)
             // Adapted from avoid
@@ -132,6 +139,7 @@ trait ConstraintHandling {
           if approximateWildcards then super.mapWild(t)
           else newTypeVar(apply(t.effectiveBounds).toBounds)
       // println("raw: " + rawBound.show)
+      // XX: need realizability check for try/i8900.scala
       val bound = dropWildcards(rawBound)
       // println("pro: " + bound.show)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
