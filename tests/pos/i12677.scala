@@ -17,15 +17,16 @@ object Bug {
   def i: CustomHook[Int] = ???
   val f = F(i.blah)
   f: F[CustomHook[String]] // error
+  // f: F[CustomHook[String]] // error
 }
 
-// ====================================================================================
-object Workaround {
-  final class CustomHook[A] {
-    def blah[B](implicit tc: TC[A] { type Out = B }): CustomHook[B] = ??? // raise type
-  }
+// // ====================================================================================
+// object Workaround {
+//   final class CustomHook[A] {
+//     def blah[B](implicit tc: TC[A] { type Out = B }): CustomHook[B] = ??? // raise type
+//   }
 
-  def i: CustomHook[Int] = ???
-  val f = F(i.blah)
-  f: F[CustomHook[String]] // works
-}
+//   def i: CustomHook[Int] = ???
+//   val f = F(i.blah)
+//   f: F[CustomHook[String]] // works
+// }
