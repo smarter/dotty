@@ -93,6 +93,8 @@ trait ConstraintHandling {
       // so we shouldn't allow them as constraints either.
       false
     else
+      // def description = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
+      // println(i"adding $description$location")
       val dropWildcards = new AvoidWildcardsMap:
         if isUpper then variance = -1
         if flipVariance then variance = -variance
@@ -104,12 +106,34 @@ trait ConstraintHandling {
         //     println(s"mapping[$variance]: " + t.show)
         //     mapOver(t)
 
+        override def apply(tp: Type): Type = tp match
+          case tp: NamedType if /*false &&*/ !tp.symbol.isStatic && tp.uniqId > constraint.typeVarOfParam(param).uniqId =>
+            // println("tp: " + tp)
+            // println("param: " + param + " bound: " + rawBound.show)
+            // Adapted from avoid
+            tp match
+              case tp: TermRef =>
+                tp.info.widenExpr.dealias match
+                  case info: SingletonType => apply(info)
+                  case info => range(defn.NothingType, apply(info))
+              case tp: TypeRef =>
+                tp.info match
+                  case info: AliasingBounds =>
+                    apply(info.alias)
+                  case TypeBounds(lo, hi) =>
+                    range(atVariance(-variance)(apply(lo)), apply(hi))
+                  case info: ClassInfo =>
+                    range(defn.NothingType, apply(TypeOps.classBound(info)))
+                  case _ =>
+                    emptyRange // should happen only in error cases
+          case _ =>
+            super.apply(tp)
         override def mapWild(t: WildcardType) =
           if approximateWildcards then super.mapWild(t)
           else newTypeVar(apply(t.effectiveBounds).toBounds)
-      // println("b: " + rawBound.show)
+      // println("raw: " + rawBound.show)
       val bound = dropWildcards(rawBound)
-      // println("a: " + bound.show)
+      // println("pro: " + bound.show)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound
       if equalBounds && !bound.existsPart(_ eq param, StopAt.Static) then

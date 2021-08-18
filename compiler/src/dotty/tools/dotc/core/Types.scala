@@ -94,13 +94,9 @@ object Types {
 
 // ----- Tests -----------------------------------------------------
 
-//    // debug only: a unique identifier for a type
-//    val uniqId = {
-//      nextId = nextId + 1
-//      if (nextId == 19555)
-//        println("foo")
-//      nextId
-//    }
+    val uniqId =
+      nextId = nextId + 1
+      nextId
 
     /** A cache indicating whether the type was still provisional, last time we checked */
     @sharable private var mightBeProvisional = true
@@ -4610,7 +4606,7 @@ object Types {
      *  is also a singleton type.
      */
     def instantiate(fromBelow: Boolean)(using Context): Type =
-      val tp = avoidCaptures(TypeComparer.instanceType(origin, fromBelow))
+      val tp = /*avoidCaptures*/(TypeComparer.instanceType(origin, fromBelow))
       if myInst.exists then // The line above might have triggered instantiation of the current type variable
         myInst
       else
