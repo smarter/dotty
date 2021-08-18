@@ -153,7 +153,7 @@ trait ConstraintHandling {
           else newTypeVar(apply(t.effectiveBounds).toBounds)
       // println("raw: " + rawBound.show)
       // XX: need realizability check for try/i8900.scala
-      val bound = dropWildcards(rawBound)
+      val bound = if !this.isInstanceOf[GadtConstraint] then dropWildcards(rawBound) else rawBound
       // println("pro: " + bound.show)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound
