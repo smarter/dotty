@@ -94,6 +94,8 @@ trait ConstraintHandling {
       val dropWildcards = new AvoidWildcardsMap:
         if !isUpper then variance = -1
         override def mapWild(t: WildcardType) =
+          assert(!ctx.mode.is(Mode.GadtConstraintInference))
+          assert(!ConstraintHandling.this.isInstanceOf[GadtConstraint])
           if approximateWildcards then super.mapWild(t)
           else newTypeVar(apply(t.effectiveBounds).toBounds)
       val bound = dropWildcards(rawBound)
