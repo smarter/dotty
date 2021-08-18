@@ -5833,7 +5833,8 @@ object Types {
   class AvoidWildcardsMap(using Context) extends ApproximatingTypeMap:
     protected def mapWild(t: WildcardType) =
       val bounds = t.effectiveBounds
-      range(atVariance(-variance)(apply(bounds.lo)), apply(bounds.hi))
+      if variance <= 0 then apply(bounds.hi)
+      else apply(bounds.lo)
     def apply(t: Type): Type = t match
       case t: WildcardType => mapWild(t)
       case _ => mapOver(t)
