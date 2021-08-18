@@ -125,8 +125,11 @@ trait ConstraintHandling {
               range(defn.NothingType, defn.AnyType)
           }
 
+        def paramLevel = constraint.typeVarOfParam(param) match
+          case tv: TypeVar => tv.nestingLevel
+          case _ => Int.MaxValue
         override def apply(tp: Type): Type = tp match
-          case tp: NamedType if /*false &&*/ !tp.symbol.isStatic && tp.symbol.id > constraint.typeVarOfParam(param).asInstanceOf[TypeVar].nestingLevel =>
+          case tp: NamedType if /*false &&*/ !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
             // println("tp: " + tp)
             // println("param: " + param + " bound: " + rawBound.show)
             // Adapted from avoid
