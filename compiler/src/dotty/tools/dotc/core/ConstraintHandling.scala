@@ -152,7 +152,7 @@ trait ConstraintHandling {
 
           // For i8900pf / runST
           // what if we're inside poly fun? then hoepfully constraint contains binder
-          case tp: TypeParamRef if false && !constraint.contains(tp.binder) =>
+          case tp: TypeParamRef if !constraint.contains(tp.binder) =>
             // assert binder is apply of polyfun
             val TypeBounds(lo, hi) = tp.underlying.bounds
             range(atVariance(-variance)(apply(lo)), apply(hi))
