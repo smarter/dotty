@@ -96,6 +96,8 @@ trait ConstraintHandling {
       // def description = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
       // println(i"adding $description$location")
       val dropWildcards = new AvoidWildcardsMap:
+        @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
+
         if isUpper then variance = -1
         if flipVariance then variance = -variance
         // if isUpper then variance = -1
@@ -154,6 +156,15 @@ trait ConstraintHandling {
             // assert binder is apply of polyfun
             val TypeBounds(lo, hi) = tp.underlying.bounds
             range(atVariance(-variance)(apply(lo)), apply(hi))
+
+          // Also copied from avoid to fix tests/pos/i11464.scala
+          case tp: LazyRef =>
+            if localParamRefs.contains(tp.ref) then tp
+            else if isExpandingBounds then emptyRange
+            else mapOver(tp)
+          case tl: HKTypeLambda =>
+            localParamRefs ++= tl.paramRefs
+            mapOver(tl)
 
           case _ =>
             super.apply(tp)
