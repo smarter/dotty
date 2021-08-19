@@ -128,6 +128,7 @@ trait ConstraintHandling {
         def paramLevel = constraint.typeVarOfParam(param) match
           case tv: TypeVar => tv.nestingLevel
           case _ => Int.MaxValue
+
         override def apply(tp: Type): Type = tp match
           case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
             // Adapted from avoid
@@ -146,6 +147,14 @@ trait ConstraintHandling {
                     range(defn.NothingType, apply(TypeOps.classBound(info)))
                   case _ =>
                     emptyRange // should happen only in error cases
+
+          // For i8900pf / runST
+          // what if we're inside poly fun? then hoepfully constraint contains binder
+          case tp: TypeParamRef if false && !constraint.contains(tp.binder) =>
+            // assert binder is apply of polyfun
+            val TypeBounds(lo, hi) = tp.underlying.bounds
+            range(atVariance(-variance)(apply(lo)), apply(hi))
+
           case _ =>
             super.apply(tp)
         override def mapWild(t: WildcardType) =
