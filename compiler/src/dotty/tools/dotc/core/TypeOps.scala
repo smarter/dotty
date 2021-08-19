@@ -462,8 +462,14 @@ object TypeOps:
         case tp: SkolemType if partsToAvoid(Nil, tp.info).nonEmpty =>
           range(defn.NothingType, apply(tp.info))
         case tp: TypeVar if mapCtx.typerState.constraint.contains(tp) =>
+          // TODO: Instead, tighten the bounds to remove things that escape? Not
+          // sure what's better, tightening bounds of tvar we depend on, or
+          // stripping it away (the latter is probably more harmful in
+          // ConstraintHandling). Stripping away might be necessary if the bounds
+          // both have stuff to avoid.
           val lo = TypeComparer.instanceType(
             tp.origin, fromBelow = variance > 0 || variance == 0 && tp.hasLowerBound)(using mapCtx)
+          // TODO: come up with a test case where we need to avoid on the upper bound too.
           val lo1 = apply(lo)
           if (lo1 ne lo) lo1 else tp
         case tp: LazyRef =>
