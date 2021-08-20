@@ -822,9 +822,9 @@ object ProtoTypes {
       tp.derivedViewProto(
           wildApprox(tp.argType, theMap, seen, internal),
           wildApprox(tp.resultType, theMap, seen, internal))
-    case tp: FunProto if !tp.isInstanceOf[FunProtoTyped] =>
-      // tp.typedArgs()(using tp.protoCtx).map(arg => dummyTree.withType(wildApprox(arg.tpe)))
-      FunProtoTyped(tp.typedArgs(), tp.resType)(ctx.typer, tp.applyKind)
+    case tp: FunProto =>
+      tp.typedArgs()
+      tp
     case tp: IgnoredProto =>
       WildcardType
     case  _: ThisType | _: BoundType => // default case, inlined for speed
