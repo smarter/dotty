@@ -306,7 +306,7 @@ object ProtoTypes {
     typer: Typer,
     override val applyKind: ApplyKind,
     state: FunProtoState = new FunProtoState,
-    val constrainResultDeep: Boolean = false)(using protoCtx: Context)
+    val constrainResultDeep: Boolean = false)(using val protoCtx: Context)
   extends UncachedGroundType with ApplyingProto with FunOrPolyProto {
     override def resultType(using Context): Type = resType
 
@@ -500,7 +500,7 @@ object ProtoTypes {
    *  [](args): resultType, where args are known to be typed
    */
   class FunProtoTyped(args: List[tpd.Tree], resultType: Type)(typer: Typer, applyKind: ApplyKind)(using Context)
-  extends FunProto(args, resultType)(typer, applyKind):
+  extends FunProto(args, resultType)(typer, applyKind/*, constrainResultDeep = true*/):
     override def typedArgs(norm: (untpd.Tree, Int) => untpd.Tree)(using Context): List[tpd.Tree] = args
     override def typedArg(arg: untpd.Tree, formal: Type)(using Context): tpd.Tree = arg.asInstanceOf[tpd.Tree]
     override def allArgTypesAreCurrent()(using Context): Boolean = true
@@ -823,10 +823,33 @@ object ProtoTypes {
           wildApprox(tp.argType, theMap, seen, internal),
           wildApprox(tp.resultType, theMap, seen, internal))
     case tp: FunProto =>
-      val z = (if (theMap != null && seen.eq(theMap.seen)) theMap else new WildApproxMap(seen, internal))
-        .mapOver(tp).asInstanceOf[FunProto]
-      z.typedArgs()
+      val z = FunProtoTyped(
+        args = tp.args
+          .map(ctx.typer.typed(_))
+          .map(arg => arg.withType(wildApprox(arg.tpe, theMap, seen, internal))),
+        resultType = wildApprox(tp.resultType, theMap, seen, internal)
+      )(ctx.typer, tp.applyKind)
       z
+      
+      // val tp2 = tp.withContext(ctx).asInstanceOf[FunProto]
+      // val z = (if (theMap != null && seen.eq(theMap.seen)) theMap else new WildApproxMap(seen, internal))
+      //   .mapOver(tp2).asInstanceOf[FunProto]
+      // // z.typedArgs()
+      // z
+
+      // FunProtoTyped(
+      //   inContext(tp.protoCtx) {
+      //     val w2 = tp.typedArgs().map(arg =>
+      //       println("arg: " + arg.show + " " + arg.tpe.show)
+      //       val w = arg.withType(wildApprox(arg.tpe, theMap, seen, internal))
+      //       println("w: " + w.tpe.show)
+      //       w
+      //     )
+      //     println("w2: " + w2.map(_.tpe.show))
+      //     w2
+      //   },
+      //   wildApprox(tp.resultType, theMap, seen, internal)
+      // )(ctx.typer, tp.applyKind)
     case tp: IgnoredProto =>
       WildcardType
     case  _: ThisType | _: BoundType => // default case, inlined for speed
