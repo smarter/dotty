@@ -823,8 +823,10 @@ object ProtoTypes {
           wildApprox(tp.argType, theMap, seen, internal),
           wildApprox(tp.resultType, theMap, seen, internal))
     case tp: FunProto =>
-      tp.typedArgs()
-      tp
+      val z = (if (theMap != null && seen.eq(theMap.seen)) theMap else new WildApproxMap(seen, internal))
+        .mapOver(tp).asInstanceOf[FunProto]
+      z.typedArgs()
+      z
     case tp: IgnoredProto =>
       WildcardType
     case  _: ThisType | _: BoundType => // default case, inlined for speed
