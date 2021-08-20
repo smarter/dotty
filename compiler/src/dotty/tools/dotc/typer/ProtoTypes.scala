@@ -822,14 +822,16 @@ object ProtoTypes {
       tp.derivedViewProto(
           wildApprox(tp.argType, theMap, seen, internal),
           wildApprox(tp.resultType, theMap, seen, internal))
-    case tp: FunProto =>
-      val z = FunProtoTyped(
-        args = tp.args
-          .map(ctx.typer.typed(_))
-          .map(arg => arg.withType(wildApprox(arg.tpe, theMap, seen, internal))),
-        resultType = wildApprox(tp.resultType, theMap, seen, internal)
-      )(ctx.typer, tp.applyKind)
-      z
+    // case tp: FunProto =>
+    //   println("tp: " + tp.show)
+    //   tp
+      // val z = FunProtoTyped(
+      //   args = tp.args
+      //     .map(ctx.typer.typed(_))
+      //     .map(arg => arg.withType(wildApprox(arg.tpe, theMap, seen, internal))),
+      //   resultType = wildApprox(tp.resultType, theMap, seen, internal)
+      // )(ctx.typer, tp.applyKind)
+      // z
       
       // val tp2 = tp.withContext(ctx).asInstanceOf[FunProto]
       // val z = (if (theMap != null && seen.eq(theMap.seen)) theMap else new WildApproxMap(seen, internal))

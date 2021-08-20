@@ -591,8 +591,10 @@ trait ImplicitRunInfo:
               if ctx.typerState.constraint.contains(t) then provisional = true
             case t: TermParamRef =>
               traverse(t.underlying)
-            // case t: FunProto =>
-            //   // skip
+            case t: FunProto =>
+              val args = t.typedArgs()(using t.protoCtx).map(arg => wildApprox(arg.tpe)(using t.protoCtx))
+              args.foreach(traverse)
+              traverse(t.resultType)
             case t =>
               traverseChildren(t)
 
