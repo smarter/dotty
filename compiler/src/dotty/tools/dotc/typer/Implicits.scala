@@ -588,7 +588,9 @@ trait ImplicitRunInfo:
               traverse(t.underlying)
             case t: TypeParamRef =>
               traverse(t.underlying)
-              if ctx.typerState.constraint.contains(t) then provisional = true
+              if ctx.typerState.constraint.contains(t) then
+                assert(false, t)
+                provisional = true
             case t: TermParamRef =>
               traverse(t.underlying)
             case t: FunProto =>
