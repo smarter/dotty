@@ -593,10 +593,10 @@ trait ImplicitRunInfo:
                 provisional = true
             case t: TermParamRef =>
               traverse(t.underlying)
-            case t: FunProto =>
-              val args = t.typedArgs()(using t.protoCtx).map(arg => wildApprox(arg.tpe)(using t.protoCtx))
-              args.foreach(traverse)
-              traverse(t.resultType)
+            // case t: FunProto =>
+            //   val args = t.typedArgs()(using t.protoCtx).map(arg => wildApprox(arg.tpe)(using t.protoCtx))
+            //   args.foreach(traverse)
+            //   traverse(t.resultType)
             case t =>
               traverseChildren(t)
 
