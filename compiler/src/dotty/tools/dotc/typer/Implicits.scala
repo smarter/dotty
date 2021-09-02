@@ -1175,6 +1175,7 @@ trait Implicits:
           if diff == 0 && alt1.isExtension && alt2.isExtension then
             // Fall back: if both results are extension method applications,
             // compare the extension methods instead of their wrappers.
+            // TODO: create and instantiate type vars at this point (like in isAsSpecific) to fix leo.scala?
             def stripExtension(alt: SearchSuccess) = methPart(stripApply(alt.tree)).tpe
             (stripExtension(alt1), stripExtension(alt2)) match
               case (ref1: TermRef, ref2: TermRef) => diff = compare(ref1, ref2)
