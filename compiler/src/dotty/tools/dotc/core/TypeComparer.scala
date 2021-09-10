@@ -750,8 +750,11 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     }
 
     def tryBaseType(cls2: Symbol) = {
+      // println("ctx: " + ctx.typerState.constraint.show)
+      // println("tp1: " + tp1 + " + cls2: " + cls2)
       val base = nonExprBaseType(tp1, cls2)
-      if (base.exists && (base `ne` tp1))
+      if base.exists && (base `ne` tp1) then
+        // println("base: " + base)
         isSubType(base, tp2, if (tp1.isRef(cls2)) approx else approx.addLow) ||
         base.isInstanceOf[OrType] && fourthTry
           // if base is a disjunction, this might have come from a tp1 type that

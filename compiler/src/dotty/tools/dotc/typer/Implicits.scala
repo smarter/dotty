@@ -1189,9 +1189,21 @@ trait Implicits:
               s
             (stripExtension(alt1), stripExtension(alt2)) match
               case (ref1: TermRef, ref2: TermRef) =>
-                val comparisonState = alt1.tstate.fresh().setCommittable(false)
-                inContext(ctx.fresh.setTyperState(comparisonState)) {
-                  comparisonState.mergeConstraintWith(alt2.tstate)
+                val constraintsIn1 = alt1.tstate.constraint ne ctx.typerState.constraint
+                val constraintsIn2 = alt2.tstate.constraint ne ctx.typerState.constraint
+                def exploreState(alt: SearchSuccess): TyperState =
+                  alt.tstate.fresh(committable = false)
+                val comparisonState =
+                  if constraintsIn1 && constraintsIn2 then
+                    exploreState(alt1).mergeConstraintWith(alt2.tstate)
+                  else if constraintsIn1 then
+                    exploreState(alt1)
+                  else if constraintsIn2 then
+                    exploreState(alt2)
+                  else
+                    ctx.typerState
+
+                inContext(ctx.withTyperState(comparisonState)) {
                   diff = compare(ref1, ref2)
                 }
               case _ =>
