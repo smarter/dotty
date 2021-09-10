@@ -8,7 +8,7 @@ import config.Printers
 import core.Mode
 
 object trace extends TraceSyntax:
-  inline def isEnabled = true //Config.tracingEnabled
+  inline def isEnabled = Config.tracingEnabled
   protected val isForced = false
 
   object force extends TraceSyntax:
