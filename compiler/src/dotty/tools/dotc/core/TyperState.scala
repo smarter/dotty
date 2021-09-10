@@ -187,6 +187,8 @@ class TyperState() {
    *       be owned by a common parent of `this` and `that`).
    */
   def mergeConstraintWith(that: TyperState)(using Context): Unit =
+    if this eq that then return
+
     that.ensureNotConflicting(constraint)
 
     val comparingCtx =
@@ -199,7 +201,8 @@ class TyperState() {
         // Integrate the type lambdas from `other`
         constraint.contains(tl) || other.isRemovable(tl) || {
           val tvars = tl.paramRefs.map(other.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
-          tvars.foreach(tvar => if !tvar.inst.exists && !isOwnedAnywhere(this, tvar) then includeVar(tvar))
+          if this.isCommittable then
+            tvars.foreach(tvar => if !tvar.inst.exists && !isOwnedAnywhere(this, tvar) then includeVar(tvar))
           typeComparer.addToConstraint(tl, tvars)
         }) &&
         // Integrate the additional constraints on type variables from `other`

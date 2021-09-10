@@ -1182,12 +1182,18 @@ trait Implicits:
               // println("alt: " + alt.show)
 
               // wildApprox: less precise than creating tvars since it allows the same tparam to stand for multiple types
-              val s = wildApprox(methPart(stripApply(alt.tree)).tpe)(using ctx.fresh.setTyperState(alt.tstate))
+              // val s = wildApprox(methPart(stripApply(alt.tree)).tpe)(using ctx.fresh.setTyperState(alt.tstate))
+              val s = methPart(stripApply(alt.tree)).tpe
               // println("s: " + s)
               // Thread.dumpStack
               s
             (stripExtension(alt1), stripExtension(alt2)) match
-              case (ref1: TermRef, ref2: TermRef) => diff = compare(ref1, ref2)
+              case (ref1: TermRef, ref2: TermRef) =>
+                val comparisonState = alt1.tstate.fresh().setCommittable(false)
+                inContext(ctx.fresh.setTyperState(comparisonState)) {
+                  comparisonState.mergeConstraintWith(alt2.tstate)
+                  diff = compare(ref1, ref2)
+                }
               case _ =>
           if diff < 0 then alt2
           else if diff > 0 then alt1
