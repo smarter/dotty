@@ -1170,13 +1170,22 @@ trait Implicits:
        */
       def disambiguate(alt1: SearchResult, alt2: SearchSuccess) = alt1 match
         case alt1: SearchSuccess =>
+          // println("alt1.ref: " + alt1.ref.show)
+          // println("alt2.ref: " + alt2.ref.show)
           var diff = compareAlternatives(alt1, alt2)
           assert(diff <= 0)   // diff > 0 candidates should already have been eliminated in `rank`
           if diff == 0 && alt1.isExtension && alt2.isExtension then
             // Fall back: if both results are extension method applications,
             // compare the extension methods instead of their wrappers.
             // TODO: create and instantiate type vars at this point (like in isAsSpecific) to fix leo.scala?
-            def stripExtension(alt: SearchSuccess) = methPart(stripApply(alt.tree)).tpe
+            def stripExtension(alt: SearchSuccess) =
+              // println("alt: " + alt.show)
+
+              // wildApprox: less precise than creating tvars since it allows the same tparam to stand for multiple types
+              val s = wildApprox(methPart(stripApply(alt.tree)).tpe)(using ctx.fresh.setTyperState(alt.tstate))
+              // println("s: " + s)
+              // Thread.dumpStack
+              s
             (stripExtension(alt1), stripExtension(alt2)) match
               case (ref1: TermRef, ref2: TermRef) => diff = compare(ref1, ref2)
               case _ =>
@@ -1214,6 +1223,7 @@ trait Implicits:
               val newPending = remaining.filter(betterThanFailed)
               rank(newPending, fail, Nil).recoverWith(_ => fail)
 
+            // println("try: " + cand)
             negateIfNot(tryImplicit(cand, contextual)) match {
               case fail: SearchFailure =>
                 if (fail.isAmbiguous)
@@ -1229,6 +1239,7 @@ trait Implicits:
                       compareAlternatives(newCand, cand) > 0)
                 else rank(remaining, found, fail :: rfailures)
               case best: SearchSuccess =>
+                // println("best: " + best.show)
                 if (ctx.mode.is(Mode.ImplicitExploration) || isCoherent)
                   best
                 else disambiguate(found, best) match {
@@ -1389,6 +1400,7 @@ trait Implicits:
       val eligible =
         if contextual then ctx.implicits.eligible(wildProto)
         else implicitScope(wildProto).eligible
+      // println("eligible: " + eligible)
       searchImplicit(eligible, contextual) match
         case result: SearchSuccess =>
           result

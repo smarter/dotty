@@ -655,12 +655,12 @@ trait Applications extends Compatibility {
             case SAMType(sam) => argtpe <:< sam.toFunctionType(isJava = formal.classSymbol.is(JavaDefined))
             case _ => false
 
-        println("a: " + argtpe/*.show*/)
-        println("f: " + formal/*.show*/)
-        println("c: " + ctx.typerState.constraint.show)
+        // println("a: " + argtpe/*.show*/)
+        // println("f: " + formal/*.show*/)
+        // println("c: " + ctx.typerState.constraint.show)
         val z = isCompatible(argtpe, formal)
-        println("c2: " + ctx.typerState.constraint.show)
-        println("z: " + z)
+        // println("c2: " + ctx.typerState.constraint.show)
+        // println("z: " + z)
         z
         // Only allow SAM-conversion to PartialFunction if implicit conversions
         // are enabled. This is necessary to avoid ambiguity between an overload
@@ -1560,7 +1560,7 @@ trait Applications extends Compatibility {
               isApplicableMethodRef(alt2, tp1.paramInfos, WildcardType, ArgMatch.Compatible)
           }
         case tp1: PolyType => // (2)
-          println("tp1: " + tp1.show)
+          // println("tp1: " + tp1.show)
           inContext(ctx.fresh.setExploreTyperState()) {
             // Fully define the PolyType parameters so that the infos of the
             // tparams created below never contain TypeRefs whose underling types
@@ -1621,7 +1621,7 @@ trait Applications extends Compatibility {
           def apply(t: Type) = t match {
             case t @ AppliedType(tycon, args) =>
               def mapArg(arg: Type, tparam: TypeParamInfo) =
-                if (false && variance > 0 && tparam.paramVarianceSign < 0) defn.FunctionOf(arg :: Nil, defn.UnitType)
+                if (variance > 0 && tparam.paramVarianceSign < 0) defn.FunctionOf(arg :: Nil, defn.UnitType)
                 else arg
               mapOver(t.derivedAppliedType(tycon, args.zipWithConserve(tycon.typeParams)(mapArg)))
             case _ => mapOver(t)
@@ -1669,8 +1669,8 @@ trait Applications extends Compatibility {
       def winsType1 = isAsSpecific(alt1, tp1, alt2, tp2)
       def winsType2 = isAsSpecific(alt2, tp2, alt1, tp1)
 
-      println(i"compare($alt1, $alt2)? $tp1 $tp2 $ownerScore $winsType1 $winsType2")
-      Thread.dumpStack
+      // println(i"compare($alt1, $alt2)? $tp1 $tp2 $ownerScore $winsType1 $winsType2")
+      // Thread.dumpStack
       if (ownerScore == 1)
         if (winsType1 || !winsType2) 1 else 0
       else if (ownerScore == -1)
@@ -1684,15 +1684,15 @@ trait Applications extends Compatibility {
     if alt1.symbol.is(ConstructorProxy) && !alt2.symbol.is(ConstructorProxy) then -1
     else if alt2.symbol.is(ConstructorProxy) && !alt1.symbol.is(ConstructorProxy) then 1
     else
-      println("alt1: " + alt1.show)
-      println("alt2: " + alt2.show)
+      // println("alt1: " + alt1.show)
+      // println("alt2: " + alt2.show)
       val fullType1 = widenGiven(alt1.widen, alt1)
       val fullType2 = widenGiven(alt2.widen, alt2)
       val strippedType1 = stripImplicit(fullType1)
       val strippedType2 = stripImplicit(fullType2)
 
       val result = compareWithTypes(strippedType1, strippedType2)
-      println("res: " + result)
+      // println("res: " + result)
       if (result != 0) result
       else if (strippedType1 eq fullType1)
         if (strippedType2 eq fullType2) 0         // no implicits either side: its' a draw
@@ -2233,12 +2233,21 @@ trait Applications extends Compatibility {
       case _ =>
         (tree, currentPt)
 
+    // println("methodRef: " + methodRef.show)
+    // println("receiver: " + receiver.show)
+    // println("pt: " + pt.show)
     val (core, pt1) = normalizePt(methodRef, pt)
-    withMode(Mode.SynthesizeExtMethodReceiver) {
+    // println("core: " + core.show)
+    // println("pt1: " + pt1.show)
+    // println("c0: " + ctx.typerState.constraint.show)
+    val z = withMode(Mode.SynthesizeExtMethodReceiver) {
       typed(
         untpd.Apply(core, untpd.TypedSplice(receiver, isExtensionReceiver = true) :: Nil),
         pt1, ctx.typerState.ownedVars)
     }
+    // println("z: " + z.show)
+    // println("c1: " + ctx.typerState.constraint.show)
+    z
   }
 
   /** Assuming methodRef is a reference to an extension method defined e.g. as
