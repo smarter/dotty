@@ -3318,12 +3318,12 @@ class Typer extends Namer
 
     def adaptNoArgsImplicitMethod(wtp: MethodType): Tree = {
       assert(wtp.isImplicitMethod)
-      val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
-      def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToInstantiate)
-        replaceSingletons(tp)
-      }
-      wtp.paramInfos.foreach(instantiate)
+      // val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
+      // def instantiate(tp: Type): Unit = {
+      //   instantiateSelected(tp, tvarsToInstantiate)
+      //   replaceSingletons(tp)
+      // }
+      // wtp.paramInfos.foreach(instantiate)
       val saved = ctx.typerState.snapshot()
 
       def dummyArg(tp: Type) = untpd.Ident(nme.???).withTypeUnchecked(tp)
@@ -3343,7 +3343,13 @@ class Typer extends Namer
                 else formals1
               implicitArgs(formals2, argIndex + 1, pt)
 
-            val arg = inferImplicitArg(formal, tree.span.endPos)
+            def instantiate(tp: Type): Type = {
+              new IsFullyDefinedAccumulator(ForceDegree.flipBottom, whatev = true).process(tp)
+              replaceSingletons(tp)
+              tp
+            }
+
+            val arg = inferImplicitArg(instantiate(formal), tree.span.endPos)
             arg.tpe match
               case failed: AmbiguousImplicits =>
                 val pt1 = pt.deepenProtoTrans

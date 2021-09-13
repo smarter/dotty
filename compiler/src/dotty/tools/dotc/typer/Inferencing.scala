@@ -159,7 +159,7 @@ object Inferencing {
    *  2nd Phase: If first phase was successful, instantiate all remaining type variables
    *  to their upper bound.
    */
-  private class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false)
+  /*private*/ class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false, whatev: Boolean = false)
     (using Context) extends TypeAccumulator[Boolean] {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
@@ -178,7 +178,13 @@ object Inferencing {
         && ctx.typerState.constraint.contains(tvar)
         && {
           val direction = instDirection(tvar.origin)
-          if minimizeSelected then
+          if whatev then
+            if direction <= 0 && tvar.hasLowerBound then
+              instantiate(tvar, fromBelow = true)
+            else if direction >= 0 && tvar.hasUpperBound then
+              instantiate(tvar, fromBelow = false)
+            // else hold off instantiating unbounded unconstrained variable
+          else if minimizeSelected then
             if direction <= 0 && tvar.hasNonWildcardLowerBound then
               instantiate(tvar, fromBelow = true)
             else if direction >= 0 && tvar.hasNonWildcardUpperBound then
