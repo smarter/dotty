@@ -4595,6 +4595,7 @@ object Types {
     /** For uninstantiated type variables: Is the lower bound different from Nothing and
      *  does it not contain wildcard types?
      */
+    // TODO: no longer needed since OrderingConstraint#init strips wildcards?
     def hasNonWildcardLowerBound(using Context): Boolean =
       val lo = currentEntry.loBound
       !lo.isExactlyNothing && !lo.containsWildcardTypes

@@ -177,11 +177,12 @@ object Inferencing {
         force.appliesTo(tvar)
         && ctx.typerState.constraint.contains(tvar)
         && {
-          val direction = instDirection(tvar.origin)
+          val dirOpt = instDirection(tvar.origin)
+          val direction = dirOpt.getOrElse(0)
           if whatev then
-            if direction <= 0 && tvar.hasLowerBound then
+            if dirOpt.isDefined && direction <= 0 && tvar.hasLowerBound then
               instantiate(tvar, fromBelow = true)
-            else if direction >= 0 && tvar.hasUpperBound then
+            else if dirOpt.isDefined && direction >= 0 && tvar.hasUpperBound then
               instantiate(tvar, fromBelow = false)
             // else hold off instantiating unbounded unconstrained variable
           else if minimizeSelected then
@@ -375,7 +376,7 @@ object Inferencing {
    *           -1 (minimize) if constraint is uniformly from below,
    *            0 if unconstrained, or constraint is from below and above.
    */
-  private def instDirection(param: TypeParamRef)(using Context): Int = {
+  private def instDirection(param: TypeParamRef)(using Context): Option[Int] = {
     val constrained = TypeComparer.fullBounds(param)
     val original = param.binder.paramInfos(param.paramNum)
     val cmp = TypeComparer
@@ -383,7 +384,8 @@ object Inferencing {
       if (!cmp.isSubTypeWhenFrozen(constrained.lo, original.lo)) 1 else 0
     val approxAbove =
       if (!cmp.isSubTypeWhenFrozen(original.hi, constrained.hi)) 1 else 0
-    approxAbove - approxBelow
+    if approxBelow == 0 && approxAbove == 0 then None
+    else Some(approxAbove - approxBelow)
   }
 
   /** Following type aliases and stripping refinements and annotations, if one arrives at a
