@@ -447,18 +447,19 @@ private class ExtractDependenciesCollector extends tpd.TreeTraverser { thisTreeT
   private abstract class TypeDependencyTraverser(using Context) extends TypeTraverser() {
     protected def addDependency(symbol: Symbol): Unit
 
-    val seen = new mutable.HashSet[Type]
-    def traverse(tp: Type): Unit = if (!seen.contains(tp)) {
-      seen += tp
+    val seen = new mutable.HashSet[Symbol]
+    def traverse(tp: Type): Unit = if (true/*!seen.contains(tp)*/) {
+      // println("seen: " + seen)
+      // println("tp: " + tp)
+      // seen += tp
       tp match {
         case tp: NamedType =>
           val sym = tp.symbol
-          if (!sym.is(Package)) {
+          if !seen.contains(sym) && !sym.is(Package) then
+            seen += sym
             addDependency(sym)
-            if (!sym.isClass)
-              traverse(tp.info)
+            if !sym.isClass then traverse(tp.info)
             traverse(tp.prefix)
-          }
         case tp: ThisType =>
           traverse(tp.underlying)
         case tp: ConstantType =>
