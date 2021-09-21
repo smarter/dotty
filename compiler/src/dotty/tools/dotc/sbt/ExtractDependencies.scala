@@ -447,11 +447,11 @@ private class ExtractDependenciesCollector extends tpd.TreeTraverser { thisTreeT
   private abstract class TypeDependencyTraverser(using Context) extends TypeTraverser() {
     protected def addDependency(symbol: Symbol): Unit
 
-    val seen = new mutable.HashSet[Symbol]
-    def traverse(tp: Type): Unit = if (true/*!seen.contains(tp)*/) {
-      // println("seen: " + seen)
-      // println("tp: " + tp)
-      // seen += tp
+    // types: tests/run/enum-values.scala
+    // symbols: new thing
+    val seen = new mutable.HashSet[Symbol | Type]
+    def traverse(tp: Type): Unit = if (!seen.contains(tp)) {
+      seen += tp
       tp match {
         case tp: NamedType =>
           val sym = tp.symbol
