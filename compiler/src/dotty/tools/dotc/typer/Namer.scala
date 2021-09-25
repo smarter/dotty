@@ -1704,8 +1704,8 @@ class Namer { typer: Typer =>
     // it would be erased to BoxedUnit.
     def dealiasIfUnit(tp: Type) = if (tp.isRef(defn.UnitClass)) defn.UnitType else tp
 
-    def cookedRhsType = dealiasIfUnit(rhsType).deskolemized
-    def lhsType = fullyDefinedType(cookedRhsType, "right-hand side", mdef.span)
+    def cookedRhsType = dealiasIfUnit(rhsType)
+    def lhsType = fullyDefinedType(cookedRhsType, "right-hand side", mdef.span).deskolemized
     //if (sym.name.toString == "y") println(i"rhs = $rhsType, cooked = $cookedRhsType")
     if (inherited.exists)
       if (isInlineVal) lhsType else inherited
