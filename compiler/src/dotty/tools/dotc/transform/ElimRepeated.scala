@@ -32,7 +32,11 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
   override def changesMembers: Boolean = true // the phase adds vararg forwarders
 
   def transformInfo(tp: Type, sym: Symbol)(using Context): Type =
-    elimRepeated(tp, sym.is(JavaDefined))
+    val z = elimRepeated(tp, sym.is(JavaDefined))
+    if z ne tp then
+      println("elim: " + sym + " " + sym.id)
+      // Thread.dumpStack
+    z
 
   /** Create forwarder symbols for the methods that are annotated
    *  with `@varargs` or that override java varargs.
@@ -73,6 +77,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
         else
           ref1
       case ref1 =>
+        if ref1 ne ref then println("transformed: " + ref1)
         ref1
 
   override def infoMayChange(sym: Symbol)(using Context): Boolean = sym.is(Method)
@@ -108,6 +113,8 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
   private def elimRepeated(tp: Type, isJava: Boolean)(using Context): Type = tp.stripTypeVar match
     case tp @ MethodTpe(paramNames, paramTypes, resultType) =>
       val resultType1 = elimRepeated(resultType, isJava)
+      println("~tp: " + tp.show)
+      // TODO: look at the paramTypes of the symbol to see V instead of Long in try/i13645
       val paramTypes1 =
         val lastIdx = paramTypes.length - 1
         if lastIdx >= 0 then
@@ -119,12 +126,33 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
             // to allow passing primitives as repeated arguments, but we can't
             // pass a primitive array as argument to such a method since the
             // parameter will be erased to `Object[]`. To handle this correctly we
-            // drop usage of `FromJavaObject` as an element type here, the
-            // tree transformer of this phase is then responsible for handling
+            // erase to Object element types coming from Java if they allow primitives.
+            // The tree transformer of this phase is then responsible for handling
             // mismatches by emitting the correct adaptation (cf `adaptToArray`).
             // See also the documentation of `FromJavaObjectSymbol`.
             val last1 =
-              if isJava && last.elemType.isFromJavaObject then
+              println("elem: " + last.elemType + " " + last.elemType.typeSymbol)
+              // println("elem2: " + last.elemType.bounds.hi)
+              // last.elemType match {
+              //   case tp: TypeParamRef =>
+              //     println("info: " + tp.underlying)
+              //     tp.underlying match {
+              //       case tpu: TypeBounds =>
+              //         println("info2: " + tpu.underlying)
+              //         println("IS: " + tpu.underlying.derivesFrom(defn.FromJavaObjectSymbol))
+              //         val sym = tpu.underlying.asInstanceOf[NamedType].symbol
+              //         println("sym: " + sym)
+              //         val zz = defn.FromJavaObjectSymbol.derivesFrom(defn.FromJavaObjectSymbol)
+              //         println("zz: " + zz)
+              //       case _ =>
+              //     }
+              //   case _ =>
+              // }
+              // println("Z: " + last.elemType.classSymbol)
+              // println("Z2: " + (defn.IntType <:< last.elemType))
+              val elemTp = last.elemType
+              if isJava && (elemTp.classSymbol eq defn.ObjectClass) then
+                // println("elim")
                 defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
               else
                 last.translateFromRepeated(toArray = isJava)
@@ -137,6 +165,10 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
     case tp =>
       tp
 
+  override def transformTypeApply(tree: TypeApply)(using Context): Tree =
+    println("#fun: " + tree.fun.show + " " + tree.fun.tpe)
+    tree
+
   override def transformApply(tree: Apply)(using Context): Tree =
     val args = tree.args.mapConserve {
       case arg: Typed if isWildcardStarArg(arg) =>
@@ -144,6 +176,8 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
         val tpe = arg.expr.tpe
         if isJavaDefined then
           val pt = tree.fun.tpe.widen.firstParamTypes.last
+          println("fun: " + tree.fun.show + " " + tree.fun.tpe.show)
+          println("pt: " + pt.show)
           adaptToArray(arg.expr, pt.elemType.bounds.hi)
         else if tpe.derivesFrom(defn.ArrayClass) then
           arrayToSeq(arg.expr)
@@ -177,6 +211,9 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
   private def adaptToArray(tree: Tree, elemPt: Type)(implicit ctx: Context): Tree =
     val elemTp = tree.tpe.elemType
     val elemTpMatches = elemTp <:< elemPt
+    println("tree: " + tree.show + " elemPt: " + elemPt.show)
+    println("elemTp: " + elemTp.show)
+    println("elemTpMatches: " + elemTpMatches)
     val treeIsArray = tree.tpe.derivesFrom(defn.ArrayClass)
     if elemTpMatches && treeIsArray then
       tree // No adaptation necessary
