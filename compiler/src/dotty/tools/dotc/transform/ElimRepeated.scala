@@ -176,7 +176,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
     assert(elemTpMatches)
     val treeIsArray = tree.tpe.derivesFrom(defn.ArrayClass)
     if elemTpMatches && treeIsArray then
-      tree // No adaptation necessary
+      Typed(tree, TypeTree(defn.ArrayOf(elemTp))) // No adaptation necessary
     else tree match
       case SeqLiteral(elems, elemtpt) =>
         JavaSeqLiteral(elems, elemtpt).withSpan(tree.span)
