@@ -125,9 +125,9 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
             // mismatches by emitting the correct adaptation (cf `adaptToArray`).
             // See also the documentation of `FromJavaObjectSymbol`.
             val last1 =
-              if isJava && last.elemType.isFromJavaObject then
-                defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
-              else
+              // if isJava && last.elemType.isFromJavaObject then
+              //   defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
+              // else
                 last.translateFromRepeated(toArray = isJava)
             paramTypes.updated(lastIdx, last1)
           else paramTypes
@@ -169,43 +169,30 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
         .appliedToType(elemType)
         .appliedTo(tree, clsOf(elemClass.typeRef))
 
-  /** Adapt a Seq or Array tree to be a subtype of `Array[_ <: $elemPt]`.
-   *
-   *  @pre `elemPt` must either be a super type of the argument element type or `Object`.
-   *        The special handling of `Object` is required to deal with the translation
-   *        of generic Java varargs in `elimRepeated`.
-   */
+  /** Adapt a Seq or Array tree to be a subtype of `Array[_ <: $elemPt]`. */
   private def adaptToArray(tree: Tree, elemPt: Type)(implicit ctx: Context): Tree =
     val elemTp = tree.tpe.elemType
     val elemTpMatches = elemTp <:< elemPt
+    assert(elemTpMatches)
     val treeIsArray = tree.tpe.derivesFrom(defn.ArrayClass)
     if elemTpMatches && treeIsArray then
       tree // No adaptation necessary
     else tree match
       case SeqLiteral(elems, elemtpt) =>
-        // By the precondition, we only have mismatches if elemPt is Object, in
-        // that case we use `FromJavaObject` as the element type to allow the
-        // sequence literal to typecheck no matter the types of the elements,
-        // Erasure will take care of any necessary boxing (see documentation
-        // of `FromJavaObjectSymbol` for more information).
-        val adaptedElemTpt = if elemTpMatches then elemtpt else TypeTree(defn.FromJavaObjectType)
-        JavaSeqLiteral(elems, adaptedElemTpt).withSpan(tree.span)
+        JavaSeqLiteral(elems, elemtpt).withSpan(tree.span)
       case _ =>
-        if treeIsArray then
-          // Convert an Array[T] to an Array[Object]
-          ref(defn.ScalaRuntime_toObjectArray)
-            .appliedTo(tree)
-        else if elemTpMatches then
-          // Convert a Seq[T] to an Array[$elemPt]
-          ref(defn.DottyArraysModule)
-            .select(nme.seqToArray)
-            .appliedToType(elemPt)
-            .appliedTo(tree, clsOf(elemPt))
-        else
-          // Convert a Seq[T] to an Array[Object]
-          ref(defn.ScalaRuntime_toArray)
-            .appliedToType(elemTp)
-            .appliedTo(tree)
+        // Convert a Seq[T] to an Array[`elemTp`]
+        Typed(
+        ref(defn.DottyArraysModule)
+          .select(nme.seqToArray)
+          .appliedToType(elemTp)
+          .appliedTo(tree, clsOf(elemTp)),
+          // This seemingly redundant ascription to Array[`elemTp`] is needed because
+          // the result type of `seqToArray` is erased to `Object`, but we need
+          // to know the precise result type for `Erasure.Boxing.cast` to adapt a
+          // primitive array into a reference array if needed (see
+          // tests/run/t1360.scala for a test case).
+         TypeTree(defn.ArrayOf(elemTp)))
 
   /** Convert an Array into a scala.Seq */
   private def arrayToSeq(tree: Tree)(using Context): Tree =

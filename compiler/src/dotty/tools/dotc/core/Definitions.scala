@@ -387,7 +387,7 @@ class Definitions {
    *     passing primitives, but that would be very inconvenient as it is common to
    *     want to pass a primitive to an Object repeated argument (e.g.
    *     `String.format("foo: %d", 1)`). So instead we type them _without_ adding the
-   *     `& Object` and let `ElimRepeated` take care of doing any necessary adaptation
+   *     `& Object` and let `ElimRepeated` and `Erasure` take care of doing any necessary adaptation
    *     (note that adapting a primitive array to a reference array requires
    *     copying the whole array, so this transformation only preserves semantics
    *     if the callee does not try to mutate the varargs array which is a reasonable
