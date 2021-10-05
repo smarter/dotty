@@ -127,7 +127,10 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
               // if isJava && last.elemType.isFromJavaObject then
               //   defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
               // else
-                last.translateFromRepeated(toArray = isJava)
+                if isJava then
+                  varargArrayType(last)
+                else
+                  last.translateFromRepeated(toArray = false)
             paramTypes.updated(lastIdx, last1)
           else paramTypes
         else paramTypes
@@ -311,17 +314,13 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
           val vararg = varargArrayType(last)
           tp.derivedLambdaType(tp.paramNames, init :+ vararg, tp.resultType)
 
-  /** Translate a repeated type T* to an `Array[? <: Upper]`
-   *  such that it is compatible with java varargs.
-   *
-   *  When necessary we set `Upper = T & AnyRef`
-   *  to prevent the erasure of `Array[? <: Upper]` to Object,
-   *  which would break the varargs from Java.
+  /** Translate a repeated type T* to an `Array[? <: Upper]` for some `Upper`
+   *  such that the result has the same erasure as `T...` in Java.
    */
   private def varargArrayType(tp: Type)(using Context): Type =
     val array = tp.translateFromRepeated(toArray = true) // Array[? <: T]
     val element = array.elemType.hiBound // T
 
-    if element <:< defn.AnyRefType || element.typeSymbol.isPrimitiveValueClass then array
+    if !element.isFromJavaObject && element <:< defn.AnyRefType || element.typeSymbol.isPrimitiveValueClass then array
     else defn.ArrayOf(TypeBounds.upper(AndType(element, defn.AnyRefType))) // Array[? <: T & AnyRef]
 }
