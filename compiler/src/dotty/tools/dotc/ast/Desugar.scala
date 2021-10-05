@@ -1334,7 +1334,7 @@ object desugar {
       val grouped =
         ModuleDef(name, Template(emptyConstructor, Nil, Nil, EmptyValDef, nestedStats))
           .withMods(Modifiers(Synthetic))
-      cpy.PackageDef(pdef)(pdef.pid, topStats :+ grouped)
+      cpy.PackageDef(pdef)(pdef.pid, grouped :: topStats)
     }
   }
 
