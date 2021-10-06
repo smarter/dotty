@@ -299,7 +299,8 @@ object Types {
       loop(this)
     }
 
-    def isFromJavaObject(using Context): Boolean = typeSymbol eq defn.FromJavaObjectSymbol
+    def isFromJavaObject(using Context): Boolean =
+      this.isInstanceOf[TypeRef] && (typeSymbol eq defn.FromJavaObjectSymbol)
 
     /** True iff `symd` is a denotation of a class type parameter and the reference
      *  `<pre> . <symd>` is an actual argument reference, i.e. `pre` is not the
