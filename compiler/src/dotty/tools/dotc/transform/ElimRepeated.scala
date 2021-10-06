@@ -124,7 +124,8 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
             // mismatches by emitting the correct adaptation (cf `adaptToArray`).
             // See also the documentation of `FromJavaObjectSymbol`.
             val last1 =
-              if isJava && last.elemType.isFromJavaObject then
+              // println("last.elemType: " + last.elemType + " " + last.elemType.isFromJavaObject)
+              if isJava && last.elemType.isInstanceOf[TypeRef] && last.elemType.isFromJavaObject then
                 defn.ArrayOf(TypeBounds.upper(defn.ObjectType))
               else
                 last.translateFromRepeated(toArray = isJava)
