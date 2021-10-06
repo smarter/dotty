@@ -179,7 +179,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
     val elemTpMatches = elemTp <:< elemPt
     val treeIsArray = tree.tpe.derivesFrom(defn.ArrayClass)
     if elemTpMatches && treeIsArray then
-      tree // No adaptation necessary
+      Typed(tree, TypeTree(defn.ArrayOf(elemPt))) // No adaptation necessary
     else tree match
       case SeqLiteral(elems, elemtpt) =>
         // By the precondition, we only have mismatches if elemPt is Object, in
@@ -196,10 +196,10 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
             .appliedTo(tree)
         else if elemTpMatches then
           // Convert a Seq[T] to an Array[$elemPt]
-          ref(defn.DottyArraysModule)
+          Typed(ref(defn.DottyArraysModule)
             .select(nme.seqToArray)
             .appliedToType(elemPt)
-            .appliedTo(tree, clsOf(elemPt))
+            .appliedTo(tree, clsOf(elemPt)), TypeTree(defn.ArrayOf(elemPt)))
         else
           // Convert a Seq[T] to an Array[Object]
           ref(defn.ScalaRuntime_toArray)
