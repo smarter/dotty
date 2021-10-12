@@ -66,9 +66,11 @@ trait ConstraintHandling {
   def nonParamBounds(param: TypeParamRef)(using Context): TypeBounds = constraint.nonParamBounds(param)
 
   def fullLowerBound(param: TypeParamRef)(using Context): Type =
+    if !constraint.entry(param).isInstanceOf[TypeBounds | NoType.type] then return constraint.entry(param)
     constraint.minLower(param).foldLeft(nonParamBounds(param).lo)(_ | _)
 
   def fullUpperBound(param: TypeParamRef)(using Context): Type =
+    if !constraint.entry(param).isInstanceOf[TypeBounds | NoType.type] then return constraint.entry(param)
     constraint.minUpper(param).foldLeft(nonParamBounds(param).hi)(_ & _)
 
   /** Full bounds of `param`, including other lower/upper params.

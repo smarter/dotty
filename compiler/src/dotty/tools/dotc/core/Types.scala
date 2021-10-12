@@ -4609,24 +4609,26 @@ object Types {
      */
     private def currentEntry(using Context): Type = ctx.typerState.constraint.entry(origin)
 
-    /** For uninstantiated type variables: Is the lower bound different from Nothing? */
-    def hasLowerBound(using Context): Boolean = !currentEntry.loBound.isExactlyNothing
+    /** For uninstantiated type variables: Is the full lower bound different from Nothing? */
+    def hasLowerBound(using Context): Boolean =
+      !TypeComparer.fullLowerBound(origin).isExactlyNothing
 
-    /** For uninstantiated type variables: Is the upper bound different from Any? */
-    def hasUpperBound(using Context): Boolean = !currentEntry.hiBound.isRef(defn.AnyClass)
+    /** For uninstantiated type variables: Is the full upper bound different from Any? */
+    def hasUpperBound(using Context): Boolean =
+      !TypeComparer.fullUpperBound(origin).isRef(defn.AnyClass)
 
-    /** For uninstantiated type variables: Is the lower bound different from Nothing and
+    /** For uninstantiated type variables: Is the full lower bound different from Nothing and
      *  does it not contain wildcard types?
      */
     def hasNonWildcardLowerBound(using Context): Boolean =
-      val lo = currentEntry.loBound
+      val lo = TypeComparer.fullLowerBound(origin)
       !lo.isExactlyNothing && !lo.containsWildcardTypes
 
-    /** For uninstantiated type variables: Is the upper bound different from Any and
+    /** For uninstantiated type variables: Is the full upper bound different from Any and
      *  does it not contain wildcard types?
      */
     def hasNonWildcardUpperBound(using Context): Boolean =
-      val hi = TypeComparer.fullUpperBound(origin).orElse(currentEntry.hiBound)
+      val hi = TypeComparer.fullUpperBound(origin)
       !hi.isRef(defn.AnyClass) && !hi.containsWildcardTypes
 
     /** Unwrap to instance (if instantiated) or origin (if not), until result
