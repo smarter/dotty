@@ -335,9 +335,7 @@ object Inferencing {
       case TypeApply(fn, targs) =>
         val tvars = targs.filter(_.isInstanceOf[InferredTypeTree]).tpes.collect {
           case tvar: TypeVar
-          if !tvar.isInstantiated &&
-             ctx.typerState.ownedVars.contains(tvar) &&
-             !locked.contains(tvar) => tvar
+          if !locked.contains(tvar) => tvar
         }
         boundVars(fn, acc ::: tvars)
       case Select(pre, _) => boundVars(pre, acc)
@@ -360,7 +358,33 @@ object Inferencing {
         case Block(_, expr) => occurring(expr, toTest, acc)
         case _ => acc
       }
-    occurring(tree, boundVars(tree, Nil), Nil)
+    val l = occurring(tree, boundVars(tree, Nil), Nil)
+    val set = scala.collection.mutable.LinkedHashSet.from(l)
+    val traverser = new TypeTraverser {
+      def traverse(tp: Type) = tp match {
+        case tvar: TypeVar
+        if !tvar.isInstantiated &&
+           // ctx.typerState.ownedVars.contains(tvar) &&
+           !locked.contains(tvar) =>
+          // println("tvar: " + tvar)
+          val f = TypeComparer.fullBounds(tvar.origin)
+          // println("f: " + f.show)
+          // println("ts: " + ctx.typerState.const)
+          set += tvar
+          traverseChildren(f)
+        // case tvar: TypeVar =>
+        //   println("Xvar: " + tvar)
+        //   println("is: " + !tvar.isInstantiated)
+        //   println("o: " + ctx.typerState.ownedVars.contains(tvar))
+        //   println("l: " + !locked.contains(tvar))
+        //   traverseChildren(tp)
+        case _ =>
+          // println("tp: " + tp.show)
+          traverseChildren(tp)
+        }
+    }
+    l.foreach(traverser.traverse)
+    set.toList
   }
 
   /** The instantiation direction for given poly param computed
