@@ -880,7 +880,7 @@ trait Applications extends Compatibility {
 
     def realApply(using Context): Tree = {
       val originalProto =
-        new FunProto(tree.args, IgnoredProto(pt))(this, tree.applyKind)(using argCtx(tree))
+        new FunProto(tree.args, /*IgnoredProto*/(pt))(this, tree.applyKind)(using argCtx(tree))
       record("typedApply")
       val fun1 = typedExpr(tree.fun, originalProto)
 
