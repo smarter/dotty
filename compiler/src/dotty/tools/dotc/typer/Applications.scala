@@ -883,11 +883,11 @@ trait Applications extends Compatibility {
         case tp: FunProto => tp.derivedFunProto(resultType = ignoreNonFunProto(tp.resultType))
         case _ => IgnoredProto(tp)
       val pt2 = ignoreNonFunProto(pt)
-      // println("pt: " + pt.show)
-      // println("pt2: " + pt2.show)
+      // println("~pt: " + pt.show)
       val originalProto =
         new FunProto(tree.args, pt2)(this, tree.applyKind)(using argCtx(tree))
         // new FunProto(tree.args, pt2)(this, tree.applyKind)(using argCtx(tree))
+      // println("orig: " + originalProto.show)
       record("typedApply")
       val fun1 = typedExpr(tree.fun, originalProto)
       // println("fun1: " + fun1.denot.show)
@@ -2018,12 +2018,7 @@ trait Applications extends Compatibility {
       // println("found: " + found)
       if found.length <= 1 then found
       else
-        // val deepPt = pt.deepenProto
-        // println("deep: " + deepPt.show)
-        val deepPt = pt match
-          case IgnoredProto(pt) => pt
-          case _ => pt
-        deepPt match
+        pt match
           case pt @ FunProto(_, PolyProto(targs, resType)) =>
             // try to narrow further with snd argument list and following type params
             resolveMapped(candidates,
@@ -2048,11 +2043,13 @@ trait Applications extends Compatibility {
                 noDefaults
               else if noDefaultsCount > 1 && noDefaultsCount < alts.length then
                 resolveOverloaded1(noDefaults, pt)
-              else if deepPt ne pt then
-                // try again with a deeper known expected type
-                resolveOverloaded1(alts, deepPt)
               else
-                candidates
+                val deepPt = pt.deepenProto
+                if deepPt ne pt then
+                  // try again with a deeper known expected type
+                  resolveOverloaded1(alts, deepPt)
+                else
+                  candidates
     }
   end resolveOverloaded1
 
