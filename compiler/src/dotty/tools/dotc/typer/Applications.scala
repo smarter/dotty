@@ -879,13 +879,18 @@ trait Applications extends Compatibility {
   def typedApply(tree: untpd.Apply, pt: Type)(using Context): Tree = {
 
     def realApply(using Context): Tree = {
-      val pt2 = pt match
-        case pt: FunProto => pt
-        case _ => IgnoredProto(pt)
+      def ignoreNonFunProto(tp: Type): Type = tp match
+        case tp: FunProto => tp.derivedFunProto(resultType = ignoreNonFunProto(tp.resultType))
+        case _ => IgnoredProto(tp)
+      val pt2 = ignoreNonFunProto(pt)
+      // println("pt: " + pt.show)
+      // println("pt2: " + pt2.show)
       val originalProto =
         new FunProto(tree.args, pt2)(this, tree.applyKind)(using argCtx(tree))
+        // new FunProto(tree.args, pt2)(this, tree.applyKind)(using argCtx(tree))
       record("typedApply")
       val fun1 = typedExpr(tree.fun, originalProto)
+      // println("fun1: " + fun1.denot.show)
 
       // If adaptation created a tupled dual of `originalProto`, pick the right version
       // (tupled or not) of originalProto to proceed.
@@ -893,11 +898,15 @@ trait Applications extends Compatibility {
         if originalProto.hasTupledDual && needsTupledDual(fun1.tpe, originalProto)
         then originalProto.tupledDual
         else originalProto
+      // println("proto: " + proto.show)
 
       /** Type application where arguments come from prototype, and no implicits are inserted */
       def simpleApply(fun1: Tree, proto: FunProto)(using Context): Tree =
         methPart(fun1).tpe match {
           case funRef: TermRef =>
+            // println("funRef: " + funRef.show)
+            // println("proto: " + proto.show)
+            // println("pt: " + pt.show)
             val app = ApplyTo(tree, fun1, funRef, proto, pt)
             convertNewGenericArray(
               widenEnumCase(
@@ -1998,15 +2007,22 @@ trait Applications extends Compatibility {
       case _ => false
 
     record("resolveOverloaded.narrowedApplicable", candidates.length)
+    // println("%pt: " + pt.show)
+    // println("%cand: " + candidates)
     if pt.unusableForInference then
       // `pt` might have become erroneous by typing arguments of FunProtos.
       // If `pt` is erroneous, don't try to go further; report the error in `pt` instead.
       candidates
     else
       val found = narrowMostSpecific(candidates)
+      // println("found: " + found)
       if found.length <= 1 then found
       else
-        val deepPt = pt.deepenProto
+        // val deepPt = pt.deepenProto
+        // println("deep: " + deepPt.show)
+        val deepPt = pt match
+          case IgnoredProto(pt) => pt
+          case _ => pt
         deepPt match
           case pt @ FunProto(_, PolyProto(targs, resType)) =>
             // try to narrow further with snd argument list and following type params
@@ -2216,7 +2232,9 @@ trait Applications extends Compatibility {
       case _ =>
         (tree, currentPt)
 
+    // println("~pt: " + pt.show)
     val (core, pt1) = normalizePt(methodRef, pt)
+    // println("~pt1: " + pt1.show)
     withMode(Mode.SynthesizeExtMethodReceiver) {
       typed(
         untpd.Apply(core, untpd.TypedSplice(receiver, isExtensionReceiver = true) :: Nil),
