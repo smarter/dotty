@@ -879,8 +879,11 @@ trait Applications extends Compatibility {
   def typedApply(tree: untpd.Apply, pt: Type)(using Context): Tree = {
 
     def realApply(using Context): Tree = {
+      val pt2 = pt match
+        case pt: FunProto => pt
+        case _ => IgnoredProto(pt)
       val originalProto =
-        new FunProto(tree.args, /*IgnoredProto*/(pt))(this, tree.applyKind)(using argCtx(tree))
+        new FunProto(tree.args, pt2)(this, tree.applyKind)(using argCtx(tree))
       record("typedApply")
       val fun1 = typedExpr(tree.fun, originalProto)
 
