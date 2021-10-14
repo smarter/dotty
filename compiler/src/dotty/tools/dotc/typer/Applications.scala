@@ -443,13 +443,15 @@ trait Applications extends Compatibility {
           else
             fail(TypeMismatch(methType.resultType, resultType, None))
 
-        if resultType.deepenProto ne resultType then
+        if (resultType.deepenProto ne resultType) then
           def finalPt(mt: Type, pt: Type): Boolean = (mt, pt.revealIgnored) match
             case (mt: MethodType, pt @ FunProto(_, res)) if matchingApply(mt, pt) =>
               finalPt(resultTypeApprox(mt), res)
             case (_: MethodType, _) => false
             case (_, _: ProtoType) => false
             case (tp, pt) =>
+              // if methType.show.toString.contains(": A") then
+              //   Thread.dumpStack
               // println("m: " + methType.show + " res: " + resultType.show)
               // println("tp: " + tp.show + " pt: " + pt.show)
               necessarilyCompatible(tp, pt)
@@ -465,7 +467,9 @@ trait Applications extends Compatibility {
         // if resultType.isIgnored then
 
         // match all arguments with corresponding formal parameters
-        matchArgs(orderedArgs, methType.paramInfos, 0)
+        // println("m0: " + success)
+        val m = matchArgs(orderedArgs, methType.paramInfos, 0)
+        // println("ma: " + success)
       case _ =>
         if (methType.isError) ok = false
         else fail(s"$methString does not take parameters")
@@ -562,7 +566,12 @@ trait Applications extends Compatibility {
            */
           def addTyped(arg: Arg): List[Type] =
             if !formal.isRepeatedParam then checkNoVarArg(arg)
-            addArg(typedArg(arg, formal), formal)
+            // println("arg: " + arg)
+            // println("formal: " + formal.show)
+            val ta = typedArg(arg, formal)
+            // println("ta: " + ta)
+            // println("c: " + ctx.typerState.constraint.show)
+            addArg(ta, formal)
             if methodType.isParamDependent && typeOfArg(arg).exists then
               // `typeOfArg(arg)` could be missing because the evaluation of `arg` produced type errors
               formals1.mapconserve(safeSubstParam(_, methodType.paramRefs(n), typeOfArg(arg)))
@@ -676,7 +685,12 @@ trait Applications extends Compatibility {
             case SAMType(sam) => argtpe <:< sam.toFunctionType(isJava = formal.classSymbol.is(JavaDefined))
             case _ => false
 
-        isCompatible(argtpe, formal)
+        // println("argtpe: " + argtpe.show)
+        // println("formal: " + formal.show)
+        // println(TypeComparer.explained(_.isSubType(argtpe, formal)))
+        val ic = isCompatible(argtpe, formal)
+        // println("ic: " + ic)
+        ic
         // Only allow SAM-conversion to PartialFunction if implicit conversions
         // are enabled. This is necessary to avoid ambiguity between an overload
         // taking a PartialFunction and one taking a Function1 because
@@ -709,8 +723,12 @@ trait Applications extends Compatibility {
     final def addArg(arg: TypedArg, formal: Type): Unit = ok = ok & argOK(arg, formal)
     def makeVarArg(n: Int, elemFormal: Type): Unit = {}
     def fail(msg: Message, arg: Arg): Unit =
+      // println(msg)
+      // Thread.dumpStack
       ok = false
     def fail(msg: Message): Unit =
+      // println(msg)
+      // Thread.dumpStack
       ok = false
     def appPos: SrcPos = NoSourcePosition
     @threadUnsafe lazy val normalizedFun:   Tree = ref(methRef)
@@ -774,11 +792,13 @@ trait Applications extends Compatibility {
 
     def fail(msg: Message, arg: Trees.Tree[T]): Unit = {
       report.error(msg, arg.srcPos)
+      // Thread.dumpStack
       ok = false
     }
 
     def fail(msg: Message): Unit = {
       report.error(msg, app.srcPos)
+      // Thread.dumpStack
       ok = false
     }
 
@@ -917,9 +937,10 @@ trait Applications extends Compatibility {
       // expected type through `constrainResult`. This can add more constraints which
       // help sharpen the inferred parameter types for the argument function literal(s).
       // This tweak is needed to make i1378 compile.
-      if (tree.args.exists(untpd.isFunctionWithUnknownParamType(_)))
-        if (!constrainResult(tree.symbol, fun1.tpe.widen, proto.derivedFunProto(resultType = pt)))
-          typr.println(i"result failure for $tree with type ${fun1.tpe.widen}, expected = $pt")
+      // if (tree.args.exists(untpd.isFunctionWithUnknownParamType(_)))
+      //   if (!constrainResult(tree.symbol, fun1.tpe.widen, proto.derivedFunProto(resultType = pt)))
+          // typr.println(i"result failure for $tree with type ${fun1.tpe.widen}, expected = $pt
+          // ")
 
       /** Type application where arguments come from prototype, and no implicits are inserted */
       def simpleApply(fun1: Tree, proto: FunProto)(using Context): Tree =

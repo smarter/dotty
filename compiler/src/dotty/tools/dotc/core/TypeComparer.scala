@@ -420,6 +420,12 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
               addConstraint(tp1, tp2, fromBelow = false) && flagNothingBound
             else thirdTry
           }
+
+        ctx.typerState.constraint.entry(tp1) match
+          case NoType =>
+          case tp: TypeBounds =>
+          case tp => return recur(tp, tp2) // assert if this happens in master?
+
         compareTypeParamRef
       case tp1: ThisType =>
         val cls1 = tp1.cls
@@ -548,6 +554,10 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     }
 
     def compareTypeParamRef(tp2: TypeParamRef): Boolean =
+      ctx.typerState.constraint.entry(tp2) match
+        case NoType =>
+        case tp: TypeBounds =>
+        case tp => return recur(tp1, tp) // assert if this happens in master?
       assumedTrue(tp2) || {
         val alwaysTrue =
           // The following condition is carefully formulated to catch all cases
@@ -560,6 +570,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           if (frozenConstraint) recur(tp1, bounds(tp2).lo)
           else isSubTypeWhenFrozen(tp1, tp2)
         alwaysTrue || {
+          // println("tp2: " + tp2.show)
+          // println("ctx: " + ctx.typerState.constraint.show)
+          // println("tp2c: " + ctx.typerState.constraint.contains(tp2))
           if (canConstrain(tp2) && !approx.low)
             addConstraint(tp2, tp1.widenExpr, fromBelow = true)
           else fourthTry
