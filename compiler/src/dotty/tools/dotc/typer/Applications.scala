@@ -443,6 +443,25 @@ trait Applications extends Compatibility {
           else
             fail(TypeMismatch(methType.resultType, resultType, None))
 
+        if resultType.deepenProto ne resultType then
+          def finalPt(mt: Type, pt: Type): Boolean = (mt, pt.revealIgnored) match
+            case (mt: MethodType, FunProto(_, res)) => finalPt(mt.resultType, res)
+            case (_: MethodType, _) => false
+            case (_, _: ProtoType) => false
+            case (tp, pt) =>
+              // println("tp: " + tp.show + " pt: " + pt.show)
+              necessarilyCompatible(tp, pt)
+          // println("ra: " + resultApprox.show)
+          // println("rt: " + resultType.show)
+          val f = finalPt(resultApprox, resultType)
+          // println("f: " + f)
+          // val fpt = finalPt(resultType)
+          // if !fpt.isInstanceOf[ProtoType] then
+          //   // println("methType: " + methType.show)
+          //   // println("final: " + fpt.show)
+          //   necessarilyCompatible(resultApprox.finalResultType, fpt)
+        // if resultType.isIgnored then
+
         // match all arguments with corresponding formal parameters
         matchArgs(orderedArgs, methType.paramInfos, 0)
       case _ =>
