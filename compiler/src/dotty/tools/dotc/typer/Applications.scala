@@ -445,10 +445,13 @@ trait Applications extends Compatibility {
 
         if resultType.deepenProto ne resultType then
           def finalPt(mt: Type, pt: Type): Boolean = (mt, pt.revealIgnored) match
-            case (mt: MethodType, FunProto(_, res)) => finalPt(mt.resultType, res)
+            case (mt: MethodType, pt @ FunProto(_, res))
+                if mt.companion.ne(ImplicitMethodType) && (mt.isContextualMethod == (pt.applyKind == ApplyKind.Using)) =>
+              finalPt(resultTypeApprox(mt), res)
             case (_: MethodType, _) => false
             case (_, _: ProtoType) => false
             case (tp, pt) =>
+              // println("m: " + methType.show + " res: " + resultType.show)
               // println("tp: " + tp.show + " pt: " + pt.show)
               necessarilyCompatible(tp, pt)
           // println("ra: " + resultApprox.show)
