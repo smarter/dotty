@@ -496,7 +496,9 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     constr.println(i"renamed $this to $current")
     current.checkNonCyclic()
 
-  def instType(tvar: TypeVar): Type = entry(tvar.origin) match
+  def instType(tvar: TypeVar): Type = instType(tvar.origin)
+
+  def instType(param: TypeParamRef): Type = entry(param) match
     case _: TypeBounds => NoType
     case tp: TypeParamRef => typeVarOfParam(tp).orElse(tp)
     case tp => tp

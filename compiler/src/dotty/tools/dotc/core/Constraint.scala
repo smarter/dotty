@@ -131,6 +131,9 @@ abstract class Constraint extends Showable {
    */
   def instType(tvar: TypeVar): Type
 
+  /** Equivalent to `instType(typeVarOfParam(param))`. */
+  def instType(param: TypeParamRef): Type
+
   /** The given `tl` in case it is not contained in this constraint,
    *  a fresh copy of `tl` otherwise.
    */

@@ -409,7 +409,10 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           }
           true
         }
-        def compareTypeParamRef =
+        def compareTypeParamRef: Boolean =
+          val inst = ctx.typerState.constraint.instType(tp1)
+          if inst.exists then
+            return recur(inst, tp2)
           assumedTrue(tp1) ||
           tp2.match {
             case tp2: TypeParamRef => constraint.isLess(tp1, tp2)
@@ -548,6 +551,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     }
 
     def compareTypeParamRef(tp2: TypeParamRef): Boolean =
+      val inst = ctx.typerState.constraint.instType(tp2)
+      if inst.exists then
+        return recur(tp1, inst)
       assumedTrue(tp2) || {
         val alwaysTrue =
           // The following condition is carefully formulated to catch all cases
