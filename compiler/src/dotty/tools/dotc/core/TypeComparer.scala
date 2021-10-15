@@ -2900,9 +2900,10 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
     def matchCase(cas: Type): Option[Type] = trace(i"match case $cas vs $scrut", matchTypes) {
       val cas1 = cas match {
         case cas: HKTypeLambda =>
-          val (tl, targs) = constrained(cas, ast.tpd.EmptyTree)
+          val (tl, targs) = constrained(cas, ast.tpd.EmptyTree/*, alwaysAddTypeVars = true*/)
           caseLambda = tl
-          tl.instantiate(targs.map(_.tpe))
+          // tl.instantiate(targs.map(_.tpe))
+          tl.resultType
         case _ =>
           cas
       }
