@@ -655,9 +655,13 @@ object ProtoTypes {
     constrained(tl, owningTree,
       alwaysAddTypeVars = tl.isInstanceOf[PolyType] && ctx.typerState.isCommittable)
 
-  /**  Same as `constrained(tl, EmptyTree)`, but returns just the created type lambda */
-  def constrained(tl: TypeLambda)(using Context): TypeLambda =
-    constrained(tl, EmptyTree)._1
+  def instantiateWithConstraints(tl: TypeLambda)(using Context): Type =
+    val targs = constrained(tl, ast.tpd.EmptyTree, alwaysAddTypeVars = true)._2
+    tl.instantiate(targs.tpes)
+
+  // /**  Same as `constrained(tl, EmptyTree)`, but returns just the created type lambda */
+  // def constrained(tl: TypeLambda)(using Context): TypeLambda =
+  //   constrained(tl, EmptyTree)._1
 
   /** A new type variable with given bounds for its origin.
    *  @param  represents  If exists, the TermParamRef that the TypeVar represents
@@ -726,7 +730,7 @@ object ProtoTypes {
     Stats.record("normalize")
     tp.widenSingleton match {
       case poly: PolyType =>
-        normalize(constrained(poly).resultType, pt)
+        normalize(instantiateWithConstraints(poly), pt)
       case mt: MethodType =>
         if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = true), pt)
         else if (mt.isResultDependent) tp

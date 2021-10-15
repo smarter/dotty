@@ -410,9 +410,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           true
         }
         def compareTypeParamRef: Boolean =
-          val inst = ctx.typerState.constraint.instType(tp1)
-          if inst.exists then
-            return recur(inst, tp2)
+          // val inst = ctx.typerState.constraint.instType(tp1)
+          // if inst.exists then
+          //   return recur(inst, tp2)
           assumedTrue(tp1) ||
           tp2.match {
             case tp2: TypeParamRef => constraint.isLess(tp1, tp2)
@@ -551,9 +551,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     }
 
     def compareTypeParamRef(tp2: TypeParamRef): Boolean =
-      val inst = ctx.typerState.constraint.instType(tp2)
-      if inst.exists then
-        return recur(tp1, inst)
+      // val inst = ctx.typerState.constraint.instType(tp2)
+      // if inst.exists then
+      //   return recur(tp1, inst)
       assumedTrue(tp2) || {
         val alwaysTrue =
           // The following condition is carefully formulated to catch all cases
@@ -2900,8 +2900,9 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
     def matchCase(cas: Type): Option[Type] = trace(i"match case $cas vs $scrut", matchTypes) {
       val cas1 = cas match {
         case cas: HKTypeLambda =>
-          caseLambda = constrained(cas)
-          caseLambda.resultType
+          val (tl, targs) = constrained(cas, ast.tpd.EmptyTree)
+          caseLambda = tl
+          tl.instantiate(targs.map(_.tpe))
         case _ =>
           cas
       }
