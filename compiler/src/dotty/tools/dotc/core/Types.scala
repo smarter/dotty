@@ -4620,14 +4620,16 @@ object Types {
      */
     def hasNonWildcardLowerBound(using Context): Boolean =
       val lo = currentEntry.loBound
-      !lo.isExactlyNothing && !lo.containsWildcardTypes
+      assert(!lo.containsWildcardTypes)
+      !lo.isExactlyNothing
 
     /** For uninstantiated type variables: Is the upper bound different from Any and
      *  does it not contain wildcard types?
      */
     def hasNonWildcardUpperBound(using Context): Boolean =
       val hi = currentEntry.hiBound
-      !hi.isRef(defn.AnyClass) && !hi.containsWildcardTypes
+      assert(!hi.containsWildcardTypes)
+      !hi.isRef(defn.AnyClass)
 
     /** Unwrap to instance (if instantiated) or origin (if not), until result
      *  is no longer a TypeVar
