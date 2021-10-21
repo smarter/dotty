@@ -1,5 +1,6 @@
--- Error: tests/neg/i12284.scala:8:36 ----------------------------------------------------------------------------------
+-- [E043] Type Error: tests/neg/i12284.scala:8:17 ----------------------------------------------------------------------
 8 |  val xx: Vector[G[_]] = deps.map(i => magic(i)) // error
-  |                                  ^^^^^^^^^^^^^
-  |                                  return type G[?] of lambda cannot be made hygienic;
-  |                                  it is not a supertype of the hygienic type Any
+  |                 ^^^^
+  |                 unreducible application of higher-kinded type G to wildcard arguments
+
+longer explanation available when compiling with `-explain`
