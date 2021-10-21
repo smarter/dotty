@@ -142,11 +142,14 @@ trait ConstraintHandling {
             topLevel = false
             super.mapOver(tp)
 
+        def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
+
         override def apply(tp: Type): Type = tp match
           // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
           case tp: NamedType if tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > paramLevel =>
             // println("param: " + param.show + " " + paramLevel)
             // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
+            // println(desc)
             // Adapted from avoid
             tp match
               case tp: TermRef =>
@@ -166,11 +169,11 @@ trait ConstraintHandling {
 
           case tp: TypeVar if !topLevel && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
             // println("REPLACE: " + tp + " v: " + variance)
-            def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
+            // println(desc)
             // if variance == 0 then
             //   // assert(variance != 0, "stuck: " + tp)
             //   return expandBounds(bounds(tp.origin))
-            val tvar = newTypeVar(TypeBounds.empty)
+            val tvar = newTypeVar(TypeBounds.emptyPolyKind)
             tvar.nestingLevel = paramLevel
             // TODO: find example where an assert triggers, something like:
             //   tp between local1..local2 ==>
@@ -180,6 +183,7 @@ trait ConstraintHandling {
               assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
             if variance >= 0 then
               assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+            // println("ctx2: " + ctx.typerState.constraint.show)
             tvar
 
           // For i8900pf / runST
