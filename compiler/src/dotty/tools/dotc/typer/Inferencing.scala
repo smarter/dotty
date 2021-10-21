@@ -11,7 +11,7 @@ import NameKinds.UniqueName
 import util.Spans._
 import util.{Stats, SimpleIdentityMap}
 import Decorators._
-import config.Printers.{gadts, typr, debug}
+import config.Printers.{constr, gadts, typr, debug}
 import annotation.tailrec
 import reporting._
 import collection.mutable
@@ -164,7 +164,7 @@ object Inferencing {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
       val inst = tvar.instantiate(fromBelow)
-      typr.println(i"forced instantiation of ${tvar.origin} = $inst")
+      constr.println(i"forced instantiation of ${tvar.origin} = $inst")
       inst
     }
 
@@ -294,7 +294,7 @@ object Inferencing {
               case TypeBounds(lo, hi)
               if (hi frozen_<:< lo) =>
                 val inst = TypeComparer.approximation(param, fromBelow = true)
-                typr.println(i"replace singleton $param := $inst")
+                constr.println(i"replace singleton $param := $inst")
                 accCtx.typerState.constraint = constraint.replace(param, inst)
               case _ =>
             }
@@ -568,7 +568,7 @@ trait Inferencing { this: Typer =>
     if ((ownedVars ne locked) && !ownedVars.isEmpty) {
       val qualifying = ownedVars -- locked
       if (!qualifying.isEmpty) {
-        typr.println(i"interpolate $tree: ${tree.tpe.widen} in $state, owned vars = ${state.ownedVars.toList}%, %, qualifying = ${qualifying.toList}%, %, previous = ${locked.toList}%, % / ${state.constraint}")
+        constr.println(i"interpolate $tree: ${tree.tpe.widen} in $state, owned vars = ${state.ownedVars.toList}%, %, qualifying = ${qualifying.toList}%, %, previous = ${locked.toList}%, % / ${state.constraint}")
         val resultAlreadyConstrained =
           tree.isInstanceOf[Apply] || tree.tpe.isInstanceOf[MethodOrPoly]
         if (!resultAlreadyConstrained)
@@ -610,13 +610,13 @@ trait Inferencing { this: Typer =>
             // instantiated `tvar` through unification.
             val v = vs(tvar)
             if v == null then
-              typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = ${tvar.hasLowerBound}, $constraint")
+              constr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = ${tvar.hasLowerBound}, $constraint")
               toInstantiate += ((tvar, tvar.hasLowerBound))
             else if v.intValue != 0 then
-              typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
+              constr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
               toInstantiate += ((tvar, v.intValue == 1))
             else
-              typr.println(i"no interpolation for nonvariant $tvar in $state")
+              constr.println(i"no interpolation for nonvariant $tvar in $state")
 
         /** Instantiate all type variables in `buf` in the indicated directions.
          *  If a type variable A is instantiated from below, and there is another

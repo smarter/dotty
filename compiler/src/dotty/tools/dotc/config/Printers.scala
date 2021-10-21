@@ -12,7 +12,7 @@ object Printers {
 
   val default = new Printer
 
-  val constr = noPrinter
+  val constr = new Printer//noPrinter
   val core = noPrinter
   val checks = noPrinter
   val config = noPrinter
