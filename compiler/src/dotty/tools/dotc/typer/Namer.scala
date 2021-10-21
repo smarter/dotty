@@ -751,7 +751,7 @@ class Namer(nestingLevel: Int) { typer: Typer =>
         if (sym.is(Module)) moduleValSig(sym)
         else valOrDefDefSig(original, sym, Nil, identity)(using localContext(sym).setNewScope)
       case original: DefDef =>
-        val typer1 = ctx.typer.newLikeThis
+        val typer1 = ctx.typer.newLikeThis(ictx.scope.nestingLevel + 1)
         nestedTyper(sym) = typer1
         typer1.defDefSig(original, sym, this)(using localContext(sym).setTyper(typer1))
       case imp: Import =>
