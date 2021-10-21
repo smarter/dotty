@@ -29,7 +29,7 @@ class PlainPrinter(_ctx: Context) extends Printer {
   protected def maxToTextRecursions: Int = 100
 
   protected def showUniqueIds = ctx.settings.uniqid.value || Printer.debugPrintUnique
-  protected def showNestingLevel = false
+  protected def showNestingLevel = ctx.settings.YdebugLevel.value
 
   protected final def limiter: MessageLimiter = ctx.property(MessageLimiter).get
 

@@ -48,6 +48,7 @@ trait AllScalaSettings extends CommonScalaSettings, PluginSettings, VerboseSetti
 
   val source: Setting[String] = ChoiceSetting("-source", "source version", "source version", List("3.0", "3.1", "future", "3.0-migration", "future-migration"), "3.0", aliases = List("--source"))
   val uniqid: Setting[Boolean] = BooleanSetting("-uniqid", "Uniquely tag all identifiers in debugging output.", aliases = List("--unique-id"))
+  val YdebugLevel: Setting[Boolean] = BooleanSetting("-Ydebug-level", "debug nesting levels")
   val rewrite: Setting[Option[Rewrites]] = OptionSetting[Rewrites]("-rewrite", "When used in conjunction with a `...-migration` source version, rewrites sources to migrate to new version.", aliases = List("--rewrite"))
   val fromTasty: Setting[Boolean] = BooleanSetting("-from-tasty", "Compile classes from tasty files. The arguments are .tasty or .jar files.", aliases = List("--from-tasty"))
 
