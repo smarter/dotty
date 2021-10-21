@@ -134,6 +134,7 @@ trait ConstraintHandling {
         var topLevel = true
         override def mapOver(tp: Type) = tp match
           case tp: AppliedType =>
+            // XX: this top-level thing doesn't really make sense, if we're comparing tvar to tvar, then we don't end up here, so we're comparing ?F <: ?G[X]
             val tycon2 = this(tp.tycon)
             topLevel = false
             derivedAppliedType(tp, tycon2, mapArgs(tp.args, tp.tyconTypeParams))
@@ -164,17 +165,21 @@ trait ConstraintHandling {
                     emptyRange // should happen only in error cases
 
           case tp: TypeVar if !topLevel && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
-            if variance == 0 then
-              // assert(variance != 0, "stuck: " + tp)
-              return expandBounds(bounds(tp.origin))
+            // println("REPLACE: " + tp + " v: " + variance)
+            def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
+            // if variance == 0 then
+            //   // assert(variance != 0, "stuck: " + tp)
+            //   return expandBounds(bounds(tp.origin))
             val tvar = newTypeVar(TypeBounds.empty)
-            // println("REPLACE: " + tp)
-            // println(i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint")
             tvar.nestingLevel = paramLevel
-            if variance < 0 then
-              tvar <:< tp
-            else
-              tp <:< tvar
+            // TODO: find example where an assert triggers, something like:
+            //   tp between local1..local2 ==>
+            //     tvar <:< apply(local1) ~~> tvar <:< Nothing
+            //     apply(local2) <:< tvar ~~>  Any <:< tvar
+            if variance <= 0 then
+              assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+            if variance >= 0 then
+              assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
             tvar
 
           // For i8900pf / runST
@@ -188,7 +193,7 @@ trait ConstraintHandling {
           // Also copied from avoid to fix tests/pos/i11464.scala
           case tp: LazyRef =>
             if localParamRefs.contains(tp.ref) then tp
-            else if isExpandingBounds then emptyRange
+            else if isExpandingBounds then emptyRange // XX: not kind-correct since upper-bounded by Any
             else mapOver(tp)
           case tl: HKTypeLambda =>
             localParamRefs ++= tl.paramRefs
