@@ -306,8 +306,17 @@ trait ConstraintHandling {
     constraint = constraint.addLess(p2, p1)
     val down = constraint.exclusiveLower(p2, p1)
     val up = constraint.exclusiveUpper(p1, p2)
-    constraint = constraint.unify(p1, p2)
-    val bounds = constraint.nonParamBounds(p1)
+
+    // Instantiate more nested first for try/i8900a3.scala
+
+    val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
+    val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
+
+    val pL = if level1 <= level2 then p1 else p2
+    val pR = if level1 <= level2 then p2 else p1
+
+    constraint = constraint.unify(pL, pR)
+    val bounds = constraint.nonParamBounds(pL)
     val lo = bounds.lo
     val hi = bounds.hi
     isSub(lo, hi) &&
