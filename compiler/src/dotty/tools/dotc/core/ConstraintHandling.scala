@@ -131,8 +131,21 @@ trait ConstraintHandling {
           case tv: TypeVar => tv.nestingLevel
           case _ => Int.MaxValue
 
+        var topLevel = true
+        override def mapOver(tp: Type) = tp match
+          case tp: AppliedType =>
+            val tycon2 = this(tp.tycon)
+            topLevel = false
+            derivedAppliedType(tp, tycon2, mapArgs(tp.args, tp.tyconTypeParams))
+          case tp =>
+            topLevel = false
+            super.mapOver(tp)
+
         override def apply(tp: Type): Type = tp match
-          case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
+          // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
+          case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) /*&& !tp.symbol.isStatic*/ && tp.symbol.nestingLevel > paramLevel =>
+            // println("param: " + param.show + " " + paramLevel)
+            // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
             // Adapted from avoid
             tp match
               case tp: TermRef =>
@@ -149,6 +162,20 @@ trait ConstraintHandling {
                     range(defn.NothingType, apply(TypeOps.classBound(info)))
                   case _ =>
                     emptyRange // should happen only in error cases
+
+          case tp: TypeVar if !topLevel && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
+            if variance == 0 then
+              // assert(variance != 0, "stuck: " + tp)
+              return expandBounds(bounds(tp.origin))
+            val tvar = newTypeVar(TypeBounds.empty)
+            // println("REPLACE: " + tp)
+            // println(i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint")
+            tvar.nestingLevel = paramLevel
+            if variance < 0 then
+              tvar <:< tp
+            else
+              tp <:< tvar
+            tvar
 
           // For i8900pf / runST
           // what if we're inside poly fun? then hoepfully constraint contains binder

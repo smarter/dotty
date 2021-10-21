@@ -541,7 +541,7 @@ object Contexts {
 
     def typer: Typer = this.typeAssigner match {
       case typer: Typer => typer
-      case _ => new Typer
+      case _ => new Typer//(ctx.scope.nestingLevel)??
     }
 
     override def toString: String =

@@ -233,7 +233,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   }
 
   /** The `decls` scope associated with given symbol */
-  protected def symScope(sym: Symbol): Scope = symScopes.getOrElseUpdate(sym, newScope)
+  protected def symScope(sym: Symbol)(using Context): Scope = symScopes.getOrElseUpdate(sym, newScope)
 
   /** Does entry represent an (internal) symbol */
   protected def isSymbolEntry(i: Int)(using Context): Boolean = {
@@ -671,7 +671,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
       init()
   }
 
-  def rootClassUnpickler(start: Coord, cls: Symbol, module: Symbol, infoRef: Int): ClassUnpickler =
+  def rootClassUnpickler(start: Coord, cls: Symbol, module: Symbol, infoRef: Int)(using Context): ClassUnpickler =
     (new ClassUnpickler(infoRef) with SymbolLoaders.SecondCompleter {
       override def startCoord(denot: SymDenotation): Coord = start
     }).withDecls(symScope(cls)).withSourceModule(module)

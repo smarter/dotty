@@ -197,7 +197,7 @@ class Definitions {
   @tu lazy val EmptyPackageClass: ClassSymbol = EmptyPackageVal.moduleClass.asClass
 
   /** A package in which we can place all methods and types that are interpreted specially by the compiler */
-  @tu lazy val OpsPackageVal: TermSymbol = newCompletePackageSymbol(RootClass, nme.OPS_PACKAGE).entered
+  @tu lazy val OpsPackageVal: TermSymbol = newCompletePackageSymbol(RootClass, nme.OPS_PACKAGE, decls = newScope(0)).entered
   @tu lazy val OpsPackageClass: ClassSymbol = OpsPackageVal.moduleClass.asClass
 
   @tu lazy val ScalaPackageVal: TermSymbol = requiredPackage(nme.scala)
@@ -430,7 +430,7 @@ class Definitions {
     Any_toString, Any_##, Any_getClass, Any_isInstanceOf, Any_typeTest, Object_eq, Object_ne)
 
   @tu lazy val AnyKindClass: ClassSymbol = {
-    val cls = newCompleteClassSymbol(ScalaPackageClass, tpnme.AnyKind, AbstractFinal | Permanent, Nil)
+    val cls = newCompleteClassSymbol(ScalaPackageClass, tpnme.AnyKind, AbstractFinal | Permanent, Nil, newScope(0))
     if (!ctx.settings.YnoKindPolymorphism.value)
       // Enable kind-polymorphism by exposing scala.AnyKind
       cls.entered
