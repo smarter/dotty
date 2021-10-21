@@ -143,7 +143,7 @@ trait ConstraintHandling {
 
         override def apply(tp: Type): Type = tp match
           // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
-          case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) /*&& !tp.symbol.isStatic*/ && tp.symbol.nestingLevel > paramLevel =>
+          case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > paramLevel =>
             // println("param: " + param.show + " " + paramLevel)
             // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
             // Adapted from avoid
