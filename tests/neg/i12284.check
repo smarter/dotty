@@ -1,5 +1,5 @@
--- Error: tests/neg/i12284.scala:7:36 ----------------------------------------------------------------------------------
-7 |  val xx: Vector[F[_]] = deps.map(i => magic(i)) // error
+-- Error: tests/neg/i12284.scala:8:36 ----------------------------------------------------------------------------------
+8 |  val xx: Vector[G[_]] = deps.map(i => magic(i)) // error
   |                                  ^^^^^^^^^^^^^
-  |                                  return type F[i.A] of lambda cannot be made hygienic;
+  |                                  return type G[?] of lambda cannot be made hygienic;
   |                                  it is not a supertype of the hygienic type Any
