@@ -47,7 +47,7 @@ import config.SourceVersion._
  *  The scheme is designed to allow sharing of nodes, as long as each duplicate appears
  *  in a different method.
  */
-class Namer { typer: Typer =>
+class Namer(nestingLevel: Int) { typer: Typer =>
 
   import untpd._
 
@@ -91,7 +91,7 @@ class Namer { typer: Typer =>
    *  and where they survive until typechecking. A context with this typer also
    *  has this scope.
    */
-  val scope: MutableScope = newScope
+  val scope: MutableScope = newScope(nestingLevel)
 
   /** We are entering symbols coming from a SourceLoader */
   private var lateCompile = false
@@ -329,9 +329,9 @@ class Namer { typer: Typer =>
       val existingType = pkgOwner.info.decls.lookup(pid.name.toTypeName)
       if (existingType.exists) {
         report.error(PkgDuplicateSymbol(existingType), pid.srcPos)
-        newCompletePackageSymbol(pkgOwner, (pid.name ++ "$_error_").toTermName).entered
+        newCompletePackageSymbol(pkgOwner, (pid.name ++ "$_error_").toTermName, decls = newScope).entered
       }
-      else newCompletePackageSymbol(pkgOwner, pid.name.asTermName).entered
+      else newCompletePackageSymbol(pkgOwner, pid.name.asTermName, decls = newScope).entered
     }
   }
 

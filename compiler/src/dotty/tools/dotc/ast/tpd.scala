@@ -343,7 +343,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
         if (head.isRef(defn.AnyClass)) defn.AnyRefType :: parents else head :: parents
       }
       else parents
-    val cls = newNormalizedClassSymbol(owner, tpnme.ANON_CLASS, Synthetic | Final, parents1,
+    val cls = newNormalizedClassSymbol(owner, tpnme.ANON_CLASS, Synthetic | Final, parents1, Scopes.newScope,
         coord = fns.map(_.span).reduceLeft(_ union _))
     val constr = newConstructor(cls, Synthetic, Nil, Nil).entered
     def forwarder(fn: TermSymbol, name: TermName) = {

@@ -798,7 +798,15 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
   protected def optAscription[T >: Untyped](tpt: Tree[T]): Text = optText(tpt)(": " ~ _)
 
   private def idText(tree: untpd.Tree): Text =
-    if showUniqueIds && tree.hasType && tree.symbol.exists then s"#${tree.symbol.id}" else ""
+    (if showUniqueIds && tree.hasType && tree.symbol.exists then s"#${tree.symbol.id}" else "") ~
+    (if showNestingLevel then tree.typeOpt match
+      case tp: NamedType => s"#${tp.symbol.nestingLevel}"
+      case tp: TypeVar => s"#${tp.nestingLevel.toString}"
+      case tp: TypeParamRef =>
+        val tvar = ctx.typerState.constraint.typeVarOfParam(tp)
+        if tvar.exists then s"#${tvar.asInstanceOf[TypeVar].nestingLevel.toString}" else ""
+      case _ => ""
+     else "")
 
   private def useSymbol(tree: untpd.Tree) =
     tree.hasType && tree.symbol.exists && ctx.settings.YprintSyms.value

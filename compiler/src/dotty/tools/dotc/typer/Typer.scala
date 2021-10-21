@@ -104,7 +104,7 @@ object Typer {
     tree.putAttachment(HiddenSearchFailure,
       fail :: tree.attachmentOrElse(HiddenSearchFailure, Nil))
 }
-class Typer extends Namer
+class Typer(nestingLevel: Int = 0) extends Namer(nestingLevel)
                with TypeAssigner
                with Applications
                with Implicits
@@ -135,7 +135,7 @@ class Typer extends Namer
   private var foundUnderScala2: Type = NoType
 
   // Overridden in derived typers
-  def newLikeThis: Typer = new Typer
+  def newLikeThis: Typer = new Typer(nestingLevel + 1)
 
   /** Find the type of an identifier with given `name` in given context `ctx`.
    *   @param name       the name of the identifier

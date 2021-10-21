@@ -1477,13 +1477,16 @@ object SymDenotations {
       else if is(Contravariant) then Contravariant
       else EmptyFlags
 
-    /** The length of the owner chain of this symbol. 1 for _root_, 0 for NoSymbol */
-    def nestingLevel(using Context): Int =
-      @tailrec def recur(d: SymDenotation, n: Int): Int = d match
-        case NoDenotation => n
-        case d: ClassDenotation => d.nestingLevel + n // profit from the cache in ClassDenotation
-        case _ => recur(d.owner, n + 1)
-      recur(this, 0)
+    // var myNestingLevel = -1
+
+    // /** The length of the owner chain of this symbol. 1 for _root_, 0 for NoSymbol */
+    // def nestingLevel(using Context): Int =
+    //   // @tailrec def recur(d: SymDenotation, n: Int): Int = d match
+    //   //   case NoDenotation => n
+    //   //   case d: ClassDenotation => d.nestingLevel + n // profit from the cache in ClassDenotation
+    //   //   case _ => recur(d.owner, n + 1)
+    //   // if myNestingLevel == -1 then myNestingLevel = recur(this, 0)
+    //   myNestingLevel
 
     /** The flags to be used for a type parameter owned by this symbol.
      *  Overridden by ClassDenotation.
@@ -2324,11 +2327,9 @@ object SymDenotations {
     override def registeredCompanion_=(c: Symbol) =
       myCompanion = c
 
-    private var myNestingLevel = -1
-
-    override def nestingLevel(using Context) =
-      if myNestingLevel == -1 then myNestingLevel = owner.nestingLevel + 1
-      myNestingLevel
+    // override def nestingLevel(using Context) =
+    //   if myNestingLevel == -1 then myNestingLevel = owner.nestingLevel + 1
+    //   myNestingLevel
   }
 
   /** The denotation of a package class.
