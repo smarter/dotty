@@ -135,6 +135,9 @@ trait ConstraintHandling {
 
         override def apply(tp: Type): Type = tp match
           // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
+          // Is nesting enough? What if comparing tvar from one branch and local symbol from other branch?
+          // - check what lionel does
+          // - check what https://okmij.org/ftp/ML/generalization.html says.
           case tp: NamedType if tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > paramLevel =>
             // println("param: " + param.show + " " + paramLevel)
             // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
