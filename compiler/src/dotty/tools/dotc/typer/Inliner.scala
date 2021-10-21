@@ -1511,7 +1511,7 @@ class Inliner(call: tpd.Tree, rhsToInline: tpd.Tree)(using Context) {
    *  4. Make sure inlined code is type-correct.
    *  5. Make sure that the tree's typing is idempotent (so that future -Ycheck passes succeed)
    */
-  class InlineTyper(initialErrorCount: Int) extends ReTyper {
+  class InlineTyper(initialErrorCount: Int, nestingLevel: Int = ctx.scope.nestingLevel + 1) extends ReTyper(nestingLevel) {
     import reducer._
 
     override def ensureAccessible(tpe: Type, superAccess: Boolean, pos: SrcPos)(using Context): Type = {
@@ -1663,7 +1663,7 @@ class Inliner(call: tpd.Tree, rhsToInline: tpd.Tree)(using Context) {
         }
       }
 
-    override def newLikeThis: Typer = new InlineTyper(initialErrorCount)
+    override def newLikeThis(nestingLevel: Int): Typer = new InlineTyper(initialErrorCount, nestingLevel)
 
     /** True if this inline typer has already issued errors */
     override def hasInliningErrors(using Context) = ctx.reporter.errorCount > initialErrorCount

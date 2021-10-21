@@ -135,7 +135,7 @@ class Typer(nestingLevel: Int = 0) extends Namer(nestingLevel)
   private var foundUnderScala2: Type = NoType
 
   // Overridden in derived typers
-  def newLikeThis: Typer = new Typer(nestingLevel + 1)
+  def newLikeThis(nestingLevel: Int): Typer = new Typer(nestingLevel)
 
   /** Find the type of an identifier with given `name` in given context `ctx`.
    *   @param name       the name of the identifier
