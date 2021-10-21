@@ -131,17 +131,6 @@ trait ConstraintHandling {
           case tv: TypeVar => tv.nestingLevel
           case _ => Int.MaxValue
 
-        var topLevel = true
-        override def mapOver(tp: Type) = tp match
-          case tp: AppliedType =>
-            // XX: this top-level thing doesn't really make sense, if we're comparing tvar to tvar, then we don't end up here, so we're comparing ?F <: ?G[X]
-            val tycon2 = this(tp.tycon)
-            topLevel = false
-            derivedAppliedType(tp, tycon2, mapArgs(tp.args, tp.tyconTypeParams))
-          case tp =>
-            topLevel = false
-            super.mapOver(tp)
-
         def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
 
         override def apply(tp: Type): Type = tp match
@@ -167,7 +156,7 @@ trait ConstraintHandling {
                   case _ =>
                     emptyRange // should happen only in error cases
 
-          case tp: TypeVar if !topLevel && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
+          case tp: TypeVar if !tp.isInstantiated && tp.nestingLevel > paramLevel =>
             // println("REPLACE: " + tp + " v: " + variance)
             // println(desc)
             // if variance == 0 then
