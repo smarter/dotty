@@ -162,9 +162,9 @@ trait ConstraintHandling {
           case tp: TypeVar if !tp.isInstantiated && tp.nestingLevel > paramLevel =>
             // println("REPLACE: " + tp + " v: " + variance)
             // println(desc)
-            // if variance == 0 then
-            //   // assert(variance != 0, "stuck: " + tp)
-            //   return expandBounds(bounds(tp.origin))
+            if variance == 0 then
+              // assert(variance != 0, "stuck: " + tp)
+              return expandBounds(bounds(tp.origin))
             val tvar = newTypeVar(TypeBounds.emptyPolyKind)
             tvar.nestingLevel = paramLevel
             // TODO: find example where an assert triggers, something like:
