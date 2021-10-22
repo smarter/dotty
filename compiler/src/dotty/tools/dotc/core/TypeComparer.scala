@@ -1527,8 +1527,11 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             arg2.contains(arg1norm)
           case _ =>
             arg1 match {
-              case arg1: TypeBounds =>
-                compareCaptured(arg1, arg2)
+              case arg1 @ TypeBounds(lo1, hi1) =>
+                if lo1 frozen_=:= hi1 then
+                  isSubArg(lo1, arg2) // Foo[? >: A <: A] <:< Foo[A], JSCodeGen.scala
+                else
+                  compareCaptured(arg1, arg2)
               case _ =>
                 (v > 0 || isSubType(arg2, arg1)) &&
                 (v < 0 || isSubType(arg1, arg2))
