@@ -164,7 +164,9 @@ trait ConstraintHandling {
             // println(desc)
 
             def makeVar(isUpper: Boolean): TypeVar =
-              val tvar = newTypeVar(TypeBounds.emptyPolyKind)
+              // TODO: emptyPolyKind breaks i8900a4.scala
+              val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+              val tvar = newTypeVar(bounds)
               tvar.nestingLevel = paramLevel
               if isUpper then
                 assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
@@ -176,7 +178,10 @@ trait ConstraintHandling {
             if variance != 0 then
               makeVar(isUpper = variance >= 0)
             else
-              range(makeVar(isUpper = false), makeVar(isUpper = true))
+              val tvar1 = makeVar(isUpper = false)
+              val tvar2 = makeVar(isUpper = true)
+              assert(tvar1 <:< tvar2, i"$tvar1 <:< $tvar2 -- $desc")
+              range(tvar1, tvar2)
 
           // For i8900pf / runST
           // what if we're inside poly fun? then hoepfully constraint contains binder
