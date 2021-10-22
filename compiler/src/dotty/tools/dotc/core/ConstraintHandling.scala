@@ -227,6 +227,7 @@ trait ConstraintHandling {
             if isUpper then oldBounds.derivedTypeBounds(lo, hi & bound)
             else oldBounds.derivedTypeBounds(lo | bound, hi)
           finally homogenizeArgs = saved
+        // constr.println(i"## update $param [$lo..$hi] --> isUpper=[$isUpper], raw=[$rawBound], b=[$bound], n={$narrowedBounds]")
         val c1 = constraint.updateEntry(param, narrowedBounds)
         (c1 eq constraint)
         || {

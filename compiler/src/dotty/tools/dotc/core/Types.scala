@@ -5756,8 +5756,21 @@ object Types {
             if (distributeArgs(args, tp.tyconTypeParams))
               range(tp.derivedAppliedType(tycon, loBuf.toList),
                     tp.derivedAppliedType(tycon, hiBuf.toList))
-            else range(defn.NothingType, defn.AnyType)
-              // TODO: can we give a better bound than `topType`?
+            else
+              var saved = true
+              // TODO: just don't make Range arguments if application head is HK?
+              val args2 = args.mapConserve {
+                case Range(a, b) =>
+                  saved = saved && (a =:= b)
+                  a
+                case arg =>
+                  arg
+              }
+              if saved && (args2 ne args) then
+                derivedAppliedType(tp, tycon, args2)
+              else
+                range(defn.NothingType, defn.AnyType)
+                // TODO: can we give a better bound than `topType`?
           else tp.derivedAppliedType(tycon, args)
       }
 
