@@ -162,21 +162,21 @@ trait ConstraintHandling {
           case tp: TypeVar if !tp.isInstantiated && tp.nestingLevel > paramLevel =>
             // println("REPLACE: " + tp + " v: " + variance)
             // println(desc)
-            if variance == 0 then
-              // assert(variance != 0, "stuck: " + tp)
-              return expandBounds(bounds(tp.origin))
-            val tvar = newTypeVar(TypeBounds.emptyPolyKind)
-            tvar.nestingLevel = paramLevel
-            // TODO: find example where an assert triggers, something like:
-            //   tp between local1..local2 ==>
-            //     tvar <:< apply(local1) ~~> tvar <:< Nothing
-            //     apply(local2) <:< tvar ~~>  Any <:< tvar
-            if variance <= 0 then
-              assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
-            if variance >= 0 then
-              assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
-            // println("ctx2: " + ctx.typerState.constraint.show)
-            tvar
+
+            def makeVar(isUpper: Boolean): TypeVar =
+              val tvar = newTypeVar(TypeBounds.emptyPolyKind)
+              tvar.nestingLevel = paramLevel
+              if isUpper then
+                assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+              else
+                assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+              // println("ctx2: " + ctx.typerState.constraint.show)
+              tvar
+
+            if variance != 0 then
+              makeVar(isUpper = variance >= 0)
+            else
+              range(makeVar(isUpper = false), makeVar(isUpper = true))
 
           // For i8900pf / runST
           // what if we're inside poly fun? then hoepfully constraint contains binder
