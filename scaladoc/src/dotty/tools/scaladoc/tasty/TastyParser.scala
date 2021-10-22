@@ -85,6 +85,7 @@ case class ScaladocTastyInspector()(using ctx: DocContext) extends DocTastyInspe
       import symOps._
       Try(QueryParser(link).readQuery()).toOption.flatMap(query =>
         MemberLookup.lookupOpt(query, None).map {
+          // TODO: match may not be exhaustive. It would fail on pattern case: (_, _, _)
           case (sym, _, inheritingParent) => inheritingParent match
             case Some(parent) => sym.driInContextOfInheritingParent(parent)
             case None => sym.dri
