@@ -98,8 +98,17 @@ trait ConstraintHandling {
       val dropWildcards = new AvoidWildcardsMap:
         @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
 
+        def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
+
+        override protected[core] def variance_=(x: Int): Unit =
+          // if variance != -1 && x == -1 then
+          //   println("@@: " + desc)
+          //   Thread.dumpStack
+          super.variance_=(x)
+
         if isUpper then variance = -1
         if flipVariance then variance = -variance
+
         // if isUpper then variance = -1
 
         // override def apply(t: Type): Type = t match
@@ -130,8 +139,6 @@ trait ConstraintHandling {
         def paramLevel = constraint.typeVarOfParam(param) match
           case tv: TypeVar => tv.nestingLevel
           case _ => Int.MaxValue
-
-        def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
 
         override def apply(tp: Type): Type = tp match
           // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
@@ -200,8 +207,36 @@ trait ConstraintHandling {
             localParamRefs ++= tl.paramRefs
             mapOver(tl)
 
+          case tp: AppliedType =>
+            val isHK = tp.tycon.isLambdaSub
+            derivedAppliedType(tp, this(tp.tycon), mapArgs(tp.args, tp.tyconTypeParams, isHK))
+
           case _ =>
+            // println(s"[$variance]map over: " + tp.show)
             super.apply(tp)
+
+        def mapArgs(args: List[Type], tparams: List[ParamInfo], isHK: Boolean): List[Type] = args match
+          case arg :: otherArgs if tparams.nonEmpty =>
+            val arg1 = arg match
+              case arg: TypeBounds => this(arg)
+              case arg => atVariance(variance * tparams.head.paramVarianceSign)(mapArg(arg, isHK))
+            val otherArgs1 = mapArgs(otherArgs, tparams.tail)
+            if ((arg1 eq arg) && (otherArgs1 eq otherArgs)) args
+            else arg1 :: otherArgs1
+          case nil =>
+            nil
+
+        def mapArg(tp: Type, isHKArg: Boolean): Type = tp match
+          case tp: TypeVar if isHKArg && variance == 0 && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
+            // Don't use a range since hk applications can't be wildcards.
+            val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+            val tvar = newTypeVar(bounds)
+            tvar.nestingLevel = paramLevel
+            assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+            assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+            tvar
+          case _ => apply(tp)
+
         override def mapWild(t: WildcardType) =
           if approximateWildcards then super.mapWild(t)
           else newTypeVar(apply(t.effectiveBounds).toBounds)
