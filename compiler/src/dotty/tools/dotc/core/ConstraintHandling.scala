@@ -166,9 +166,18 @@ trait ConstraintHandling {
                   case _ =>
                     emptyRange // should happen only in error cases
 
+          // at the top-level in AndOrType we go through OrderingConstraint#dependentParams:
+          // ?A <: ?B & X becomes:
+          //   ?A <: ?B & X // not stripped actually?
+          //   ?A <: ?B
+          // Does that mean we don't need the avoidance?
+          // - New bounds on B will be approximated as they're propagated to A
+          // - Are existing bounds also approximated? Not sure because we're not
+          //   going through ConstraintHandling#addLess.
+          //     ==> isn't that lack of propagation already problematic on master?
           case tp: TypeVar if !tp.isInstantiated && tp.nestingLevel > paramLevel =>
-            // println("REPLACE: " + tp + " v: " + variance)
-            // println(desc)
+            println("REPLACE: " + tp + " v: " + variance)
+            println(desc)
 
             def makeVar(isUpper: Boolean): TypeVar =
               // TODO: emptyPolyKind breaks i8900a4.scala
@@ -228,6 +237,9 @@ trait ConstraintHandling {
 
         def mapArg(tp: Type, isHKArg: Boolean): Type = tp match
           case tp: TypeVar if isHKArg && variance == 0 && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
+            println("0REPLACE: " + tp + " v: " + variance)
+            println(desc)
+
             // Don't use a range since hk applications can't be wildcards.
             val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
             val tvar = newTypeVar(bounds)
@@ -290,6 +302,11 @@ trait ConstraintHandling {
         val p2 = adjust(tp.tp2)
         if p1.exists && p2.exists then tp.derivedAndOrType(p1, p2) else NoType
       case tp: TypeVar if constraint.contains(tp.origin) =>
+        // val u2 = adjust(tp.underlying)
+        // if u2 ne tp.underlying then u2 else tp
+        // XX: why are we doing this?
+        // If in constraint but not instantatiated leads to TypeParamRef, which could loose its link to TypeVar
+        // like what happens in https://github.com/lampepfl/dotty/pull/13779
         adjust(tp.underlying)
       case tp: ExprType =>
         // ExprTypes are not value types, so type parameters should not
@@ -354,6 +371,7 @@ trait ConstraintHandling {
     val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
     val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
 
+    // XX: is the reordering here breaking the assumption of unifying in ConstraintHandling#order?
     val pL = if level1 <= level2 then p1 else p2
     val pR = if level1 <= level2 then p2 else p1
 
