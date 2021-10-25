@@ -5330,7 +5330,9 @@ object Types {
 
   /** Common base class of TypeMap and TypeAccumulator */
   abstract class VariantTraversal:
-    protected[core] var variance: Int = 1
+    private var myVariance: Int = 1
+    protected[core] def variance: Int = myVariance
+    protected[core] def variance_=(x: Int): Unit = myVariance = x
 
     inline protected def atVariance[T](v: Int)(op: => T): T = {
       val saved = variance
@@ -5438,6 +5440,7 @@ object Types {
             derivedSelect(tp, prefix1)
 
         case tp: AppliedType =>
+          // println("map over: " + tp)
           derivedAppliedType(tp, this(tp.tycon), mapArgs(tp.args, tp.tyconTypeParams))
 
         case tp: LambdaType =>
@@ -5759,7 +5762,10 @@ object Types {
               range(tp.derivedAppliedType(tycon, loBuf.toList),
                     tp.derivedAppliedType(tycon, hiBuf.toList))
             else
-              var saved = true
+              // Setting this to true breaks SnippetChecker, unless we disable flipVariance,
+              // but that breaks bootstrapping, etc.
+              var saved = false //true
+              // println(i"%[$variance] $tp -- $tycon -- $args")
               // TODO: just don't make Range arguments if application head is HK?
               val args2 = args.mapConserve {
                 case Range(a, b) =>
@@ -5867,8 +5873,10 @@ object Types {
     def apply(t: Type): Type = t match
       case t: WildcardType => mapWild(t)
       case _ =>
-        // println(s"mapping[$variance]: " + t.show)
-        mapOver(t)
+        // println(s"mapping[$variance]: " + t)
+        val z = mapOver(t)
+        // println(s"mapped[$variance]: " + t)
+        z
 
   // ----- TypeAccumulators ----------------------------------------------------
 
