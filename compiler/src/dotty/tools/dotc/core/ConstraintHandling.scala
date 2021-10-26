@@ -206,10 +206,12 @@ trait ConstraintHandling {
             if variance != 0 then
               makeVar(isUpper = variance >= 0)
             else
-              val tvar1 = makeVar(isUpper = false)
-              val tvar2 = makeVar(isUpper = true)
-              assert(tvar1 <:< tvar2, i"$tvar1 <:< $tvar2 -- $desc")
-              range(tvar1, tvar2)
+              val bounds = tvarBounds(tp)
+              val tvar = newTypeVar(bounds)
+              tvar.nestingLevel = paramLevel
+              assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+              assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+              tvar
 
           // For i8900pf / runST
           // what if we're inside poly fun? then hoepfully constraint contains binder
@@ -228,39 +230,9 @@ trait ConstraintHandling {
             localParamRefs ++= tl.paramRefs
             mapOver(tl)
 
-          case tp: AppliedType =>
-            val isHK = tp.tycon.isLambdaSub
-            derivedAppliedType(tp, this(tp.tycon), mapArgs(tp.args, tp.tyconTypeParams, isHK))
-
           case _ =>
             // println(s"[$variance]map over: " + tp.show)
             super.apply(tp)
-
-        def mapArgs(args: List[Type], tparams: List[ParamInfo], isHK: Boolean): List[Type] = args match
-          case arg :: otherArgs if tparams.nonEmpty =>
-            val arg1 = arg match
-              case arg: TypeBounds => this(arg)
-              case arg => atVariance(variance * tparams.head.paramVarianceSign)(mapArg(arg, isHK))
-            val otherArgs1 = mapArgs(otherArgs, tparams.tail)
-            if ((arg1 eq arg) && (otherArgs1 eq otherArgs)) args
-            else arg1 :: otherArgs1
-          case nil =>
-            nil
-
-        def mapArg(tp: Type, isHKArg: Boolean): Type = tp match
-          case tp: TypeVar if isHKArg && variance == 0 && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
-            // println("0REPLACE: " + tp + " v: " + variance)
-            // println(desc)
-
-            // Don't use a range since hk applications can't be wildcards.
-            // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
-            val bounds = tvarBounds(tp)
-            val tvar = newTypeVar(bounds)
-            tvar.nestingLevel = paramLevel
-            assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
-            assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
-            tvar
-          case _ => apply(tp)
 
         override def mapWild(t: WildcardType) =
           if approximateWildcards then super.mapWild(t)
