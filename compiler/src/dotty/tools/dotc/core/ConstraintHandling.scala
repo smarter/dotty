@@ -88,7 +88,7 @@ trait ConstraintHandling {
 
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
     if !constraint.contains(param) then true
-    else if !isUpper && param.occursIn(rawBound) then
+    else if !isUpper && param.occursIn(constraint.ensureNonCyclic(param, TypeBounds(rawBound, defn.AnyType))) then
       // We don't allow recursive lower bounds when defining a type,
       // so we shouldn't allow them as constraints either.
       false
@@ -175,9 +175,11 @@ trait ConstraintHandling {
           // - Are existing bounds also approximated? Not sure because we're not
           //   going through ConstraintHandling#addLess.
           //     ==> isn't that lack of propagation already problematic on master?
+          //      ==> probably fine, it just means more recursion in subtype checking,
+          //          but it does mean we do have to avoid higher level tvars in AndOrTypes.
           case tp: TypeVar if !tp.isInstantiated && tp.nestingLevel > paramLevel =>
-            println("REPLACE: " + tp + " v: " + variance)
-            println(desc)
+            // println("REPLACE: " + tp + " v: " + variance)
+            // println(desc)
 
             def makeVar(isUpper: Boolean): TypeVar =
               // TODO: emptyPolyKind breaks i8900a4.scala
@@ -237,8 +239,8 @@ trait ConstraintHandling {
 
         def mapArg(tp: Type, isHKArg: Boolean): Type = tp match
           case tp: TypeVar if isHKArg && variance == 0 && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
-            println("0REPLACE: " + tp + " v: " + variance)
-            println(desc)
+            // println("0REPLACE: " + tp + " v: " + variance)
+            // println(desc)
 
             // Don't use a range since hk applications can't be wildcards.
             val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
@@ -331,9 +333,19 @@ trait ConstraintHandling {
       else report.log(msg)
     def others = if isUpper then constraint.lower(param) else constraint.upper(param)
     val bound = adjust(rawBound)
+    {
     bound.exists
-    && addOneBound(param, bound, isUpper) && others.forall(addOneBound(_, bound, isUpper))
-        .showing(i"added $description = $result$location", constr)
+    && {
+      constr.println(s"bound[$param]")
+      val aob = addOneBound(param, bound, isUpper)
+      constr.println(s"aob[$param]: " + aob)
+      aob && {
+        val os = others.forall(addOneBound(_, bound, isUpper))
+        constr.println(s"os[$param]: " + os)
+        os
+      }
+    }
+    }.showing(i"added $description = $result$location", constr)
   end addBoundTransitively
 
   protected def addLess(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
@@ -347,8 +359,17 @@ trait ConstraintHandling {
         val hi2 = constraint.nonParamBounds(p2).hi
         constr.println(i"adding $description down1 = $down1, up2 = $up2$location")
         constraint = constraint.addLess(p1, p2)
-        down1.forall(addOneBound(_, hi2, isUpper = true)) &&
-        up2.forall(addOneBound(_, lo1, isUpper = false))
+        //DEBUG HERE
+        down1.forall { d1 =>
+          val z = addOneBound(d1, hi2, isUpper = true)
+          if !z then constr.println(s"$d1 !<:< $hi2")
+          z
+        } &&
+        up2.forall { u2 =>
+          val z = addOneBound(u2, lo1, isUpper = false)
+          if !z then constr.println(s"$lo1 !<:< $u2")
+          z
+        }
       }
     constr.println(i"added $description = $res$location")
     res
@@ -371,7 +392,8 @@ trait ConstraintHandling {
     val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
     val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
 
-    // XX: is the reordering here breaking the assumption of unifying in ConstraintHandling#order?
+    // XX: is the reordering here breaking the assumption of `unifying` in OrderingConstraint#order?
+    // ... no because order is called from addLess above.
     val pL = if level1 <= level2 then p1 else p2
     val pR = if level1 <= level2 then p2 else p1
 
@@ -684,8 +706,9 @@ trait ConstraintHandling {
 
     def addParamBound(bound: TypeParamRef) =
       constraint.entry(param) match {
-        case _: TypeBounds =>
+        case _: TypeBounds/* | NoType*/ =>
           if (fromBelow) addLess(bound, param) else addLess(param, bound)
+        // What if the entry is NoType? When does that happen exactly?
         case tp =>
           if (fromBelow) isSub(bound, tp) else isSub(tp, bound)
       }

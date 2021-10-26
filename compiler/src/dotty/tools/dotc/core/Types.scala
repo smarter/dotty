@@ -3116,7 +3116,6 @@ object Types {
 
   abstract case class AndType(tp1: Type, tp2: Type) extends AndOrType {
     def isAnd: Boolean = true
-
     private var myBaseClassesPeriod: Period = Nowhere
     private var myBaseClasses: List[ClassSymbol] = _
     /** Base classes of are the merge of the operand base classes. */
@@ -3164,12 +3163,6 @@ object Types {
 
   object AndType {
     def apply(tp1: Type, tp2: Type)(using Context): AndType = {
-      tp1 match
-        case tp1: NamedType if tp1.symbol.id == 3844 && tp2.show.toString.contains("param") =>
-          println("tp2: " + tp2)
-          Thread.dumpStack
-        case _ =>
-
       assert(tp1.isValueTypeOrWildcard &&
              tp2.isValueTypeOrWildcard, i"$tp1 & $tp2 / " + s"$tp1 & $tp2")
       unchecked(tp1, tp2)

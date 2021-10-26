@@ -17,6 +17,8 @@ abstract class Constraint extends Showable {
 
   type This <: Constraint
 
+  def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type
+
   /** Does the constraint's domain contain the type parameters of `tl`? */
   def contains(tl: TypeLambda): Boolean
 

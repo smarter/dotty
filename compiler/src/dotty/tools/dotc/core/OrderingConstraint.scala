@@ -243,7 +243,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     case param: TypeParamRef if contains(param) =>
       todos += (if isUpper then order(_, _, param) else order(_, param, _))
       NoType
-    case tp: TypeBounds =>
+    case tp: TypeBounds => // hit because we call stripParams on bounds
       val lo1 = stripParams(tp.lo, todos, !isUpper).orElse(defn.NothingType)
       val hi1 = stripParams(tp.hi, todos, isUpper).orElse(defn.AnyKindType)
       tp.derivedTypeBounds(lo1, hi1)
@@ -306,7 +306,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *  References can be direct or indirect through instantiations of other
    *  parameters in the constraint.
    */
-  private def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
+  /*private*/ def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
 
     def recur(tp: Type, fromBelow: Boolean): Type = tp match
       case tp: AndOrType =>
@@ -340,9 +340,14 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 
     inst match
       case bounds: TypeBounds =>
+        val z =
         bounds.derivedTypeBounds(
           recur(bounds.lo, fromBelow = true),
           recur(bounds.hi, fromBelow = false))
+        // if z ne bounds then
+        //   println("#BEF: " + bounds)
+        //   println("#AFT: " + z)
+        z
       case _ =>
         inst
   end ensureNonCyclic
@@ -388,12 +393,14 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    */
   private def dependentParams(tp: Type, isUpper: Boolean)(using Context): List[TypeParamRef] = tp match
     case param: TypeParamRef if contains(param) =>
+      // Can use TypeParamRef because addBoundTransitively#adjust strips TypeVars?
+      // difference with stripParams is that we call upper/lower here, so we're recursive.
       param :: (if (isUpper) upper(param) else lower(param))
     case tp: AndType if isUpper  =>
       dependentParams(tp.tp1, isUpper) | (dependentParams(tp.tp2, isUpper))
     case tp: OrType if !isUpper =>
       dependentParams(tp.tp1, isUpper).intersect(dependentParams(tp.tp2, isUpper))
-    case EtaExpansion(tycon) =>
+    case EtaExpansion(tycon) => // not in stripParams, meaningful distinction?
       dependentParams(tycon, isUpper)
     case _ =>
       Nil
