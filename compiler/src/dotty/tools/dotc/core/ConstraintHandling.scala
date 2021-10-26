@@ -180,6 +180,9 @@ trait ConstraintHandling {
           case tp: TypeVar if !tp.isInstantiated && tp.nestingLevel > paramLevel =>
             // println("REPLACE: " + tp + " v: " + variance)
             // println(desc)
+            if flipVariance && variance == 0 then
+              // flipVariance means constraintResult, better not to constrain too much.
+              return emptyRange
 
             def makeVar(isUpper: Boolean): TypeVar =
               // TODO: emptyPolyKind breaks i8900a4.scala
@@ -196,6 +199,10 @@ trait ConstraintHandling {
             if variance != 0 then
               makeVar(isUpper = variance >= 0)
             else
+              // val fb = fullBounds(tp.origin)
+              // range(fb)
+              // println("tp: " + tp)
+              // println("ctx: " + constraint.show)
               val tvar1 = makeVar(isUpper = false)
               val tvar2 = makeVar(isUpper = true)
               assert(tvar1 <:< tvar2, i"$tvar1 <:< $tvar2 -- $desc")
@@ -238,7 +245,8 @@ trait ConstraintHandling {
             nil
 
         def mapArg(tp: Type, isHKArg: Boolean): Type = tp match
-          case tp: TypeVar if isHKArg && variance == 0 && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
+          case tp: TypeVar if !flipVariance && isHKArg && variance == 0 && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
+            // flipVariance case handled in apply
             // println("0REPLACE: " + tp + " v: " + variance)
             // println(desc)
 
