@@ -5477,7 +5477,13 @@ object Types {
           tp.map(this)
 
         case tp: RefinedType =>
-          derivedRefinedType(tp, this(tp.parent), this(tp.refinedInfo))
+          val p = this(tp.parent)
+          val ri = tp.refinedInfo match
+            case ri: AliasingBounds =>
+              atVariance(0)(this(ri))
+            case ri =>
+              this(ri) // Is this correct?
+          derivedRefinedType(tp, p, ri)
 
         case tp: RecType =>
           record("TypeMap.RecType")
@@ -5679,16 +5685,24 @@ object Types {
         case Range(parentLo, parentHi) =>
           range(derivedRefinedType(tp, parentLo, info), derivedRefinedType(tp, parentHi, info))
         case _ =>
+          // assert(false, i"$tp -- $parent -- $info")
           def propagate(lo: Type, hi: Type) =
             range(derivedRefinedType(tp, parent, lo), derivedRefinedType(tp, parent, hi))
           if (parent.isExactlyNothing) parent
           else info match {
+            case Range(TypeAlias(lo), TypeAlias(hi)) =>
+              if variance > 0 then
+                tp.derivedRefinedType(parent, tp.refinedName, TypeBounds(lo, hi)) // need testcase
+              else
+                range(defn.NothingType, tp.parent) // kindness
             case Range(infoLo: TypeBounds, infoHi: TypeBounds) =>
-              assert(variance == 0)
+              assert(variance == 0, s"$tp -- $parent -- $info")
               if (!infoLo.isTypeAlias && !infoHi.isTypeAlias) propagate(infoLo, infoHi)
               else range(defn.NothingType, tp.parent)
             case Range(infoLo, infoHi) =>
+              assert(false,  i"$tp -- $parent -- $info")
               propagate(infoLo, infoHi)
+              // tp.derivedRefinedType(parent, tp.refinedName, rangeToBounds(info))
             case _ =>
               tp.derivedRefinedType(parent, tp.refinedName, info)
           }

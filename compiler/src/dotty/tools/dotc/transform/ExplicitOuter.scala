@@ -165,7 +165,7 @@ object ExplicitOuter {
    *  - otherwise O[?, ..., ?]
    */
   // XX: why is the explicit result type needed with commit change?
-  private def newOuterSym(owner: ClassSymbol, cls: ClassSymbol, name: TermName, flags: FlagSet)(using Context): TermSymbol = {
+  private def newOuterSym(owner: ClassSymbol, cls: ClassSymbol, name: TermName, flags: FlagSet)(using Context) = {
     val outerThis = owner.owner.enclosingClass.thisType
     val outerCls = outerClass(cls)
     val prefix = owner.thisType.baseType(cls).normalizedPrefix
