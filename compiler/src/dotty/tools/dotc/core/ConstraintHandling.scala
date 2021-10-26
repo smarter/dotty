@@ -142,7 +142,7 @@ trait ConstraintHandling {
 
         def kindTop(tp: Type): Type =
           if tp frozen_<:< defn.AnyType then defn.AnyType
-          else tp.ensureLambdaSub match
+          else TypeApplications.EtaExpansion(tp) match
             case tp: HKTypeLambda =>
               tp.derivedLambdaType(resType = kindTop(tp.resultType))
 
