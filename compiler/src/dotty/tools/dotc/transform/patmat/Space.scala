@@ -899,7 +899,7 @@ class SpaceEngine(using Context) extends SpaceLogic {
       })
 
 
-    if uncovered.nonEmpty then
+    if uncovered.nonEmpty && false then
       val hasMore = uncovered.lengthCompare(6) > 0
       val deduped = dedup(uncovered.take(6))
       report.warning(PatternMatchExhaustivity(show(deduped), hasMore), sel.srcPos)
