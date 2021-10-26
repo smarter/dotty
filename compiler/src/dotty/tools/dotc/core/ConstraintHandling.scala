@@ -140,6 +140,15 @@ trait ConstraintHandling {
           case tv: TypeVar => tv.nestingLevel
           case _ => Int.MaxValue
 
+        def kindTop(tp: Type): Type =
+          if tp frozen_<:< defn.AnyType then defn.AnyType
+          else tp.ensureLambdaSub match
+            case tp: HKTypeLambda =>
+              tp.derivedLambdaType(resType = kindTop(tp.resultType))
+
+        def tvarBounds(tvar: TypeVar): TypeBounds =
+          TypeBounds.upper(kindTop(bounds(tvar.origin).hi))
+
         override def apply(tp: Type): Type = tp match
           // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
           // Is nesting enough? What if comparing tvar from one branch and local symbol from other branch?
@@ -183,7 +192,8 @@ trait ConstraintHandling {
 
             def makeVar(isUpper: Boolean): TypeVar =
               // TODO: emptyPolyKind breaks i8900a4.scala
-              val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+              // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+              val bounds = tvarBounds(tp)
               val tvar = newTypeVar(bounds)
               tvar.nestingLevel = paramLevel
               if isUpper then
@@ -243,7 +253,8 @@ trait ConstraintHandling {
             // println(desc)
 
             // Don't use a range since hk applications can't be wildcards.
-            val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+            // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+            val bounds = tvarBounds(tp)
             val tvar = newTypeVar(bounds)
             tvar.nestingLevel = paramLevel
             assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
