@@ -208,8 +208,7 @@ trait ConstraintHandling {
             if variance != 0 then
               var isUpper = variance >= 0
 
-              // This fixes PL.scala but breaks everything else. But why? We're not overconstraining
-              // just from adding a type variable.
+              // Fixes PL.scala
               if flipVariance then isUpper = !isUpper
 
               makeVar(isUpper = isUpper)
