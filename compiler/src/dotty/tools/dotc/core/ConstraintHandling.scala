@@ -445,8 +445,8 @@ trait ConstraintHandling {
       case entry: TypeBounds =>
         val tv = constraint.typeVarOfParam(param)
         val useLowerBound = tv match
-          case tv: TypeVar if tv.preferredDirection != 0 =>
-            tv.preferredDirection < 0
+          // case tv: TypeVar if tv.preferredDirection != 0 =>
+          //   tv.preferredDirection < 0
           case _ =>
             fromBelow || param.occursIn(entry.hi)
         val inst = if useLowerBound then fullLowerBound(param) else fullUpperBound(param)
