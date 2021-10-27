@@ -613,7 +613,9 @@ trait Inferencing { this: Typer =>
             val v = vs(tvar)
             if v == null then
               typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = ${tvar.hasLowerBound}, $constraint")
-              toInstantiate += ((tvar, tvar.hasLowerBound))
+              val fromBelow =
+                if tvar.preferredDirection != 0 then tvar.preferredDirection < 0 else tvar.hasLowerBound
+              toInstantiate += ((tvar, fromBelow))
             else if v.intValue != 0 then
               typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
               toInstantiate += ((tvar, v.intValue == 1))
