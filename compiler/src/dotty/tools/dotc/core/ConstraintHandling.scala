@@ -196,6 +196,7 @@ trait ConstraintHandling {
               val bounds = tvarBounds(tp)
               val tvar = newTypeVar(bounds)
               tvar.nestingLevel = paramLevel
+              tvar.preferredDirection = if isUpper then -1 else 1
               if isUpper then
                 assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
               else
@@ -436,7 +437,12 @@ trait ConstraintHandling {
   final def approximation(param: TypeParamRef, fromBelow: Boolean)(using Context): Type =
     constraint.entry(param) match
       case entry: TypeBounds =>
-        val useLowerBound = fromBelow || param.occursIn(entry.hi)
+        val tv = constraint.typeVarOfParam(param)
+        val useLowerBound = tv match
+          // case tv: TypeVar if tv.preferredDirection != 0 =>
+          //   tv.preferredDirection < 0
+          case _ =>
+            fromBelow || param.occursIn(entry.hi)
         val inst = if useLowerBound then fullLowerBound(param) else fullUpperBound(param)
         typr.println(s"approx ${param.show}, from below = $fromBelow, inst = ${inst.show}")
         inst
