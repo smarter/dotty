@@ -459,7 +459,9 @@ object Inferencing {
         case t: TypeVar
         if !t.isInstantiated && accCtx.typerState.constraint.contains(t) =>
           val v = vmap(t)
-          if (v == null) vmap.updated(t, variance)
+          val actualDir =
+            /*if t.preferredDirection != 0 then t.preferredDirection else*/ variance
+          if (v == null) vmap.updated(t, actualDir)
           else if (v == variance || v == 0) vmap
           else vmap.updated(t, 0)
         case _ =>
@@ -604,7 +606,7 @@ trait Inferencing { this: Typer =>
         type InstantiateQueue = mutable.ListBuffer[(TypeVar, Boolean)]
         val toInstantiate = new InstantiateQueue
         for tvar <- qualifying do
-          if !tvar.isInstantiated && constraint.contains(tvar) then
+          if !tvar.isInstantiated && constraint.contains(tvar)/* && tvar.nestingLevel >= ctx.scope.nestingLevel*/ then
             constrainIfDependentParamRef(tvar, tree)
             // Needs to be checked again, since previous interpolations could already have
             // instantiated `tvar` through unification.
