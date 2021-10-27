@@ -155,7 +155,7 @@ trait ConstraintHandling {
           // Is nesting enough? What if comparing tvar from one branch and local symbol from other branch?
           // - check what lionel does
           // - check what https://okmij.org/ftp/ML/generalization.html says.
-          case tp: NamedType if tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > paramLevel =>
+          case tp: NamedType if !ctx.isAfterTyper && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > paramLevel =>
             // println("param: " + param.show + " " + paramLevel)
             // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
             // println(desc)
@@ -187,7 +187,7 @@ trait ConstraintHandling {
           //     ==> isn't that lack of propagation already problematic on master?
           //      ==> probably fine, it just means more recursion in subtype checking,
           //          but it does mean we do have to avoid higher level tvars in AndOrTypes.
-          case tp: TypeVar if !tp.isInstantiated && tp.nestingLevel > paramLevel =>
+          case tp: TypeVar if !ctx.isAfterTyper && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
             // println("REPLACE: " + tp + " v: " + variance)
             // println(desc)
 
