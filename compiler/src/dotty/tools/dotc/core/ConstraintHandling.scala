@@ -107,6 +107,7 @@ trait ConstraintHandling {
           super.variance_=(x)
 
         if isUpper then variance = -1
+        // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
         if flipVariance then variance = -variance
 
         // if isUpper then variance = -1
@@ -205,7 +206,13 @@ trait ConstraintHandling {
               tvar
 
             if variance != 0 then
-              makeVar(isUpper = variance >= 0)
+              var isUpper = variance >= 0
+
+              // This fixes PL.scala but breaks everything else. But why? We're not overconstraining
+              // just from adding a type variable.
+              if flipVariance then isUpper = !isUpper
+
+              makeVar(isUpper = isUpper)
             else
               val bounds = tvarBounds(tp)
               val tvar = newTypeVar(bounds)
