@@ -606,7 +606,7 @@ trait Inferencing { this: Typer =>
         type InstantiateQueue = mutable.ListBuffer[(TypeVar, Boolean)]
         val toInstantiate = new InstantiateQueue
         for tvar <- qualifying do
-          if !tvar.isInstantiated && constraint.contains(tvar)/* && tvar.nestingLevel >= ctx.scope.nestingLevel*/ then
+          if !tvar.isInstantiated && constraint.contains(tvar) && tvar.nestingLevel >= ctx.scope.nestingLevel then
             constrainIfDependentParamRef(tvar, tree)
             // Needs to be checked again, since previous interpolations could already have
             // instantiated `tvar` through unification.
