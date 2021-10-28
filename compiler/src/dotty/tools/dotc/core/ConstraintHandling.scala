@@ -143,9 +143,11 @@ trait ConstraintHandling {
 
         def kindTop(tp: Type): Type =
           if tp frozen_<:< defn.AnyType then defn.AnyType
-          else TypeApplications.EtaExpansion(tp) match
+          else tp.EtaExpand(tp.typeParams) match // XX: TypeApplications.EtaExpansion(tp) doesn't work because it uses typeParamsSymbols
             case tp: HKTypeLambda =>
               tp.derivedLambdaType(resType = kindTop(tp.resultType))
+            case o =>
+              assert(false, i"$o -- ${o.typeParams} -- $desc -- ${ctx.compilationUnit.source}")
 
         def tvarBounds(tvar: TypeVar): TypeBounds =
           TypeBounds.upper(kindTop(bounds(tvar.origin).hi))
