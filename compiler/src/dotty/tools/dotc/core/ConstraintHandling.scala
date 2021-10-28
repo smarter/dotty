@@ -152,9 +152,16 @@ trait ConstraintHandling {
         def tvarBounds(tvar: TypeVar): TypeBounds =
           TypeBounds.upper(kindTop(bounds(tvar.origin).hi))
 
+        // TODO: think about skolems/wildcards/wildcard capture
+        // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?
+        // Foo[? >: Int <: String] =capture=> Foo[?1.CAP] //?1.CAP can propagate out
+        //
+        // class A[T] { def foo: T }
+        // s => { var qual = s; qual.foo } // qual is skolemized, return ?1.T, as bad as x.M in try/i8900.scala ?
         override def apply(tp: Type): Type = tp match
           // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
           // Is nesting enough? What if comparing tvar from one branch and local symbol from other branch?
+          // TODO: instantiate all more nested vars when going out of a scope?
           // - check what lionel does
           // - check what https://okmij.org/ftp/ML/generalization.html says.
           case tp: NamedType if !ctx.isAfterTyper && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > paramLevel =>
