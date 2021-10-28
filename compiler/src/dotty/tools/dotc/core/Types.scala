@@ -1684,6 +1684,10 @@ object Types {
           val t2 = t.tp2.findFunctionTypeInUnion
           // Returen NoType if the union contains multiple function types
           if t2 == NoType then t1 else NoType
+      case t: AndType =>
+        val t1 = t.tp1.findFunctionTypeInUnion
+        if t1 == NoType then t.tp2.findFunctionTypeInUnion else
+          t.tp2.findFunctionTypeInUnion
       case t if defn.isNonRefinedFunction(t) =>
         t
       case t @ SAMType(_) =>
