@@ -1674,22 +1674,20 @@ object Types {
       case _ => resultType
     }
 
-    /** Find the function type in union.
-     *  If there are multiple function types, NoType is returned.
+    /** Determine the expected function type from the prototype.
+     *  If multiple function types are found in a union or intersection,
+     *  their intersection is returned. If no function type is found,
+     *  Any is returned.
      */
-    def findFunctionTypeInUnion(using Context): Type = this match {
-      case t: OrType =>
-        val t1 = t.tp1.findFunctionTypeInUnion
-        if t1 == NoType then t.tp2.findFunctionTypeInUnion else
-          val t2 = t.tp2.findFunctionTypeInUnion
-          // Returen NoType if the union contains multiple function types
-          if t2 == NoType then t1 else NoType
+    def findFunctionTypeInUnion(using Context): Type = dealias match {
+      case t: AndOrType =>
+        t.tp1.findFunctionTypeInUnion & t.tp2.findFunctionTypeInUnion
       case t if defn.isNonRefinedFunction(t) =>
         t
       case t @ SAMType(_) =>
         t
       case _ =>
-        NoType
+        defn.AnyType
     }
 
     /** This type seen as a TypeBounds */
