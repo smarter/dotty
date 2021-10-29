@@ -31,25 +31,46 @@ object TypeOps:
    *  for what this means.
    */
   final def asSeenFrom(tp: Type, pre: Type, cls: Symbol)(using Context): Type = {
-    pre match {
-      case pre: QualSkolemType =>
-        // When a selection has an unstable qualifier, the qualifier type gets
-        // wrapped in a `QualSkolemType` so that it may appear soundly as the
-        // prefix of a path in the selection type.
-        // However, we'd like to avoid referring to skolems when possible since
-        // they're an extra level of indirection we usually don't need, so we
-        // compute the type as seen from the widened prefix, and in the rare
-        // cases where this leads to an approximated type we recompute it with
-        // the skolemized prefix. See the i6199* tests for usecases.
-        val widenedAsf = new AsSeenFromMap(pre.info, cls)
-        val ret = widenedAsf.apply(tp)
+    // Disabled to avoid:
+    //     [error] -- Error: /home/smarter/opt/dotty/compiler/src/dotty/tools/backend/sjs/JSCodeGen.scala:4691:45
+    // [error] 4691 |    private val methodName = sym.name.exclude(DefaultGetterName).asTermName
+    // [error]      |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    // [error]      |                             DefaultParamInfo.this.sym.ThisName is not a legal path
+    // [error]      |                             since it is not a concrete type
+    // [error] -- Error: /home/smarter/opt/dotty/compiler/src/dotty/tools/dotc/core/NameOps.scala:277:18
+    // [error] 277 |      likeSpacedN(name ++ nme.specializedTypeNames.prefix ++
+    // [error]     |                  ^
+    // [error]     |                  name.ThisName#ThisName#ThisName#ThisName is not a legal path
+    // [error]     |                  since it is not a concrete type
+    // [error] 278 |        methodTags.fold(nme.EMPTY)(_ ++ _) ++ nme.specializedTypeNames.separator ++
+    // [error] 279 |        classTags.fold(nme.EMPTY)(_ ++ _) ++ nme.specializedTypeNames.suffix)
+    // [error] -- Error: /home/smarter/opt/dotty/compiler/src/dotty/tools/dotc/transform/LambdaLift.scala:67:10
+    // [error] 65 |        sym.name.replace {
+    // [error] 66 |          case name: SimpleName => ExpandPrefixName(sym.owner.name.asTermName, name)
+    // [error] 67 |        }.freshened
+    // [error]    |        ^
+    // [error]    |        sym.ThisName is not a legal path
+    // [error]    |        since it is not a concrete type
 
-        if (!widenedAsf.approximated)
-          return ret
+    // pre match {
+    //   case pre: QualSkolemType =>
+    //     // When a selection has an unstable qualifier, the qualifier type gets
+    //     // wrapped in a `QualSkolemType` so that it may appear soundly as the
+    //     // prefix of a path in the selection type.
+    //     // However, we'd like to avoid referring to skolems when possible since
+    //     // they're an extra level of indirection we usually don't need, so we
+    //     // compute the type as seen from the widened prefix, and in the rare
+    //     // cases where this leads to an approximated type we recompute it with
+    //     // the skolemized prefix. See the i6199* tests for usecases.
+    //     val widenedAsf = new AsSeenFromMap(pre.info, cls)
+    //     val ret = widenedAsf.apply(tp)
 
-        Stats.record("asSeenFrom skolem prefix required")
-      case _ =>
-    }
+    //     if (!widenedAsf.approximated)
+    //       return ret
+
+    //     Stats.record("asSeenFrom skolem prefix required")
+    //   case _ =>
+    // }
 
     new AsSeenFromMap(pre, cls).apply(tp)
   }

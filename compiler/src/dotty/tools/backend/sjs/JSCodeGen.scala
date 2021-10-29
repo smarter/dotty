@@ -4688,7 +4688,7 @@ object JSCodeGen {
    *  The method must have a default getter name for this class to make sense.
    */
   private class DefaultParamInfo(sym: Symbol)(using Context) {
-    private val methodName = sym.name.exclude(DefaultGetterName)
+    private val methodName = sym.name.exclude(DefaultGetterName).asTermName
 
     def isForConstructor: Boolean = methodName == nme.CONSTRUCTOR
 

@@ -254,6 +254,10 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
         report.error(em"constructor proxy ${tree.symbol} cannot be used as a value", tree.srcPos)
 
     override def transform(tree: Tree)(using Context): Tree =
+      tree.tpe match
+        case tp: NamedType if tp.symbol.isAbstractType =>
+          Checking.checkRealizable(tp.prefix, tree.srcPos)
+        case _ =>
       try tree match {
         // TODO move CaseDef case lower: keep most probable trees first for performance
         case CaseDef(pat, _, _) =>
@@ -275,7 +279,7 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
           if tree.symbol.is(Inline) then
             ctx.compilationUnit.needsInlining = true
           if (name.isTypeName) {
-            Checking.checkRealizable(qual.tpe, qual.srcPos)
+            // Checking.checkRealizable(qual.tpe, qual.srcPos)
             withMode(Mode.Type)(super.transform(tree))
           }
           else

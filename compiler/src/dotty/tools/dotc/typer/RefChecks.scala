@@ -581,7 +581,15 @@ object RefChecks {
         val missing = missingTermSymbols
         // Group missing members by the name of the underlying symbol,
         // to consolidate getters and setters.
-        val grouped = missing.groupBy(_.underlyingSymbol.name)
+        // change needed when forcing skolemization to avoid:
+        // [error] 629 |            val isMultiple = grouped.getOrElse(underlying.name, Nil).size > 1
+        // [error]     |                                               ^^^^^^^^^^^^^^^
+        // [error]     |                                               Found:    underlying.ThisName
+        // [error]     |                                               Required: ?1.ThisName
+        // [error]     |
+        // [error]     |                                               where:    ?1 is an unknown value of type dotty.tools.dotc.core.Symbols.Symbol
+        // so probably skolemization avoidance is broken?
+        val grouped = missing.groupBy(_.underlyingSymbol.name.asTermName)
 
         val missingMethods = grouped.toList flatMap {
           case (name, syms) =>
@@ -626,7 +634,7 @@ object RefChecks {
           // Give a specific error message for abstract vars based on why it fails:
           // It could be unimplemented, have only one accessor, or be uninitialized.
           if (underlying.is(Mutable)) {
-            val isMultiple = grouped.getOrElse(underlying.name, Nil).size > 1
+            val isMultiple = grouped.getOrElse(underlying.name.asTermName, Nil).size > 1
 
             // If both getter and setter are missing, squelch the setter error.
             if (member.isSetter && isMultiple) ()
