@@ -110,10 +110,33 @@ class ClassfileParser(
         s"class file '${classfile}' has unknown version $majorVersion.$minorVersion, should be at least $JAVA_MAJOR_VERSION.$JAVA_MINOR_VERSION")
   }
 
+  def printErr(err: String): Unit = System.err.println(err)
+  def debugCD[T](name: Name, default: => T, thunk: => T): T =
+    if (name.toString == "C" || name.toString == "D" || name.toString == "C.D" || name.toString == "C$D" || name.toString == "c.D" )
+      thunk
+    else
+      default
   /** Return the class symbol of the given name. */
   def classNameToSymbol(name: Name)(using Context): Symbol = innerClasses.get(name.toString) match {
-    case Some(entry) => innerClasses.classSymbol(entry)
-    case None => requiredClass(name)
+    case Some(entry) =>
+      val classSym = innerClasses.classSymbol(entry)
+      debugCD(name, (), printErr(s"classNameToSymbol (with inner) name=$name has symbol ${classSym} and loc=${classSym.showLocated}"))
+      classSym
+    case None =>
+      val classSym = debugCD(name, requiredClass(name), {
+        val nameAsString = name.toString
+        val split = nameAsString.lastIndexOf('$')
+        if (split > 0 && split < nameAsString.length)
+          val outerNameStr = nameAsString.substring(0, split)
+          val innerNameStr = nameAsString.substring(split + 1, nameAsString.length)
+          val localizedName = s"$outerNameStr.$innerNameStr".toTypeName
+          val owner = requiredClass(outerNameStr.toTypeName)
+          requiredClass(localizedName).copy(owner = owner)
+        else
+          requiredClass(name)
+      })
+      debugCD(name, (), printErr(s"classNameToSymbol (no inner) name=$name has symbol ${classSym} and loc=${classSym.showLocated}"))
+      classSym
   }
 
   var sawPrivateConstructor: Boolean = false
