@@ -6,6 +6,7 @@ package classfile
 import dotty.tools.tasty.{ TastyFormat, TastyReader, TastyHeaderUnpickler }
 
 import Contexts._, Symbols._, Types._, Names._, StdNames._, NameOps._, Scopes._, Decorators._
+import Denotations.staticRef
 import SymDenotations._, unpickleScala2.Scala2Unpickler._, Constants._, Annotations._, util.Spans._
 import Phases._
 import NameKinds.DefaultGetterName
@@ -123,18 +124,41 @@ class ClassfileParser(
       debugCD(name, (), printErr(s"classNameToSymbol (with inner) name=$name has symbol ${classSym} and loc=${classSym.showLocated}"))
       classSym
     case None =>
-      val classSym = debugCD(name, requiredClass(name), {
-        val nameAsString = name.toString
-        val split = nameAsString.lastIndexOf('$')
+      // For inner classes we usually don't get to this branch: `innerClasses.classSymbol` already returns the symbol
+      // of the inner class based on the InnerClass table. However, if the classfile is missing the
+      // InnerClass entry for `name`, it might still be that there exists an inner symbol (because
+      // some other classfile _does_ have an InnerClass entry for `name`). In this case, we want to
+      // return the actual inner symbol (C.D, with owner C), not the top-level symbol C$D. This is
+      // what the logic below is for (see PR #5822 / scala/bug#9937) in Scala 2.
+
+      val nameAsString = name.toString
+      val split = nameAsString.lastIndexOf('$')
+      val classSym =
         if (split > 0 && split < nameAsString.length)
           val outerNameStr = nameAsString.substring(0, split)
           val innerNameStr = nameAsString.substring(split + 1, nameAsString.length)
           val localizedName = s"$outerNameStr.$innerNameStr".toTypeName
-          val owner = requiredClass(outerNameStr.toTypeName)
-          requiredClass(localizedName).copy(owner = owner)
+          val outerName = outerNameStr.toTypeName
+          val owner = requiredClass(outerName) // TODO: do we need something more general that requiredClass?
+          owner.denot.infoOrCompleter match
+            // If the outer class C cannot be found, look for a top-level class C$D
+            case _: StubInfo => requiredClass(name)
+            // We have a java-defined class name C$D and look for a member D of C. But we don't know if
+            // D is declared static or not, so we have to search both in class C and its companion.
+            case _ =>
+              // TODO: we need a non ClassSymbol "Symbol" of  owner, to test if it is a class symbol or not
+              // TODO: maybe a way to go from Name to Symbol?
+              // Note: use symbol.asClass when needed
+              val innerName = innerNameStr.toTypeName
+              staticRef(outerName).requiredSymbol("class", outerName)(_.isClass) match
+                case owner: ClassSymbol => staticScope.lookup(innerName) match
+                  case cs: ClassSymbol => cs
+                  case _ => requiredClass(localizedName).copy(owner = owner) // instanceScope.lookup(innerName)
+                case _ =>
+                   requiredClass(localizedName).copy(owner = owner) // TODO: not sure if this is what we want
         else
           requiredClass(name)
-      })
+
       debugCD(name, (), printErr(s"classNameToSymbol (no inner) name=$name has symbol ${classSym} and loc=${classSym.showLocated}"))
       classSym
   }
