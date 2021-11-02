@@ -747,7 +747,11 @@ class Namer(nestingLevel: Int) { typer: Typer =>
       original match
         case ddef: DefDef if ddef.name eq nme.ANON_FUN =>
           ictx
+        // lambda params need the constraints too, e.g. to resolve match types in tests/pos/i12127.scala
+        case vdef: ValDef if vdef.name.toString.contains("$") =>
+          ictx
         case _ =>
+          // println("tree: " + original)
           val c2 = ictx.withTyperState(TyperState.initialState().setReporter(ictx.typerState.reporter))
           c2.outer = ictx.outer
           c2

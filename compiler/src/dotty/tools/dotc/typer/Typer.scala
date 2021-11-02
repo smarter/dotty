@@ -2868,7 +2868,7 @@ class Typer(nestingLevel: Int = 0) extends Namer(nestingLevel)
           // println("tvar: " + tvar + " " + tvar.underlying)
           if tvar.nestingLevel > ctx.scope.nestingLevel then
             // Thread.dumpStack
-            report.error(
+            report.inform(
              i"$tvar(${tvar.nestingLevel}) scope: ${ctx.scope.nestingLevel} while typing $tree - $pt - locked=$locked", tree.srcPos)
         )
         tree.overwriteType(tree.tpe.simplified)
