@@ -2859,9 +2859,15 @@ class Typer(nestingLevel: Int = 0) extends Namer(nestingLevel)
       if !tree.tpe.widen.isInstanceOf[MethodOrPoly] // wait with simplifying until method is fully applied
          || tree.isDef                              // ... unless tree is a definition
       then
+        // println("t: " + tree.show + " " + ctx.typerState.constraint.show)
         interpolateTypeVars(tree, pt, locked)
+        ctx.typerState.gc()
+        // println("aft: " + ctx.typerState.constraint.show)
+        // println("ts: " + ctx.typerState + " owned: " + ctx.typerState.ownedVars + " unint: " + ctx.typerState.uninstVars)
         ctx.typerState.constraint.foreachTypeVar(tvar =>
+          // println("tvar: " + tvar + " " + tvar.underlying)
           if tvar.nestingLevel > ctx.scope.nestingLevel then
+            // Thread.dumpStack
             report.error(
              i"$tvar(${tvar.nestingLevel}) scope: ${ctx.scope.nestingLevel} while typing $tree - $pt - locked=$locked", tree.srcPos)
         )
