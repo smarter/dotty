@@ -611,7 +611,9 @@ trait Inferencing { this: Typer =>
             // Needs to be checked again, since previous interpolations could already have
             // instantiated `tvar` through unification.
             val v = vs(tvar)
-            if v == null || (v.intValue == 0 && tvar.nestingLevel >= ctx.scope.nestingLevel) then
+            if v == null then
+            // XX: breaks tests/pos/constraining-lub.scala / try/i8900-uninst-inv.scala, local tvar needs to be promoted
+            // if v == null || (v.intValue == 0 && tvar.nestingLevel >= ctx.scope.nestingLevel) then
               typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = ${tvar.hasLowerBound}, $constraint")
               val fromBelow =
                 if tvar.preferredDirection != 0 then tvar.preferredDirection < 0 else tvar.hasLowerBound
@@ -620,6 +622,9 @@ trait Inferencing { this: Typer =>
               typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
               toInstantiate += ((tvar, v.intValue == 1))
             else
+              // if tvar.nestingLevel >= ctx.scope.nestingLevel then
+              //   tvar.setNestingLevel(ctx.scope.nestingLevel)
+              //   ... doesn't make sense if we're in a completer with its own nesting level
               typr.println(i"no interpolation for nonvariant $tvar in $state")
 
         /** Instantiate all type variables in `buf` in the indicated directions.
