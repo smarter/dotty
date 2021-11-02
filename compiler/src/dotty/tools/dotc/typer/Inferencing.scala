@@ -611,7 +611,7 @@ trait Inferencing { this: Typer =>
             // Needs to be checked again, since previous interpolations could already have
             // instantiated `tvar` through unification.
             val v = vs(tvar)
-            if v == null then
+            if v == null || (v.intValue == 0 && tvar.nestingLevel >= ctx.scope.nestingLevel) then
               typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = ${tvar.hasLowerBound}, $constraint")
               val fromBelow =
                 if tvar.preferredDirection != 0 then tvar.preferredDirection < 0 else tvar.hasLowerBound
