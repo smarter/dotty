@@ -2860,6 +2860,11 @@ class Typer(nestingLevel: Int = 0) extends Namer(nestingLevel)
          || tree.isDef                              // ... unless tree is a definition
       then
         interpolateTypeVars(tree, pt, locked)
+        ctx.typerState.constraint.foreachTypeVar(tvar =>
+          if tvar.nestingLevel > ctx.scope.nestingLevel then
+            report.error(
+             i"$tvar(${tvar.nestingLevel}) scope: ${ctx.scope.nestingLevel} while typing $tree - $pt - locked=$locked", tree.srcPos)
+        )
         tree.overwriteType(tree.tpe.simplified)
     tree
 
