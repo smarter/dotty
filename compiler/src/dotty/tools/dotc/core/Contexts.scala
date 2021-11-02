@@ -133,7 +133,7 @@ object Contexts {
 
     /** The outer context */
     private var _outer: Context = _
-    protected def outer_=(outer: Context): Unit = _outer = outer
+    /*protected*/ def outer_=(outer: Context): Unit = _outer = outer
     final def outer: Context = _outer
 
     /** The current context */

@@ -741,7 +741,16 @@ class Namer(nestingLevel: Int) { typer: Typer =>
     protected def localContext(owner: Symbol): FreshContext = ctx.fresh.setOwner(owner).setTree(original)
 
     /** The context with which this completer was created */
-    given creationContext: Context = ictx
+    given creationContext: Context =
+      // report.error("")
+      // println("o: " + original + " " + original.getClass)
+      original match
+        case ddef: DefDef if ddef.name eq nme.ANON_FUN =>
+          ictx
+        case _ =>
+          val c2 = ictx.withTyperState(TyperState.initialState().setReporter(ictx.typerState.reporter))
+          c2.outer = ictx.outer
+          c2
 
     // make sure testing contexts are not captured by completers
     assert(!ictx.reporter.isInstanceOf[ExploringReporter])
@@ -1020,7 +1029,11 @@ class Namer(nestingLevel: Int) { typer: Typer =>
   class ClassCompleter(cls: ClassSymbol, original: TypeDef)(ictx: Context) extends Completer(original)(ictx) {
     withDecls(newScope)
 
-    protected implicit val completerCtx: Context = localContext(cls)
+    protected implicit val completerCtx: Context =
+      val lc = localContext(cls)
+      val c2 = lc.withTyperState(TyperState.initialState().setReporter(lc.typerState.reporter))
+      c2.outer = lc.outer
+      c2
 
     private var localCtx: Context = _
 
