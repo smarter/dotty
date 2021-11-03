@@ -623,6 +623,7 @@ trait Inferencing { this: Typer =>
               toInstantiate += ((tvar, v.intValue == 1))
             else
               // if tvar.nestingLevel >= ctx.scope.nestingLevel then
+              //   tvar.nestingLevel = ctx.scope.nestingLevel
               //   tvar.setNestingLevel(ctx.scope.nestingLevel)
               //   ... doesn't make sense if we're in a completer with its own nesting level
               typr.println(i"no interpolation for nonvariant $tvar in $state")

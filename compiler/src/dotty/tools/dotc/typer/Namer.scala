@@ -752,6 +752,10 @@ class Namer(nestingLevel: Int) { typer: Typer =>
           ictx
         case _ =>
           // println("tree: " + original)
+          // ictx.typerState.constraint.foreachTypeVar(tvar =>
+          //   println("tvar: " + tvar + " " + ictx.typerState.constraint.entry(tvar.origin))
+          // )
+          // ictx
           val c2 = ictx.withTyperState(TyperState.initialState().setReporter(ictx.typerState.reporter))
           c2.outer = ictx.outer
           c2
@@ -898,7 +902,19 @@ class Namer(nestingLevel: Int) { typer: Typer =>
       val sym = denot.symbol
       addAnnotations(sym)
       addInlineInfo(sym)
+      // println("ctx: " + ctx.typerState.constraint.show)
       denot.info = typeSig(sym)
+
+      // don't loose tvars in body of typed ahead sym, fixes tests/pos/i12909.scala
+      original match
+        case ddef: DefDef if ddef.name eq nme.ANON_FUN =>
+        case vdef: ValDef if vdef.name.toString.contains("$") =>
+        case _ =>
+          ctx.typerState.constraint.foreachTypeVar(tvar =>
+            tvar.instantiate(fromBelow = true)
+          )
+
+      // println("ctx2: " + denot + " " + denot.info.show + " " + ctx.typerState.constraint.show)
       invalidateIfClashingSynthetic(denot)
       Checking.checkWellFormed(sym)
       denot.info = avoidPrivateLeaks(sym)
@@ -1034,6 +1050,7 @@ class Namer(nestingLevel: Int) { typer: Typer =>
     withDecls(newScope)
 
     protected implicit val completerCtx: Context =
+      // println("comp: " + original + " " + s"${if ctx != null && ctx.typerState != null then ctx.typerState.constraint else ""}")
       val lc = localContext(cls)
       val c2 = lc.withTyperState(TyperState.initialState().setReporter(lc.typerState.reporter))
       c2.outer = lc.outer
