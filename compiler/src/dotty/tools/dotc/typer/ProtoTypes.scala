@@ -59,20 +59,23 @@ object ProtoTypes {
         tp.widenSingleton match
           case poly: PolyType =>
             val newctx = ctx.fresh.setNewTyperState()
-            val (poly2, targs) = constrained(poly, EmptyTree)(using newctx)
-            val tvars = targs.tpes
-            // Could we use wildcards instead?
-            val tp2 = poly2.appliedTo(tvars)
+            // val tp2 = wildApprox(poly.resultType) // breaks tests/pos/i12126.scala
+            val tp2 = poly.appliedTo(poly.paramRefs.map(_ => WildcardType(TypeBounds.emptyPolyKind)))
+            // println("tp2: " + tp2.show)
+            // val (poly2, targs) = constrained(poly, EmptyTree)(using newctx)
+            // val tvars = targs.tpes
+            // // Could we use wildcards instead?
+            // val tp2 = poly2.appliedTo(tvars)
             val result = testCompat(tp2)(using newctx)
             typr.println(
                 i"""normalizedCompatible for $poly, $pt = $result
                    |constraint was: ${ctx.typerState.constraint}
                    |constraint now: ${newctx.typerState.constraint}""")
             if result && (ctx.typerState.constraint ne newctx.typerState.constraint) then
-              tvars.foreach {
-                case tvar: TypeVar =>
-                  tvar.instantiate(fromBelow = true)(using newctx)
-              }
+              // tvars.foreach {
+              //   case tvar: TypeVar =>
+              //     tvar.instantiate(fromBelow = true)(using newctx)
+              // }
               newctx.typerState.commit()
             result
           case _ => testCompat(tp)
