@@ -987,6 +987,9 @@ trait Implicits:
             searchCtx = searchCtx.outer
             (searchCtx.scope eq ctx.scope) && (searchCtx.owner eq ctx.owner.owner)
           do ()
+        // fixes tests/pos/i10295.scala, make sure we don't use the outer tstate with its own tvars when we're in a completer
+        if searchCtx != ctx then
+          searchCtx = searchCtx.withTyperState(ctx.typerState)
 
         try ImplicitSearch(pt, argument, span)(using searchCtx).bestImplicit
         catch case ce: CyclicReference =>
