@@ -51,7 +51,7 @@ object ProtoTypes {
      */
     def normalizedCompatible(tp: Type, pt: Type, keepConstraint: Boolean)(using Context): Boolean =
 
-      def testCompat(using Context): Boolean =
+      def testCompat(tp: Type)(using Context): Boolean =
         val normTp = normalize(tp, pt)
         isCompatible(normTp, pt) || pt.isRef(defn.UnitClass) && normTp.isParameterless
 
@@ -59,16 +59,24 @@ object ProtoTypes {
         tp.widenSingleton match
           case poly: PolyType =>
             val newctx = ctx.fresh.setNewTyperState()
-            val result = testCompat(using newctx)
+            val (poly2, targs) = constrained(poly, EmptyTree)(using newctx)
+            val tvars = targs.tpes
+            // Could we use wildcards instead?
+            val tp2 = poly2.appliedTo(tvars)
+            val result = testCompat(tp2)(using newctx)
             typr.println(
                 i"""normalizedCompatible for $poly, $pt = $result
                    |constraint was: ${ctx.typerState.constraint}
                    |constraint now: ${newctx.typerState.constraint}""")
             if result && (ctx.typerState.constraint ne newctx.typerState.constraint) then
+              tvars.foreach {
+                case tvar: TypeVar =>
+                  tvar.instantiate(fromBelow = true)(using newctx)
+              }
               newctx.typerState.commit()
             result
-          case _ => testCompat
-      else explore(testCompat)
+          case _ => testCompat(tp)
+      else explore(testCompat(tp))
     end normalizedCompatible
 
     private def disregardProto(pt: Type)(using Context): Boolean =
