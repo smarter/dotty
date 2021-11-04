@@ -43,7 +43,12 @@ object ProtoTypes {
      *  returning false instead.
      */
     def necessarilyCompatible(tp: Type, pt: Type)(using Context): Boolean =
-      val tpn = normalize(tp, pt, followIFT = !defn.isContextFunctionType(pt))
+      val tp2 = tp.widenSingleton match
+        case poly: PolyType =>
+          poly.instantiate(poly.paramRefs.map(_ => WildcardType(TypeBounds.emptyPolyKind)))
+        case _ =>
+          tp
+      val tpn = normalize(tp2, pt, followIFT = !defn.isContextFunctionType(pt))
       necessarySubType(tpn, pt) || tpn.isValueSubType(pt) || viewExists(tpn, pt)
 
     /** Test compatibility after normalization.
@@ -60,7 +65,7 @@ object ProtoTypes {
           case poly: PolyType =>
             val newctx = ctx.fresh.setNewTyperState()
             // val tp2 = wildApprox(poly.resultType) // breaks tests/pos/i12126.scala
-            val tp2 = poly.appliedTo(poly.paramRefs.map(_ => WildcardType(TypeBounds.emptyPolyKind)))
+            val tp2 = poly.instantiate(poly.paramRefs.map(_ => WildcardType(TypeBounds.emptyPolyKind)))
             // println("tp2: " + tp2.show)
             // val (poly2, targs) = constrained(poly, EmptyTree)(using newctx)
             // val tvars = targs.tpes
