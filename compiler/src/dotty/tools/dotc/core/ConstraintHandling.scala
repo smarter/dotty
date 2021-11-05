@@ -278,7 +278,9 @@ trait ConstraintHandling {
       val bound = if !this.isInstanceOf[GadtConstraint] then dropWildcards(rawBound) else rawBound
       // instead of asserting, do a subtype check? // or just take the underlying of TypeVar and call
       // addConstraint again.
-      assert(!bound.isInstanceOf[TypeVar | TypeParamRef], desc)
+      // actually not true (tests/pos/strip-tvars-for-lubbasetypes.scala), doesn't matter because
+      // ConstraintHandling takes care of splitting the bound?
+      // assert(!bound.isInstanceOf[TypeVar | TypeParamRef], s"rawBound: $rawBound\n$desc")
       // println("pro: " + bound.show)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound
