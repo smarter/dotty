@@ -620,6 +620,11 @@ trait Inferencing { this: Typer =>
               typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
               toInstantiate += ((tvar, v.intValue == 1))
             else
+              if tvar.nestingLevel > ctx.scope.nestingLevel then
+                comparing(cmp =>
+                  cmp.avoidNested(tvar, varianceBase = 0, maxLevel = ctx.scope.nestingLevel, i"[$tvar] -- interpolate $tree: ${tree.tpe.widen} in $state\n${state.constraint}")
+                )
+                // tvar.nestingLevel = ctx.scope.nestingLevel
               typr.println(i"no interpolation for nonvariant $tvar in $state")
 
         /** Instantiate all type variables in `buf` in the indicated directions.
