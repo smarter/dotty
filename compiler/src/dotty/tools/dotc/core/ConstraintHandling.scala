@@ -86,16 +86,13 @@ trait ConstraintHandling {
 
   protected def flipVariance: Boolean// = false
 
-  class AvoidNestedMap(isUpper: Boolean, maxLevel: Int, desc: => String)(using Context) extends AvoidWildcardsMap:
+  def avoidNested(tp: Type, varianceBase: Int, maxLevel: Int, desc: => String)(using Context): Type =
+    AvoidNestedMap(varianceBase, maxLevel, desc)(tp)
+
+  class AvoidNestedMap(varianceBase: Int, maxLevel: Int, desc: => String)(using Context) extends AvoidWildcardsMap:
     @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
 
-    override protected[core] def variance_=(x: Int): Unit =
-      // if variance != -1 && x == -1 then
-      //   println("@@: " + desc)
-      //   Thread.dumpStack
-      super.variance_=(x)
-
-    if isUpper then variance = -1
+    variance = varianceBase
     // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
     if flipVariance then variance = -variance
 
@@ -208,7 +205,7 @@ trait ConstraintHandling {
           makeVar(isUpper = isUpper)
         else
           val hi = bounds(tp.origin).hi
-          val hi1 = this(hi)
+          val hi1 = atVariance(-1)(this(hi))
           // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
           //                 Foo <:< TP is already true and we don't record extra constraint
           // ... but addConstraint already assumes bound is not alias?
@@ -219,9 +216,11 @@ trait ConstraintHandling {
           if hi1 ne hi then
             assert(tp <:< hi1, i"$tp <:< $hi1 -- $desc")
           val lo = bounds(tp.origin).lo
-          val lo1 = atVariance(-variance)(this(lo))
+          val lo1 = atVariance(1)(this(lo))
           if lo1 ne lo then
-            assert(lo1 <:< tp, i"$lo1 <:< $tp -- $desc")
+            if !(lo1 <:< tp) then
+              val combined = lo1 & hi1 // needed for try/i8900-uninst-inv.scala because lower-bound is (x: Int) avoided to Int, but upper-bound is Singleton
+              assert(combined <:< tp, i"$combined <:< $tp -- $desc")
           tp.nestingLevel = maxLevel
           tp
           // val bounds = tvarBounds(tp)
@@ -272,7 +271,8 @@ trait ConstraintHandling {
         case tv: TypeVar => tv.nestingLevel
         case _ => Int.MaxValue
 
-      val dropWildcards = new AvoidNestedMap(isUpper, paramLevel, desc)
+      val variance = if isUpper then -1 else 1
+      val dropWildcards = new AvoidNestedMap(variance, paramLevel, desc)
       // println("raw: " + rawBound.show)
       // XX: need realizability check for try/i8900.scala
       val bound = if !this.isInstanceOf[GadtConstraint] then dropWildcards(rawBound) else rawBound
