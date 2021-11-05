@@ -95,10 +95,9 @@ trait ConstraintHandling {
     else
       // def description = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
       // println(i"adding $description$location")
+      def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
       val dropWildcards = new AvoidWildcardsMap:
         @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
-
-        def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
 
         override protected[core] def variance_=(x: Int): Unit =
           // if variance != -1 && x == -1 then
@@ -222,12 +221,29 @@ trait ConstraintHandling {
 
               makeVar(isUpper = isUpper)
             else
-              val bounds = tvarBounds(tp)
-              val tvar = newTypeVar(bounds)
-              tvar.nestingLevel = paramLevel
-              assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
-              assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
-              tvar
+              val hi = bounds(tp.origin).hi
+              val hi1 = this(hi)
+              // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
+              //                 Foo <:< TP is already true and we don't record extra constraint
+              // ... but addConstraint already assumes bound is not alias?
+              // .... but alias could be in arg: List[x.T] <:< TP
+              // .... wait addConstraint makes assumptions like:
+              //        "it should not be an alias type, lazy ref, typevar, wildcard type, error type."
+              //      but approx might lead to typevar or alias? see assert below
+              if hi1 ne hi then
+                assert(tp <:< hi1, i"$tp <:< $hi1 -- $desc")
+              val lo = bounds(tp.origin).lo
+              val lo1 = atVariance(-variance)(this(lo))
+              if lo1 ne lo then
+                assert(lo1 <:< tp, i"$lo1 <:< $tp -- $desc")
+              tp.nestingLevel = paramLevel
+              tp
+              // val bounds = tvarBounds(tp)
+              // val tvar = newTypeVar(bounds)
+              // tvar.nestingLevel = paramLevel
+              // assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+              // assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+              // tvar
 
           // For i8900pf / runST
           // what if we're inside poly fun? then hoepfully constraint contains binder
@@ -256,6 +272,9 @@ trait ConstraintHandling {
       // println("raw: " + rawBound.show)
       // XX: need realizability check for try/i8900.scala
       val bound = if !this.isInstanceOf[GadtConstraint] then dropWildcards(rawBound) else rawBound
+      // instead of asserting, do a subtype check? // or just take the underlying of TypeVar and call
+      // addConstraint again.
+      assert(!bound.isInstanceOf[TypeVar | TypeParamRef], desc)
       // println("pro: " + bound.show)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound
