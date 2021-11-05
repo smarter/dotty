@@ -86,6 +86,177 @@ trait ConstraintHandling {
 
   protected def flipVariance: Boolean// = false
 
+  class AvoidNestedMap(isUpper: Boolean, maxLevel: Int, desc: => String)(using Context) extends AvoidWildcardsMap:
+    @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
+
+    override protected[core] def variance_=(x: Int): Unit =
+      // if variance != -1 && x == -1 then
+      //   println("@@: " + desc)
+      //   Thread.dumpStack
+      super.variance_=(x)
+
+    if isUpper then variance = -1
+    // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
+    if flipVariance then variance = -variance
+
+    // if isUpper then variance = -1
+
+    // override def apply(t: Type): Type = t match
+    //   case t: WildcardType => mapWild(t)
+    //   case _ =>
+    //     println(s"mapping[$variance]: " + t.show)
+    //     mapOver(t)
+
+    // copy from avoid
+    override def isStaticPrefix(pre: Type)(using Context): Boolean = pre match
+      case pre: NamedType =>
+        val sym = pre.currentSymbol
+        sym.is(Package) || sym.isStatic && isStaticPrefix(pre.prefix)
+      case _ => true
+    // copy from avoid, TODO: is this enough to avoid realizability check? same Q for regular avoid
+    override def derivedSelect(tp: NamedType, pre: Type) =
+      if (pre eq tp.prefix)
+        tp
+      else tryWiden(tp, tp.prefix).orElse {
+        if (tp.isTerm && variance > 0 && !pre.isSingleton)
+          apply(tp.info.widenExpr)
+        else if (upper(pre).member(tp.name).exists)
+          super.derivedSelect(tp, pre)
+        else
+          range(defn.NothingType, defn.AnyType)
+      }
+
+    def kindTop(tp: Type): Type =
+      if tp frozen_<:< defn.AnyType then defn.AnyType
+      else tp.EtaExpand(tp.typeParams) match // XX: TypeApplications.EtaExpansion(tp) doesn't work because it uses typeParamsSymbols
+        case tp: HKTypeLambda =>
+          tp.derivedLambdaType(resType = kindTop(tp.resultType))
+        case o =>
+          assert(false, i"$o -- ${o.typeParams} -- $desc -- ${ctx.compilationUnit.source}")
+
+    def tvarBounds(tvar: TypeVar): TypeBounds =
+      TypeBounds.upper(kindTop(bounds(tvar.origin).hi))
+
+    // TODO: think about skolems/wildcards/wildcard capture
+    // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?
+    // Foo[? >: Int <: String] =capture=> Foo[?1.CAP] //?1.CAP can propagate out
+    //
+    // class A[T] { def foo: T }
+    // s => { var qual = s; qual.foo } // qual is skolemized, return ?1.T, as bad as x.M in try/i8900.scala ?
+    override def apply(tp: Type): Type = tp match
+      // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > maxLevel =>
+      // Is nesting enough? What if comparing tvar from one branch and local symbol from other branch?
+      // TODO: instantiate all more nested vars when going out of a scope?
+      // - check what lionel does
+      // - check what https://okmij.org/ftp/ML/generalization.html says.
+      case tp: NamedType if !ctx.isAfterTyper && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > maxLevel =>
+        // println("param: " + param.show + " " + maxLevel)
+        // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
+        // println(desc)
+        // Adapted from avoid
+        tp match
+          case tp: TermRef =>
+            tp.info.widenExpr.dealias match
+              case info: SingletonType => apply(info)
+              case info => range(defn.NothingType, apply(info))
+          case tp: TypeRef =>
+            tp.info match
+              case info: AliasingBounds =>
+                apply(info.alias)
+              case TypeBounds(lo, hi) =>
+                range(atVariance(-variance)(apply(lo)), apply(hi))
+              case info: ClassInfo =>
+                range(defn.NothingType, apply(TypeOps.classBound(info)))
+              case _ =>
+                emptyRange // should happen only in error cases
+
+      // at the top-level in AndOrType we go through OrderingConstraint#dependentParams:
+      // ?A <: ?B & X becomes:
+      //   ?A <: ?B & X // not stripped actually?
+      //   ?A <: ?B
+      // Does that mean we don't need the avoidance?
+      // - New bounds on B will be approximated as they're propagated to A
+      // - Are existing bounds also approximated? Not sure because we're not
+      //   going through ConstraintHandling#addLess.
+      //     ==> isn't that lack of propagation already problematic on master?
+      //      ==> probably fine, it just means more recursion in subtype checking,
+      //          but it does mean we do have to avoid higher level tvars in AndOrTypes.
+      case tp: TypeVar if !ctx.isAfterTyper && !tp.isInstantiated && tp.nestingLevel > maxLevel =>
+        // println("REPLACE: " + tp + " v: " + variance)
+        // println(desc)
+
+        def makeVar(isUpper: Boolean): TypeVar =
+          // TODO: emptyPolyKind breaks i8900a4.scala
+          // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+          val bounds = tvarBounds(tp)
+          val tvar = newTypeVar(bounds)
+          tvar.nestingLevel = maxLevel
+          tvar.preferredDirection = if isUpper then -1 else 1
+          if isUpper then
+            assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+          else
+            assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+          // println("ctx2: " + ctx.typerState.constraint.show)
+          tvar
+
+        if variance != 0 then
+          var isUpper = variance >= 0
+
+          // Fixes PL.scala
+          if flipVariance then isUpper = !isUpper
+
+          makeVar(isUpper = isUpper)
+        else
+          val hi = bounds(tp.origin).hi
+          val hi1 = this(hi)
+          // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
+          //                 Foo <:< TP is already true and we don't record extra constraint
+          // ... but addConstraint already assumes bound is not alias?
+          // .... but alias could be in arg: List[x.T] <:< TP
+          // .... wait addConstraint makes assumptions like:
+          //        "it should not be an alias type, lazy ref, typevar, wildcard type, error type."
+          //      but approx might lead to typevar or alias? see assert below
+          if hi1 ne hi then
+            assert(tp <:< hi1, i"$tp <:< $hi1 -- $desc")
+          val lo = bounds(tp.origin).lo
+          val lo1 = atVariance(-variance)(this(lo))
+          if lo1 ne lo then
+            assert(lo1 <:< tp, i"$lo1 <:< $tp -- $desc")
+          tp.nestingLevel = maxLevel
+          tp
+          // val bounds = tvarBounds(tp)
+          // val tvar = newTypeVar(bounds)
+          // tvar.nestingLevel = maxLevel
+          // assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+          // assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+          // tvar
+
+      // For i8900pf / runST
+      // what if we're inside poly fun? then hoepfully constraint contains binder
+      // XX: no longer needed after avoidingTypeLambda improvement.
+      // case tp: TypeParamRef if !constraint.contains(tp.binder) =>
+      //   // assert binder is apply of polyfun
+      //   val TypeBounds(lo, hi) = tp.underlying.bounds
+      //   range(atVariance(-variance)(apply(lo)), apply(hi))
+
+      // Also copied from avoid to fix tests/pos/i11464.scala
+      case tp: LazyRef =>
+        if localParamRefs.contains(tp.ref) then tp
+        else if isExpandingBounds then emptyRange // XX: not kind-correct since upper-bounded by Any
+        else mapOver(tp)
+      case tl: HKTypeLambda =>
+        localParamRefs ++= tl.paramRefs
+        mapOver(tl)
+
+      case _ =>
+        // println(s"[$variance]map over: " + tp.show)
+        super.apply(tp)
+
+    override def mapWild(t: WildcardType) =
+      if approximateWildcards then super.mapWild(t)
+      else newTypeVar(apply(t.effectiveBounds).toBounds)
+
+
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
     if !constraint.contains(param) then true
     else if !isUpper && param.occursIn(constraint.ensureNonCyclic(param, TypeBounds(rawBound, defn.AnyType))) then
@@ -96,179 +267,12 @@ trait ConstraintHandling {
       // def description = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
       // println(i"adding $description$location")
       def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
-      val dropWildcards = new AvoidWildcardsMap:
-        @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
 
-        override protected[core] def variance_=(x: Int): Unit =
-          // if variance != -1 && x == -1 then
-          //   println("@@: " + desc)
-          //   Thread.dumpStack
-          super.variance_=(x)
+      def paramLevel = constraint.typeVarOfParam(param) match
+        case tv: TypeVar => tv.nestingLevel
+        case _ => Int.MaxValue
 
-        if isUpper then variance = -1
-        // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
-        if flipVariance then variance = -variance
-
-        // if isUpper then variance = -1
-
-        // override def apply(t: Type): Type = t match
-        //   case t: WildcardType => mapWild(t)
-        //   case _ =>
-        //     println(s"mapping[$variance]: " + t.show)
-        //     mapOver(t)
-
-        // copy from avoid
-        override def isStaticPrefix(pre: Type)(using Context): Boolean = pre match
-          case pre: NamedType =>
-            val sym = pre.currentSymbol
-            sym.is(Package) || sym.isStatic && isStaticPrefix(pre.prefix)
-          case _ => true
-        // copy from avoid, TODO: is this enough to avoid realizability check? same Q for regular avoid
-        override def derivedSelect(tp: NamedType, pre: Type) =
-          if (pre eq tp.prefix)
-            tp
-          else tryWiden(tp, tp.prefix).orElse {
-            if (tp.isTerm && variance > 0 && !pre.isSingleton)
-              apply(tp.info.widenExpr)
-            else if (upper(pre).member(tp.name).exists)
-              super.derivedSelect(tp, pre)
-            else
-              range(defn.NothingType, defn.AnyType)
-          }
-
-        def paramLevel = constraint.typeVarOfParam(param) match
-          case tv: TypeVar => tv.nestingLevel
-          case _ => Int.MaxValue
-
-        def kindTop(tp: Type): Type =
-          if tp frozen_<:< defn.AnyType then defn.AnyType
-          else tp.EtaExpand(tp.typeParams) match // XX: TypeApplications.EtaExpansion(tp) doesn't work because it uses typeParamsSymbols
-            case tp: HKTypeLambda =>
-              tp.derivedLambdaType(resType = kindTop(tp.resultType))
-            case o =>
-              assert(false, i"$o -- ${o.typeParams} -- $desc -- ${ctx.compilationUnit.source}")
-
-        def tvarBounds(tvar: TypeVar): TypeBounds =
-          TypeBounds.upper(kindTop(bounds(tvar.origin).hi))
-
-        // TODO: think about skolems/wildcards/wildcard capture
-        // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?
-        // Foo[? >: Int <: String] =capture=> Foo[?1.CAP] //?1.CAP can propagate out
-        //
-        // class A[T] { def foo: T }
-        // s => { var qual = s; qual.foo } // qual is skolemized, return ?1.T, as bad as x.M in try/i8900.scala ?
-        override def apply(tp: Type): Type = tp match
-          // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > paramLevel =>
-          // Is nesting enough? What if comparing tvar from one branch and local symbol from other branch?
-          // TODO: instantiate all more nested vars when going out of a scope?
-          // - check what lionel does
-          // - check what https://okmij.org/ftp/ML/generalization.html says.
-          case tp: NamedType if !ctx.isAfterTyper && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > paramLevel =>
-            // println("param: " + param.show + " " + paramLevel)
-            // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
-            // println(desc)
-            // Adapted from avoid
-            tp match
-              case tp: TermRef =>
-                tp.info.widenExpr.dealias match
-                  case info: SingletonType => apply(info)
-                  case info => range(defn.NothingType, apply(info))
-              case tp: TypeRef =>
-                tp.info match
-                  case info: AliasingBounds =>
-                    apply(info.alias)
-                  case TypeBounds(lo, hi) =>
-                    range(atVariance(-variance)(apply(lo)), apply(hi))
-                  case info: ClassInfo =>
-                    range(defn.NothingType, apply(TypeOps.classBound(info)))
-                  case _ =>
-                    emptyRange // should happen only in error cases
-
-          // at the top-level in AndOrType we go through OrderingConstraint#dependentParams:
-          // ?A <: ?B & X becomes:
-          //   ?A <: ?B & X // not stripped actually?
-          //   ?A <: ?B
-          // Does that mean we don't need the avoidance?
-          // - New bounds on B will be approximated as they're propagated to A
-          // - Are existing bounds also approximated? Not sure because we're not
-          //   going through ConstraintHandling#addLess.
-          //     ==> isn't that lack of propagation already problematic on master?
-          //      ==> probably fine, it just means more recursion in subtype checking,
-          //          but it does mean we do have to avoid higher level tvars in AndOrTypes.
-          case tp: TypeVar if !ctx.isAfterTyper && !tp.isInstantiated && tp.nestingLevel > paramLevel =>
-            // println("REPLACE: " + tp + " v: " + variance)
-            // println(desc)
-
-            def makeVar(isUpper: Boolean): TypeVar =
-              // TODO: emptyPolyKind breaks i8900a4.scala
-              // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
-              val bounds = tvarBounds(tp)
-              val tvar = newTypeVar(bounds)
-              tvar.nestingLevel = paramLevel
-              tvar.preferredDirection = if isUpper then -1 else 1
-              if isUpper then
-                assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
-              else
-                assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
-              // println("ctx2: " + ctx.typerState.constraint.show)
-              tvar
-
-            if variance != 0 then
-              var isUpper = variance >= 0
-
-              // Fixes PL.scala
-              if flipVariance then isUpper = !isUpper
-
-              makeVar(isUpper = isUpper)
-            else
-              val hi = bounds(tp.origin).hi
-              val hi1 = this(hi)
-              // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
-              //                 Foo <:< TP is already true and we don't record extra constraint
-              // ... but addConstraint already assumes bound is not alias?
-              // .... but alias could be in arg: List[x.T] <:< TP
-              // .... wait addConstraint makes assumptions like:
-              //        "it should not be an alias type, lazy ref, typevar, wildcard type, error type."
-              //      but approx might lead to typevar or alias? see assert below
-              if hi1 ne hi then
-                assert(tp <:< hi1, i"$tp <:< $hi1 -- $desc")
-              val lo = bounds(tp.origin).lo
-              val lo1 = atVariance(-variance)(this(lo))
-              if lo1 ne lo then
-                assert(lo1 <:< tp, i"$lo1 <:< $tp -- $desc")
-              tp.nestingLevel = paramLevel
-              tp
-              // val bounds = tvarBounds(tp)
-              // val tvar = newTypeVar(bounds)
-              // tvar.nestingLevel = paramLevel
-              // assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
-              // assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
-              // tvar
-
-          // For i8900pf / runST
-          // what if we're inside poly fun? then hoepfully constraint contains binder
-          // XX: no longer needed after avoidingTypeLambda improvement.
-          // case tp: TypeParamRef if !constraint.contains(tp.binder) =>
-          //   // assert binder is apply of polyfun
-          //   val TypeBounds(lo, hi) = tp.underlying.bounds
-          //   range(atVariance(-variance)(apply(lo)), apply(hi))
-
-          // Also copied from avoid to fix tests/pos/i11464.scala
-          case tp: LazyRef =>
-            if localParamRefs.contains(tp.ref) then tp
-            else if isExpandingBounds then emptyRange // XX: not kind-correct since upper-bounded by Any
-            else mapOver(tp)
-          case tl: HKTypeLambda =>
-            localParamRefs ++= tl.paramRefs
-            mapOver(tl)
-
-          case _ =>
-            // println(s"[$variance]map over: " + tp.show)
-            super.apply(tp)
-
-        override def mapWild(t: WildcardType) =
-          if approximateWildcards then super.mapWild(t)
-          else newTypeVar(apply(t.effectiveBounds).toBounds)
+      val dropWildcards = new AvoidNestedMap(isUpper, paramLevel, desc)
       // println("raw: " + rawBound.show)
       // XX: need realizability check for try/i8900.scala
       val bound = if !this.isInstanceOf[GadtConstraint] then dropWildcards(rawBound) else rawBound
