@@ -81,6 +81,26 @@ trait ConstraintHandling {
 
   protected var useNecessaryEither = false
 
+  def avoidNested(tp: Type, varianceBase: Int, maxLevel: Int, desc: => String)(using Context): Type =
+    AvoidNestedMap(varianceBase, maxLevel, desc)(tp)
+
+  class AvoidNestedMap(varianceBase: Int, val maxLevel: Int, desc: => String)(using Context) extends TypeOps.AvoidMap:
+    variance = varianceBase
+    // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
+    if useNecessaryEither then variance = -variance
+
+    def mustAvoidNested: Boolean =
+      !ctx.isAfterTyper && ctx.typerState.isCommittable
+
+    def toAvoid(tp: NamedType): Boolean =
+      mustAvoidNested && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > maxLevel
+
+    override def mapWild(t: WildcardType) =
+      if ctx.mode.is(Mode.TypevarsMissContext) then super.mapWild(t)
+      else
+        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
+        tvar
+
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
     if !constraint.contains(param) then true
     else if !isUpper && param.occursIn(rawBound) then
@@ -88,13 +108,16 @@ trait ConstraintHandling {
       // so we shouldn't allow them as constraints either.
       false
     else
-      val dropWildcards = new AvoidWildcardsMap:
-        if isUpper then variance = -1
-        if useNecessaryEither then variance = -variance
-        override def mapWild(t: WildcardType) =
-          if ctx.mode.is(Mode.TypevarsMissContext) then super.mapWild(t)
-          else newTypeVar(apply(t.effectiveBounds).toBounds)
-      val bound = dropWildcards(rawBound)
+      def desc = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
+      def paramLevel = constraint.typeVarOfParam(param) match
+        case tv: TypeVar => tv.nestingLevel
+        case _ => Int.MaxValue
+
+      val variance = if isUpper then -1 else 1
+      val dropWildcards = new AvoidNestedMap(variance, paramLevel, desc)
+      // GADT constraints are not propagated outside the case where they're
+      // valid, so avoidance isn't necessary.
+      val bound =  if !this.isInstanceOf[GadtConstraint] then dropWildcards(rawBound) else rawBound
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound
       if equalBounds && !bound.existsPart(_ eq param, StopAt.Static) then
