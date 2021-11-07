@@ -167,6 +167,69 @@ trait ConstraintHandling {
               case _ =>
                 emptyRange // should happen only in error cases
 
+      // at the top-level in AndOrType we go through OrderingConstraint#dependentParams:
+      // ?A <: ?B & X becomes:
+      //   ?A <: ?B & X // not stripped actually?
+      //   ?A <: ?B
+      // Does that mean we don't need the avoidance?
+      // - New bounds on B will be approximated as they're propagated to A
+      // - Are existing bounds also approximated? Not sure because we're not
+      //   going through ConstraintHandling#addLess.
+      //     ==> isn't that lack of propagation already problematic on master?
+      //      ==> probably fine, it just means more recursion in subtype checking,
+      //          but it does mean we do have to avoid higher level tvars in AndOrTypes.
+      case tp: TypeVar if !ctx.isAfterTyper && !tp.isInstantiated && tp.nestingLevel > maxLevel =>
+        // println("REPLACE: " + tp + " v: " + variance)
+        // println(desc)
+
+        def makeVar(isUpper: Boolean): TypeVar =
+          // TODO: emptyPolyKind breaks i8900a4.scala
+          // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+          val bounds = tvarBounds(tp)
+          val tvar = newTypeVar(bounds)
+          tvar.nestingLevel = maxLevel
+          tvar.preferredDirection = if isUpper then -1 else 1
+          if isUpper then
+            assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+          else
+            assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+          // println("ctx2: " + ctx.typerState.constraint.show)
+          tvar
+
+        if variance != 0 then
+          var isUpper = variance >= 0
+
+          // Fixes PL.scala
+          if useNecessaryEither then isUpper = !isUpper
+
+          makeVar(isUpper = isUpper)
+        else
+          val hi = bounds(tp.origin).hi
+          val hi1 = atVariance(-1)(this(hi))
+          // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
+          //                 Foo <:< TP is already true and we don't record extra constraint
+          // ... but addConstraint already assumes bound is not alias?
+          // .... but alias could be in arg: List[x.T] <:< TP
+          // .... wait addConstraint makes assumptions like:
+          //        "it should not be an alias type, lazy ref, typevar, wildcard type, error type."
+          //      but approx might lead to typevar or alias? see assert below
+          if hi1 ne hi then
+            assert(tp <:< hi1, i"$tp <:< $hi1 -- $desc")
+          val lo = bounds(tp.origin).lo
+          val lo1 = atVariance(1)(this(lo))
+          if lo1 ne lo then
+            if !(lo1 <:< tp) then
+              val combined = lo1 & hi1 // needed for try/i8900-uninst-inv.scala because lower-bound is (x: Int) avoided to Int, but upper-bound is Singleton
+              assert(combined <:< tp, i"$combined <:< $tp -- $desc")
+          tp.nestingLevel = maxLevel
+          tp
+          // val bounds = tvarBounds(tp)
+          // val tvar = newTypeVar(bounds)
+          // tvar.nestingLevel = maxLevel
+          // assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+          // assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+          // tvar
+
       // For i8900pf / runST
       // what if we're inside poly fun? then hoepfully constraint contains binder
       // XX: no longer needed after avoidingTypeLambda improvement.
