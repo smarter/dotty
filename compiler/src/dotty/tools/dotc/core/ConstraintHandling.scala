@@ -253,7 +253,10 @@ trait ConstraintHandling {
 
     override def mapWild(t: WildcardType) =
       if approximateWildcards || (variance != 0) then super.mapWild(t)
-      else newTypeVar(apply(t.effectiveBounds).toBounds)
+      else
+        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
+        tvar.nestingLevel = maxLevel
+        tvar
 
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
     if !constraint.contains(param) then true
