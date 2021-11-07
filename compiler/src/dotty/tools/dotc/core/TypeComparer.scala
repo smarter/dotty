@@ -147,7 +147,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
    *  (for instance, i12677.scala demands `useNecessaryEither` in the condition)
    */
   override protected def approximateWildcards: Boolean =
-    useNecessaryEither || ctx.mode.is(Mode.TypevarsMissContext)
+    /*useNecessaryEither ||*/ ctx.mode.is(Mode.TypevarsMissContext)
 
   def testSubType(tp1: Type, tp2: Type): CompareResult =
     GADTused = false

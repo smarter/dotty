@@ -449,7 +449,7 @@ object Inferencing {
    *
    *  we want to instantiate U to x.type right away. No need to wait further.
    */
-  private def variances(tp: Type)(using Context): VarianceMap = {
+  private def variances(tp: Type, pt: Type = WildcardType)(using Context): VarianceMap = {
     Stats.record("variances")
     val constraint = ctx.typerState.constraint
 
@@ -482,21 +482,21 @@ object Inferencing {
       def traverse(tp: Type) = { vmap1 = accu(vmap1, tp) }
       vmap.foreachBinding { (tvar, v) =>
         val param = tvar.origin
-        val e = constraint.entry(param)
-        accu.setVariance(v)
-        if (v >= 0) {
-          traverse(e.bounds.lo)
-          constraint.lower(param).foreach(p => traverse(constraint.typeVarOfParam(p)))
-        }
-        if (v <= 0) {
-          traverse(e.bounds.hi)
-          constraint.upper(param).foreach(p => traverse(constraint.typeVarOfParam(p)))
-        }
+        constraint.entry(param) match
+          case TypeBounds(lo, hi) =>
+            accu.setVariance(v)
+            if v >= 0 then
+              traverse(lo)
+              constraint.lower(param).foreach(p => traverse(constraint.typeVarOfParam(p)))
+            if v <= 0 then
+              traverse(hi)
+              constraint.upper(param).foreach(p => traverse(constraint.typeVarOfParam(p)))
+          case _ =>
       }
       if (vmap1 eq vmap) vmap else propagate(vmap1)
     }
 
-    propagate(accu(SimpleIdentityMap.empty, tp))
+    propagate(accu(accu(SimpleIdentityMap.empty, tp), pt.finalResultType))
   }
 
   /** Run the transformation after dealiasing but return the original type if it was a no-op. */
@@ -576,7 +576,7 @@ trait Inferencing { this: Typer =>
             // This is needed because it could establish singleton type upper bounds. See i2998.scala.
 
         val tp = tree.tpe.widen
-        val vs = variances(tp)
+        val vs = variances(tp, pt)
 
         // Avoid interpolating variables occurring in tree's type if typerstate has unreported errors.
         // Reason: The errors might reflect unsatisfiable constraints. In that
