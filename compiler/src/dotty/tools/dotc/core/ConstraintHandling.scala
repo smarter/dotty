@@ -84,6 +84,8 @@ trait ConstraintHandling {
    */
   protected def approximateWildcards: Boolean = true
 
+  protected var useNecessaryEither = false
+
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
     if !constraint.contains(param) then true
     else if !isUpper && param.occursIn(rawBound) then
@@ -92,9 +94,10 @@ trait ConstraintHandling {
       false
     else
       val dropWildcards = new AvoidWildcardsMap:
-        if !isUpper then variance = -1
+        if isUpper then variance = -1
+        if useNecessaryEither then variance = -variance
         override def mapWild(t: WildcardType) =
-          if approximateWildcards then super.mapWild(t)
+          if approximateWildcards /*|| (variance != 0)*/ then super.mapWild(t)
           else newTypeVar(apply(t.effectiveBounds).toBounds)
       val bound = dropWildcards(rawBound)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
