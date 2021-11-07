@@ -79,6 +79,8 @@ trait ConstraintHandling {
   def fullBounds(param: TypeParamRef)(using Context): TypeBounds =
     nonParamBounds(param).derivedTypeBounds(fullLowerBound(param), fullUpperBound(param))
 
+  protected var useNecessaryEither = false
+
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
     if !constraint.contains(param) then true
     else if !isUpper && param.occursIn(rawBound) then
@@ -87,7 +89,8 @@ trait ConstraintHandling {
       false
     else
       val dropWildcards = new AvoidWildcardsMap:
-        if !isUpper then variance = -1
+        if isUpper then variance = -1
+        if useNecessaryEither then variance = -variance
         override def mapWild(t: WildcardType) =
           if ctx.mode.is(Mode.TypevarsMissContext) then super.mapWild(t)
           else newTypeVar(apply(t.effectiveBounds).toBounds)
