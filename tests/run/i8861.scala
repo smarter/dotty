@@ -26,6 +26,7 @@ object Test {
   def main(args: Array[String]): Unit = {
     val e: Container { type A = String } = new StrV
     println(minimalOk(e)) // this one prints "hello"
+    // investigate
     println(minimalFail(e)) // this one fails with ClassCastException: class java.lang.String cannot be cast to class java.lang.Integer
   }
 }
