@@ -1659,7 +1659,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
   /** Type a case. */
   def typedCase(tree: untpd.CaseDef, sel: Tree, wideSelType: Type, pt: Type)(using Context): CaseDef = {
     val originalCtx = ctx
-    val gadtCtx: Context = ctx.fresh.setFreshGADTBounds
+    val gadtCtx: Context = ctx.fresh.setFreshGADTBounds.setNewScope
 
     def caseRest(pat: Tree)(using Context) = {
       val pt1 = instantiateMatchTypeProto(pat, pt) match {
@@ -1684,7 +1684,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     val pat1 = typedPattern(tree.pat, wideSelType)(using gadtCtx)
     caseRest(pat1)(
       using Nullables.caseContext(sel, pat1)(
-        using gadtCtx.fresh.setNewScope))
+        using gadtCtx/*.fresh.setNewScope*/))
   }
 
   def typedLabeled(tree: untpd.Labeled)(using Context): Labeled = {
@@ -2064,7 +2064,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
             then body1.tpe
             else pt & body1.tpe
           val sym = newPatternBoundSymbol(name, symTp, tree.span)
-          sym.nestingLevel += 1
+          // sym.nestingLevel += 1
           if (pt == defn.ImplicitScrutineeTypeRef || tree.mods.is(Given)) sym.setFlag(Given)
           if (ctx.mode.is(Mode.InPatternAlternative))
             report.error(i"Illegal variable ${sym.name} in pattern alternative", tree.srcPos)
@@ -3042,7 +3042,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           // in `typedCase`.
           val boundName = WildcardParamName.fresh().toTypeName
           val wildcardSym = newPatternBoundSymbol(boundName, tree1.tpe & pt, tree.span)
-          wildcardSym.nestingLevel += 1
+          // wildcardSym.nestingLevel += 1
           untpd.Bind(boundName, tree1).withType(wildcardSym.typeRef)
         case tree1 =>
           tree1
