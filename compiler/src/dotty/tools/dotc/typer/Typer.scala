@@ -1107,14 +1107,13 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     if (noLeaks(tree)) tree
     else {
       fullyDefinedType(tree.tpe, "block", tree.span)
-      // var avoidingType = TypeOps.avoid(tree.tpe, localSyms)
-      var avoidingType = comparing(cmp => cmp.avoidNested(tree.tpe, varianceBase = 1, ctx.nestingLevel - 1, i"ensureNoLocalRefs($tree : ${tree.tpe}, $pt, $localSyms"))
+      var avoidingType = TypeOps.avoid(tree.tpe, localSyms)
       val ptDefined = isFullyDefined(pt, ForceDegree.none)
       if (ptDefined && !(avoidingType.widenExpr <:< pt)) avoidingType = pt
       val tree1 = ascribeType(tree, avoidingType)
-      if !(ptDefined || noLeaks(tree1) || tree1.tpe.isErroneous) then
+      assert(ptDefined || noLeaks(tree1) || tree1.tpe.isErroneous,
           // `ptDefined` needed because of special case of anonymous classes
-          report.error(i"leak: ${escapingRefs(tree1, localSyms).toList}%, % in $tree1", tree.srcPos)
+          i"leak: ${escapingRefs(tree1, localSyms).toList}%, % in $tree1")
       tree1
     }
   }
