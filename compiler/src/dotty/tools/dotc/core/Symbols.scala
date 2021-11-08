@@ -46,7 +46,7 @@ object Symbols {
    *  @param coord  The coordinates of the symbol (a position or an index)
    *  @param id     A unique identifier of the symbol (unique per ContextBase)
    */
-  class Symbol private[Symbols] (private var myCoord: Coord, val id: Int, val nestingLevel: Int)
+  class Symbol private[Symbols] (private var myCoord: Coord, val id: Int, var nestingLevel: Int)
     extends Designator, ParamInfo, SrcPos, printing.Showable {
 
     type ThisName <: Name

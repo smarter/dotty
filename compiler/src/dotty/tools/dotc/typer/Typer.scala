@@ -1107,13 +1107,14 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     if (noLeaks(tree)) tree
     else {
       fullyDefinedType(tree.tpe, "block", tree.span)
-      var avoidingType = TypeOps.avoid(tree.tpe, localSyms)
+      // var avoidingType = TypeOps.avoid(tree.tpe, localSyms)
+      var avoidingType = comparing(cmp => cmp.avoidNested(tree.tpe, varianceBase = 1, ctx.nestingLevel - 1, i"ensureNoLocalRefs($tree : ${tree.tpe}, $pt, $localSyms"))
       val ptDefined = isFullyDefined(pt, ForceDegree.none)
       if (ptDefined && !(avoidingType.widenExpr <:< pt)) avoidingType = pt
       val tree1 = ascribeType(tree, avoidingType)
-      assert(ptDefined || noLeaks(tree1) || tree1.tpe.isErroneous,
+      if !(ptDefined || noLeaks(tree1) || tree1.tpe.isErroneous) then
           // `ptDefined` needed because of special case of anonymous classes
-          i"leak: ${escapingRefs(tree1, localSyms).toList}%, % in $tree1")
+          report.error(i"leak: ${escapingRefs(tree1, localSyms).toList}%, % in $tree1", tree.srcPos)
       tree1
     }
   }
@@ -2073,6 +2074,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
             then body1.tpe
             else pt & body1.tpe
           val sym = newPatternBoundSymbol(name, symTp, tree.span)
+          sym.nestingLevel += 1
           if (pt == defn.ImplicitScrutineeTypeRef || tree.mods.is(Given)) sym.setFlag(Given)
           if (ctx.mode.is(Mode.InPatternAlternative))
             report.error(i"Illegal variable ${sym.name} in pattern alternative", tree.srcPos)
@@ -3050,6 +3052,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           // in `typedCase`.
           val boundName = WildcardParamName.fresh().toTypeName
           val wildcardSym = newPatternBoundSymbol(boundName, tree1.tpe & pt, tree.span)
+          wildcardSym.nestingLevel += 1
           untpd.Bind(boundName, tree1).withType(wildcardSym.typeRef)
         case tree1 =>
           tree1

@@ -1490,6 +1490,8 @@ class Namer { typer: Typer =>
             // It seems at least partially redundant with the nesting level checking on TypeVar
             // instantiation.
             val hygienicType = TypeOps.avoid(rhsType, termParamss.flatten)
+            // doesn't pass yet
+            // assert(hygienicType eq rhsType, i"avoid($rhsType, ${termParamss}) = $hygienicType")
             if (!hygienicType.isValueType || !(hygienicType <:< tpt.tpe))
               report.error(i"return type ${tpt.tpe} of lambda cannot be made hygienic;\n" +
                 i"it is not a supertype of the hygienic type $hygienicType", mdef.srcPos)
