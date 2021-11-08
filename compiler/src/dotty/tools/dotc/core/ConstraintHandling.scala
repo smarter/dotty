@@ -86,10 +86,31 @@ trait ConstraintHandling {
 
   protected var useNecessaryEither = false
 
+  def lowerVar(tp: TypeVar, map: AvoidNestedMap)(using Context): tp.type =
+    val hi = bounds(tp.origin).hi
+    val hi1 = map.atVariance(-1)(map(hi))
+    // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
+    //                 Foo <:< TP is already true and we don't record extra constraint
+    // ... but addConstraint already assumes bound is not alias?
+    // .... but alias could be in arg: List[x.T] <:< TP
+    // .... wait addConstraint makes assumptions like:
+    //        "it should not be an alias type, lazy ref, typevar, wildcard type, error type."
+    //      but approx might lead to typevar or alias? see assert below
+    if hi1 ne hi then
+      assert(tp <:< hi1, i"$tp <:< $hi1")
+    val lo = bounds(tp.origin).lo
+    val lo1 = map.atVariance(1)(map(lo))
+    if lo1 ne lo then
+      if !(lo1 <:< tp) then
+        val combined = lo1 & hi1 // needed for try/i8900-uninst-inv.scala because lower-bound is (x: Int) avoided to Int, but upper-bound is Singleton
+        assert(combined <:< tp, i"$combined <:< $tp")
+    tp.nestingLevel = map.maxLevel
+    tp
+
   def avoidNested(tp: Type, varianceBase: Int, maxLevel: Int, desc: => String)(using Context): Type =
     AvoidNestedMap(varianceBase, maxLevel, desc)(tp)
 
-  class AvoidNestedMap(varianceBase: Int, maxLevel: Int, desc: => String)(using Context) extends AvoidWildcardsMap:
+  class AvoidNestedMap(varianceBase: Int, val maxLevel: Int, desc: => String)(using Context) extends AvoidWildcardsMap:
     @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
 
      variance = varianceBase
@@ -204,25 +225,7 @@ trait ConstraintHandling {
 
           makeVar(isUpper = isUpper)
         else
-          val hi = bounds(tp.origin).hi
-          val hi1 = atVariance(-1)(this(hi))
-          // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
-          //                 Foo <:< TP is already true and we don't record extra constraint
-          // ... but addConstraint already assumes bound is not alias?
-          // .... but alias could be in arg: List[x.T] <:< TP
-          // .... wait addConstraint makes assumptions like:
-          //        "it should not be an alias type, lazy ref, typevar, wildcard type, error type."
-          //      but approx might lead to typevar or alias? see assert below
-          if hi1 ne hi then
-            assert(tp <:< hi1, i"$tp <:< $hi1 -- $desc")
-          val lo = bounds(tp.origin).lo
-          val lo1 = atVariance(1)(this(lo))
-          if lo1 ne lo then
-            if !(lo1 <:< tp) then
-              val combined = lo1 & hi1 // needed for try/i8900-uninst-inv.scala because lower-bound is (x: Int) avoided to Int, but upper-bound is Singleton
-              assert(combined <:< tp, i"$combined <:< $tp -- $desc")
-          tp.nestingLevel = maxLevel
-          tp
+          lowerVar(tp, this)
           // val bounds = tvarBounds(tp)
           // val tvar = newTypeVar(bounds)
           // tvar.nestingLevel = maxLevel
@@ -435,8 +438,43 @@ trait ConstraintHandling {
   final def approximation(param: TypeParamRef, fromBelow: Boolean)(using Context): Type =
     constraint.entry(param) match
       case entry: TypeBounds =>
+        val nestingLevel = constraint.typeVarOfParam(param) match
+          case tvar: TypeVar => tvar.nestingLevel
+          case _ => -1
+
+        // todo: testcases
+        val map = new AvoidNestedMap(0, nestingLevel, "")
+        def flb(param: TypeParamRef)(using Context): Type =
+          val los0 = constraint.minLower(param)
+          val los = if nestingLevel == -1 then los0 else los0.map(p =>
+            val pVar = constraint.typeVarOfParam(p).asInstanceOf[TypeVar]
+            val pLevel = pVar.nestingLevel
+            if pLevel > nestingLevel then
+              assert(ctx.nestingLevel >= pLevel, i"$param -- $los0 -- ctx: ${ctx.nestingLevel}")
+              lowerVar(pVar, map)
+              p
+            else
+              p
+          )
+          los.foldLeft(nonParamBounds(param).lo)(_ | _)
+      
+        def fub(param: TypeParamRef)(using Context): Type =
+          val his0 = constraint.minUpper(param)
+          val his = if nestingLevel == -1 then his0 else his0.map(p =>
+            val pVar = constraint.typeVarOfParam(p).asInstanceOf[TypeVar]
+            val pLevel = pVar.nestingLevel
+            if pLevel > nestingLevel then
+              assert(ctx.nestingLevel >= pLevel, i"$param -- $his0 -- ctx: ${ctx.nestingLevel}")
+              lowerVar(pVar, map)
+              p
+            else
+              p
+          )
+          his.foldLeft(nonParamBounds(param).hi)(_ & _)
+
+
         val useLowerBound = fromBelow || param.occursIn(entry.hi)
-        val inst = if useLowerBound then fullLowerBound(param) else fullUpperBound(param)
+        val inst = if useLowerBound then flb(param) else fub(param)
         typr.println(s"approx ${param.show}, from below = $fromBelow, inst = ${inst.show}")
         inst
       case inst =>
