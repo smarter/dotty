@@ -252,7 +252,8 @@ trait ConstraintHandling {
         super.apply(tp)
 
     override def mapWild(t: WildcardType) =
-      if approximateWildcards || (variance != 0) then super.mapWild(t)
+      // variance != 0 breaks tests/patmat/i4030.scala
+      if approximateWildcards /*|| (variance != 0)*/ then super.mapWild(t)
       else
         val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
         tvar.nestingLevel = maxLevel
