@@ -104,6 +104,10 @@ trait ConstraintHandling {
       if !(lo1 <:< tp) then
         val combined = lo1 & hi1 // needed for try/i8900-uninst-inv.scala because lower-bound is (x: Int) avoided to Int, but upper-bound is Singleton
         assert(combined <:< tp, i"$combined <:< $tp")
+    // XX: incorrect if constraint is retracted, could store level in constraint but expensive/complicated
+    // so go back to making a typevar?
+    // newTypeVar(TypeAlias(tp))
+    // or newTypeVar(TypeBounds.empty); unify(newVar, tp)
     tp.nestingLevel = map.maxLevel
     tp
 
