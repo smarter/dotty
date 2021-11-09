@@ -152,8 +152,11 @@ trait ConstraintHandling {
         case o =>
           assert(false, i"$o -- ${o.typeParams} -- $desc -- ${ctx.compilationUnit.source}")
 
-    def tvarBounds(tvar: TypeVar): TypeBounds =
-      TypeBounds.upper(kindTop(bounds(tvar.origin).hi))
+    def tvarBounds(tvar: TypeVar, isUpper: Boolean): TypeBounds =
+      if isUpper then
+        TypeBounds(tvar.origin, kindTop(bounds(tvar.origin).hi))
+      else
+        TypeBounds.upper(tvar.origin)
 
     // TODO: think about skolems/wildcards/wildcard capture
     // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?
@@ -206,15 +209,9 @@ trait ConstraintHandling {
         def makeVar(isUpper: Boolean): TypeVar =
           // TODO: emptyPolyKind breaks i8900a4.scala
           // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
-          val bounds = tvarBounds(tp)
+          val bounds = tvarBounds(tp, isUpper)
           val tvar = newTypeVar(bounds)
           tvar.nestingLevel = maxLevel
-          tvar.preferredDirection = if isUpper then -1 else 1
-          if isUpper then
-            assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
-          else
-            assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
-          // println("ctx2: " + ctx.typerState.constraint.show)
           tvar
 
         if variance != 0 then

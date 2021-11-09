@@ -610,9 +610,11 @@ trait Inferencing { this: Typer =>
             // instantiated `tvar` through unification.
             val v = vs(tvar)
             if v == null then
-              typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = ${tvar.hasLowerBound}, $constraint")
-              val fromBelow =
-                if tvar.preferredDirection != 0 then tvar.preferredDirection < 0 else tvar.hasLowerBound
+              // A tvar that doesn't occur in the type of the tree might still occur in the bounds of a locked type variable,
+              // in particular this can happen because avoidNestedMap can create new tvars which are either lower bound or upper bound
+              // of existing tvar, if the derived tvar is an upper-bound, prefer instantiating it to its lower bound
+              val fromBelow = !tvar.origin.underlying.bounds.lo.isExactlyNothing
+              typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = $fromBelow, $constraint")
               toInstantiate += ((tvar, fromBelow))
             else if v.intValue != 0 then
               typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
