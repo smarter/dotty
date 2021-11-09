@@ -610,7 +610,7 @@ trait Inferencing { this: Typer =>
             // instantiated `tvar` through unification.
             val v = vs(tvar)
             if v == null then
-              if !tvar.origin.paramName.is(NameKinds.DepParamName) || tvar.nestingLevel > ctx.scope.nestingLevel then
+              if !tvar.origin.paramName.is(NameKinds.AvoidParamName) || tvar.nestingLevel > ctx.scope.nestingLevel then
                 val fromBelow = tvar.hasLowerBound
                 typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = $fromBelow, $constraint")
                 toInstantiate += ((tvar, fromBelow))

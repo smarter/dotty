@@ -678,6 +678,14 @@ object ProtoTypes {
       ._2.head.tpe.asInstanceOf[TypeVar]
   }
 
+  def newTypeVar2(bounds: TypeBounds, represents: Type = NoType)(using Context): TypeVar = {
+    val poly = PolyType(NameKinds.AvoidParamName.fresh().toTypeName :: Nil)(
+        pt => bounds :: Nil,
+        pt => represents.orElse(defn.AnyType))
+    constrained(poly, untpd.EmptyTree, alwaysAddTypeVars = true)
+      ._2.head.tpe.asInstanceOf[TypeVar]
+  }
+
   /** If `tvar` represents a parameter of a dependent function generated
    *  by `newDepVar` called from `resultTypeApprox, the term parameter reference
    *  for which the variable was substituted. Otherwise, NoType.

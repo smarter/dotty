@@ -10,7 +10,7 @@ import Flags._
 import config.Config
 import config.Printers.typr
 import reporting.trace
-import typer.ProtoTypes.newTypeVar
+import typer.ProtoTypes.newTypeVar2
 import StdNames.tpnme
 
 /** Methods for adding constraints and solving them.
@@ -210,7 +210,7 @@ trait ConstraintHandling {
           // TODO: emptyPolyKind breaks i8900a4.scala
           // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
           val bounds = tvarBounds(tp, isUpper)
-          val tvar = newTypeVar(bounds)
+          val tvar = newTypeVar2(bounds)
           tvar.nestingLevel = maxLevel
           tvar
 
@@ -255,7 +255,7 @@ trait ConstraintHandling {
       // variance != 0 breaks tests/patmat/i4030.scala
       if approximateWildcards /*|| (variance != 0)*/ then super.mapWild(t)
       else
-        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
+        val tvar = newTypeVar2(apply(t.effectiveBounds).toBounds)
         tvar.nestingLevel = maxLevel
         tvar
 
