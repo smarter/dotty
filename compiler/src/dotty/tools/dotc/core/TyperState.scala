@@ -221,7 +221,9 @@ class TyperState() {
               tv =:= tp
           )
         )
-      assert(res || ctx.reporter.errorsReported, i"cannot merge $constraint with $other.")
+      if !res then
+        throw new TypeError(i"cannot merge $constraint with $other.")
+      // assert(res || ctx.reporter.errorsReported, i"cannot merge $constraint with $other.")
     ))
 
     for tl <- constraint.domainLambdas do
