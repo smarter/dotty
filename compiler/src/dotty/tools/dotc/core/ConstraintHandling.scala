@@ -86,11 +86,20 @@ trait ConstraintHandling {
 
   protected var useNecessaryEither = false
 
+  def kindTop(tp: Type)(using Context): Type =
+    if tp frozen_<:< defn.AnyType then defn.AnyType
+    else tp.EtaExpand(tp.typeParams) match // XX: TypeApplications.EtaExpansion(tp) doesn't work because it uses typeParamsSymbols
+      case tp: HKTypeLambda =>
+        tp.derivedLambdaType(resType = kindTop(tp.resultType))
+      case o =>
+        assert(false, i"$o -- ${o.typeParams} -- ${ctx.compilationUnit.source}")
+
   def lowerVar(tp: TypeVar, newLevel: Int)(using Context): TypeVar =
     // println("bef: " + ctx.typerState.constraint.show)
     // val tp2 = newTypeVar(TypeBounds.upper(tp.origin))
     // val tp2 = newTypeVar(TypeAlias(tp.origin))
-    val tp2 = newTypeVar(TypeBounds.empty)
+    // val tp2 = newTypeVar(TypeBounds.emptyPolyKind)
+    val tp2 = newTypeVar(TypeBounds.upper(kindTop(tp)))
     tp2.nestingLevel = newLevel
     addLess(tp2.origin, tp.origin)
     addLess(tp.origin, tp2.origin)
@@ -135,14 +144,6 @@ trait ConstraintHandling {
         else
           range(defn.NothingType, defn.AnyType)
       }
-
-    def kindTop(tp: Type): Type =
-      if tp frozen_<:< defn.AnyType then defn.AnyType
-      else tp.EtaExpand(tp.typeParams) match // XX: TypeApplications.EtaExpansion(tp) doesn't work because it uses typeParamsSymbols
-        case tp: HKTypeLambda =>
-          tp.derivedLambdaType(resType = kindTop(tp.resultType))
-        case o =>
-          assert(false, i"$o -- ${o.typeParams} -- $desc -- ${ctx.compilationUnit.source}")
 
     def tvarBounds(tvar: TypeVar, isUpper: Boolean): TypeBounds =
       if isUpper then
