@@ -10,7 +10,7 @@ import Flags._
 import config.Config
 import config.Printers.typr
 import reporting.trace
-import typer.ProtoTypes.newTypeVar2
+import typer.ProtoTypes.{newTypeVar, newTypeVar2}
 import StdNames.tpnme
 
 /** Methods for adding constraints and solving them.
@@ -86,30 +86,18 @@ trait ConstraintHandling {
 
   protected var useNecessaryEither = false
 
-  def lowerVar(tp: TypeVar, map: AvoidNestedMap)(using Context): tp.type =
-    val hi = bounds(tp.origin).hi
-    val hi1 = map.atVariance(-1)(map(hi))
-    // Is this enough? x.T <:< TP if "x.T" dealiases to "Foo" then
-    //                 Foo <:< TP is already true and we don't record extra constraint
-    // ... but addConstraint already assumes bound is not alias?
-    // .... but alias could be in arg: List[x.T] <:< TP
-    // .... wait addConstraint makes assumptions like:
-    //        "it should not be an alias type, lazy ref, typevar, wildcard type, error type."
-    //      but approx might lead to typevar or alias? see assert below
-    if hi1 ne hi then
-      assert(tp <:< hi1, i"$tp <:< $hi1")
-    val lo = bounds(tp.origin).lo
-    val lo1 = map.atVariance(1)(map(lo))
-    if lo1 ne lo then
-      if !(lo1 <:< tp) then
-        val combined = lo1 & hi1 // needed for try/i8900-uninst-inv.scala because lower-bound is (x: Int) avoided to Int, but upper-bound is Singleton
-        assert(combined <:< tp, i"$combined <:< $tp")
-    // XX: incorrect if constraint is retracted, could store level in constraint but expensive/complicated
-    // so go back to making a typevar?
-    // newTypeVar(TypeAlias(tp))
-    // or newTypeVar(TypeBounds.empty); unify(newVar, tp)
-    tp.nestingLevel = map.maxLevel
-    tp
+  def lowerVar(tp: TypeVar, newLevel: Int)(using Context): TypeVar =
+    // println("bef: " + ctx.typerState.constraint.show)
+    // val tp2 = newTypeVar(TypeBounds.upper(tp.origin))
+    // val tp2 = newTypeVar(TypeAlias(tp.origin))
+    val tp2 = newTypeVar(TypeBounds.empty)
+    tp2.nestingLevel = newLevel
+    addLess(tp2.origin, tp.origin)
+    addLess(tp.origin, tp2.origin)
+    // calliny unify requires addLess(tp.origin, tp2.origin) first
+    // unify(tp2.origin, tp.origin)
+    // println("aft: " + ctx.typerState.constraint.show)
+    tp2
 
   def avoidNested(tp: Type, varianceBase: Int, maxLevel: Int, desc: => String)(using Context): Type =
     AvoidNestedMap(varianceBase, maxLevel, desc)(tp)
@@ -226,7 +214,7 @@ trait ConstraintHandling {
 
           makeVar(isUpper = isUpper)
         else
-          lowerVar(tp, this)
+          lowerVar(tp, maxLevel)
           // val bounds = tvarBounds(tp)
           // val tvar = newTypeVar(bounds)
           // tvar.nestingLevel = maxLevel
@@ -383,13 +371,41 @@ trait ConstraintHandling {
     constraint = constraint.addLess(p2, p1)
     val down = constraint.exclusiveLower(p2, p1)
     val up = constraint.exclusiveUpper(p1, p2)
-    constraint = constraint.unify(p1, p2)
-    val bounds = constraint.nonParamBounds(p1)
+
+    val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
+    val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
+
+    // XX: is the reordering here breaking the assumption of `unifying` in OrderingConstraint#order?
+    // ... no because order is called from addLess above.
+    val pL = if level1 <= level2 then p1 else p2
+    val pR = if level1 <= level2 then p2 else p1
+
+    constraint = {
+      val bound1 = constraint.nonParamBounds(pL).substParam(pR, pL)
+      var bound2 = constraint.nonParamBounds(pR).substParam(pR, pL)
+      if level1 < level2 then
+        // TODO?
+        // >: (x: Int) <: Singleton
+        // should be approxed to >: Int & Singleton <: Singleton
+        // and not >: Int <: Singleton
+        // "-1" because we want tighter bounds
+        bound2 = avoidNested(bound2, -1, level1, "")
+        val TypeBounds(lo, hi) = bound2
+        assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
+      val pLBounds = bound1 & bound2
+      constraint.updateEntry(pL, pLBounds).replace(pR, pL)
+    }
+
+    val bounds = constraint.nonParamBounds(pL)
     val lo = bounds.lo
     val hi = bounds.hi
+    // println(i"%bef: ${ctx.typerState.constraint}")
+    val z = 
     isSub(lo, hi) &&
     down.forall(addOneBound(_, hi, isUpper = true)) &&
     up.forall(addOneBound(_, lo, isUpper = false))
+    // println(i"%aft: ${ctx.typerState.constraint}")
+    z
   }
 
   protected def isSubType(tp1: Type, tp2: Type, whenFrozen: Boolean)(using Context): Boolean =
@@ -444,6 +460,7 @@ trait ConstraintHandling {
           case _ => -1
 
         // todo: testcases
+        // could we run into an infinite with lowerVar creating new variables?
         val map = new AvoidNestedMap(0, nestingLevel, "")
         def flb(param: TypeParamRef)(using Context): Type =
           val los0 = constraint.minLower(param)
@@ -452,7 +469,7 @@ trait ConstraintHandling {
             val pLevel = pVar.nestingLevel
             if pLevel > nestingLevel then
               assert(ctx.nestingLevel >= pLevel, i"$param -- $los0 -- ctx: ${ctx.nestingLevel}")
-              lowerVar(pVar, map)
+              lowerVar(pVar, nestingLevel)
               p
             else
               p
@@ -466,7 +483,7 @@ trait ConstraintHandling {
             val pLevel = pVar.nestingLevel
             if pLevel > nestingLevel then
               assert(ctx.nestingLevel >= pLevel, i"$param -- $his0 -- ctx: ${ctx.nestingLevel}")
-              lowerVar(pVar, map)
+              lowerVar(pVar, nestingLevel)
               p
             else
               p

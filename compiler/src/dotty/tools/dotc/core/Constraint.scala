@@ -96,11 +96,6 @@ abstract class Constraint extends Showable {
    */
   def addLess(p1: TypeParamRef, p2: TypeParamRef)(using Context): This
 
-  /** A constraint resulting from adding p2 = p1 to this constraint, and at the same
-   *  time transferring all bounds of p2 to p1
-   */
-  def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): This
-
   /** A new constraint which is derived from this constraint by removing
    *  the type parameter `param` from the domain and replacing all top-level occurrences
    *  of the parameter elsewhere in the constraint by type `tp`, or a conservative
