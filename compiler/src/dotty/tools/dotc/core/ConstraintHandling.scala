@@ -196,10 +196,6 @@ trait ConstraintHandling {
           // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
           val bounds = tvarBounds(tp, isUpper)
           val tvar = newTypeVar2(bounds)
-          if isUpper then
-            isSub(tp, tvar)
-          else
-            isSub(tvar, tp)
           tvar.nestingLevel = maxLevel
           tvar
 
