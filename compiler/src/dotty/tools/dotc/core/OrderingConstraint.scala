@@ -245,7 +245,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       NoType
     case tp: TypeBounds =>
       val lo1 = stripParams(tp.lo, todos, !isUpper).orElse(defn.NothingType)
-      val hi1 = stripParams(tp.hi, todos, isUpper).orElse(defn.AnyKindType)
+      // why was AnyKind here not breaking other stuff?
+      val hi1 = stripParams(tp.hi, todos, isUpper).orElse(tp.hi.kindTop)
       tp.derivedTypeBounds(lo1, hi1)
     case tp: AndType if isUpper =>
       val tp1 = stripParams(tp.tp1, todos, isUpper)
