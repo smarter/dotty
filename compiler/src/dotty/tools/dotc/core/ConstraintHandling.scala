@@ -457,7 +457,8 @@ trait ConstraintHandling {
     constraint.entry(param) match
       case entry: TypeBounds =>
         val nestingLevel = constraint.typeVarOfParam(param) match
-          case tvar: TypeVar => tvar.nestingLevel
+          // turned off for gadtconstraint, same reasoning as in addOneBound
+          case tvar: TypeVar if !this.isInstanceOf[GadtConstraint] => tvar.nestingLevel
           case _ => -1
 
         // todo: testcases
