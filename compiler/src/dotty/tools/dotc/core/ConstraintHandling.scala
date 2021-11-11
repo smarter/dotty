@@ -147,9 +147,9 @@ trait ConstraintHandling {
 
     def tvarBounds(tvar: TypeVar, isUpper: Boolean): TypeBounds =
       if isUpper then
-        TypeBounds(tvar.origin, kindTop(bounds(tvar.origin).hi))
+        TypeBounds(tvar, kindTop(bounds(tvar.origin).hi))
       else
-        TypeBounds.upper(tvar.origin)
+        TypeBounds.upper(tvar)
 
     // TODO: think about skolems/wildcards/wildcard capture
     // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?
