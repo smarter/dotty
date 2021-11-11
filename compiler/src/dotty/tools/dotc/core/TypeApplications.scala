@@ -211,7 +211,7 @@ class TypeApplications(val self: Type) extends AnyVal {
       case tp: HKTypeLambda =>
         tp.derivedLambdaType(resType = tp.resultType.kindTop)
       case o =>
-        assert(false, i"$o -- ${o.typeParams} -- ${ctx.compilationUnit.source}")
+        defn.AnyKindType
 
   /** If `self` is a higher-kinded type, its type parameters, otherwise Nil */
   final def hkTypeParams(using Context): List[TypeParamInfo] =
