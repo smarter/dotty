@@ -462,7 +462,6 @@ trait ConstraintHandling {
 
         // todo: testcases
         // could we run into an infinite with lowerVar creating new variables?
-        val map = new AvoidNestedMap(0, nestingLevel, "")
         def flb(param: TypeParamRef)(using Context): Type =
           val los0 = constraint.minLower(param)
           val los = if nestingLevel == -1 then los0 else los0.map(p =>
