@@ -381,8 +381,11 @@ trait ConstraintHandling {
         // >: (x: Int) <: Singleton
         // should be approxed to >: Int & Singleton <: Singleton
         // and not >: Int <: Singleton
+        val saved = useNecessaryEither
+        useNecessaryEither = false
         // "-1" because we want tighter bounds
         bound2 = avoidNested(bound2, -1, level1, "")
+        useNecessaryEither = saved
         val TypeBounds(lo, hi) = bound2
         assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
       val pLBounds = bound1 & bound2
