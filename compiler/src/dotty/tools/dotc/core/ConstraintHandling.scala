@@ -86,20 +86,12 @@ trait ConstraintHandling {
 
   protected var useNecessaryEither = false
 
-  def kindTop(tp: Type)(using Context): Type =
-    if tp frozen_<:< defn.AnyType then defn.AnyType
-    else tp.EtaExpand(tp.typeParams) match // XX: TypeApplications.EtaExpansion(tp) doesn't work because it uses typeParamsSymbols
-      case tp: HKTypeLambda =>
-        tp.derivedLambdaType(resType = kindTop(tp.resultType))
-      case o =>
-        assert(false, i"$o -- ${o.typeParams} -- ${ctx.compilationUnit.source}")
-
   def lowerVar(tp: TypeVar, newLevel: Int)(using Context): TypeVar =
     // println("bef: " + ctx.typerState.constraint.show)
     // val tp2 = newTypeVar(TypeBounds.upper(tp.origin))
     // val tp2 = newTypeVar(TypeAlias(tp.origin))
     // val tp2 = newTypeVar(TypeBounds.emptyPolyKind)
-    val tp2 = newTypeVar(TypeBounds.upper(kindTop(tp)))
+    val tp2 = newTypeVar(TypeBounds.upper(tp.kindTop))
     tp2.nestingLevel = newLevel
     addLess(tp2.origin, tp.origin)
     addLess(tp.origin, tp2.origin)
@@ -146,10 +138,10 @@ trait ConstraintHandling {
       }
 
     def tvarBounds(tvar: TypeVar, isUpper: Boolean): TypeBounds =
-      // if isUpper then
-      //   TypeBounds(tvar.origin, kindTop(bounds(tvar.origin).hi))
-      // else
-        TypeBounds.upper(kindTop(bounds(tvar.origin).hi))
+      if isUpper then
+        TypeBounds(tvar.origin, bounds(tvar.origin).hi.kindTop)
+      else
+        TypeBounds.upper(tvar.origin)
 
     // TODO: think about skolems/wildcards/wildcard capture
     // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?

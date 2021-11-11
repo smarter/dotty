@@ -205,6 +205,14 @@ class TypeApplications(val self: Type) extends AnyVal {
     }
   }
 
+  def kindTop(using Context): Type =
+    if self frozen_<:< defn.AnyType then defn.AnyType
+    else EtaExpand(self.typeParams) match // XX: TypeApplications.EtaExpansion(tp) doesn't work because it uses typeParamsSymbols
+      case tp: HKTypeLambda =>
+        tp.derivedLambdaType(resType = tp.resultType.kindTop)
+      case o =>
+        assert(false, i"$o -- ${o.typeParams} -- ${ctx.compilationUnit.source}")
+
   /** If `self` is a higher-kinded type, its type parameters, otherwise Nil */
   final def hkTypeParams(using Context): List[TypeParamInfo] =
     if (isLambdaSub) typeParams else Nil
