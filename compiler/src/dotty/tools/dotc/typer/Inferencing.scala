@@ -613,6 +613,7 @@ trait Inferencing { this: Typer =>
               val fromBelow =
               // tvar.origin.paramName.info match
                 tvar.origin.paramName.is(NameKinds.AvoidBelowNameKind) ||
+                !tvar.origin.paramName.is(NameKinds.AvoidAboveNameKind) &&
                 tvar.hasLowerBound
               typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = $fromBelow, $constraint")
               toInstantiate += ((tvar, fromBelow))
