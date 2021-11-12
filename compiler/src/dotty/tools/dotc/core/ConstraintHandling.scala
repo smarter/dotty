@@ -10,7 +10,7 @@ import Flags._
 import config.Config
 import config.Printers.typr
 import reporting.trace
-import typer.ProtoTypes.{newTypeVar, newTypeVar2}
+import typer.ProtoTypes.{tvarBounds, newTypeVar, newTypeVar2}
 import StdNames.tpnme
 
 /** Methods for adding constraints and solving them.
@@ -137,12 +137,6 @@ trait ConstraintHandling {
           range(defn.NothingType, defn.AnyType)
       }
 
-    def tvarBounds(tvar: TypeVar, isUpper: Boolean): TypeBounds =
-      if isUpper then
-        TypeBounds(tvar.origin, bounds(tvar.origin).hi.kindTop)
-      else
-        TypeBounds.upper(tvar.origin)
-
     // TODO: think about skolems/wildcards/wildcard capture
     // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?
     // Foo[? >: Int <: String] =capture=> Foo[?1.CAP] //?1.CAP can propagate out
@@ -194,9 +188,12 @@ trait ConstraintHandling {
         def makeVar(isUpper: Boolean): TypeVar =
           // TODO: emptyPolyKind breaks i8900a4.scala
           // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
-          val bounds = tvarBounds(tp, isUpper)
-          val tvar = newTypeVar2(bounds)
+          val tvar = newTypeVar2(tp, isUpper)
           tvar.nestingLevel = maxLevel
+          if isUpper then
+            assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+          else
+            assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
           tvar
 
         if variance != 0 then
@@ -240,7 +237,7 @@ trait ConstraintHandling {
       // variance != 0 breaks tests/patmat/i4030.scala
       if approximateWildcards /*|| (variance != 0)*/ then super.mapWild(t)
       else
-        val tvar = newTypeVar2(apply(t.effectiveBounds).toBounds)
+        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
         tvar.nestingLevel = maxLevel
         tvar
 

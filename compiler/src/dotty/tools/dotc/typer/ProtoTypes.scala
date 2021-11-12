@@ -678,8 +678,13 @@ object ProtoTypes {
       ._2.head.tpe.asInstanceOf[TypeVar]
   }
 
-  def newTypeVar2(bounds: TypeBounds, represents: Type = NoType)(using Context): TypeVar = {
-    val poly = PolyType(NameKinds.AvoidParamName.fresh().toTypeName :: Nil)(
+  def tvarBounds(tvar: TypeVar, isUpper: Boolean)(using Context): TypeBounds =
+    TypeBounds.upper(tvar.origin)
+
+  def newTypeVar2(oldVar: TypeVar, isUpper: Boolean, represents: Type = NoType)(using Context): TypeVar = {
+    val bounds = tvarBounds(oldVar, isUpper)
+    val name = (if isUpper then NameKinds.AvoidAboveNameKind else NameKinds.AvoidBelowNameKind)(oldVar.origin.paramName.toTermName).toTypeName
+    val poly = PolyType(name :: Nil)(
         pt => bounds :: Nil,
         pt => represents.orElse(defn.AnyType))
     constrained(poly, untpd.EmptyTree, alwaysAddTypeVars = true)

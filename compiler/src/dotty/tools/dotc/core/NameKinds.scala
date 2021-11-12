@@ -282,7 +282,6 @@ object NameKinds {
   val TempResultName: UniqueNameKind         = new UniqueNameKind("ev$")
   val EvidenceParamName: UniqueNameKind      = new UniqueNameKind("evidence$")
   val DepParamName: UniqueNameKind           = new UniqueNameKind("(param)")
-  val AvoidParamName: UniqueNameKind         = new UniqueNameKind("(avoid)")
   val LazyImplicitName: UniqueNameKind       = new UniqueNameKind("$_lazy_implicit_$")
   val LazyLocalName: UniqueNameKind          = new UniqueNameKind("$lzy")
   val LazyLocalInitName: UniqueNameKind      = new UniqueNameKind("$lzyINIT")
@@ -358,6 +357,13 @@ object NameKinds {
   val InitializerName: PrefixNameKind = new PrefixNameKind(INITIALIZER, "initial$")
   val ProtectedAccessorName: PrefixNameKind = new PrefixNameKind(PROTECTEDACCESSOR, "protected$")
   val InlineAccessorName: PrefixNameKind = new PrefixNameKind(INLINEACCESSOR, "inline$")
+
+  class AvoidNameKind(isUpper: Boolean) extends PrefixNameKind(AVOID,
+    if isUpper then "(above)"
+    else "(below)")
+  // FromAbove // FromBelow?
+  val AvoidAboveNameKind = AvoidNameKind(isUpper = true)
+  val AvoidBelowNameKind = AvoidNameKind(isUpper = false)
 
   val BodyRetainerName: SuffixNameKind = new SuffixNameKind(BODYRETAINER, "$retainedBody")
   val FieldName: SuffixNameKind = new SuffixNameKind(FIELD, "$$local") {

@@ -611,10 +611,9 @@ trait Inferencing { this: Typer =>
             val v = vs(tvar)
             if v == null then
               val fromBelow =
-                if tvar.origin.paramName.is(NameKinds.AvoidParamName) then
-                  !tvar.origin.underlying.bounds.lo.isExactlyNothing
-                else
-                  tvar.hasLowerBound
+              // tvar.origin.paramName.info match
+                tvar.origin.paramName.is(NameKinds.AvoidBelowNameKind) ||
+                tvar.hasLowerBound
               typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = $fromBelow, $constraint")
               toInstantiate += ((tvar, fromBelow))
             else if v.intValue != 0 then
