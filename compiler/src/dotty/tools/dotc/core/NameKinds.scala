@@ -359,8 +359,9 @@ object NameKinds {
   val InlineAccessorName: PrefixNameKind = new PrefixNameKind(INLINEACCESSOR, "inline$")
 
   class AvoidNameKind(isUpper: Boolean) extends PrefixNameKind(AVOID,
-    if isUpper then "(above)"
-    else "(below)")
+      if isUpper then "(above)" else "(below)"):
+    override def definesNewName = true
+
   // FromAbove // FromBelow?
   val AvoidAboveNameKind = AvoidNameKind(isUpper = true)
   val AvoidBelowNameKind = AvoidNameKind(isUpper = false)
