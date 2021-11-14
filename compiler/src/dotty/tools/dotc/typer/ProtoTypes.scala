@@ -679,7 +679,8 @@ object ProtoTypes {
   }
 
   def tvarBounds(tvar: TypeVar, isUpper: Boolean)(using Context): TypeBounds =
-    TypeBounds.upper(tvar.origin)
+    // TODO: keep avoided bounds of tvar? (without creating more tvars)
+    TypeBounds.upper(tvar.kindTop)
 
   def newTypeVar2(oldVar: TypeVar, isUpper: Boolean, represents: Type = NoType)(using Context): TypeVar = {
     val bounds = tvarBounds(oldVar, isUpper)
