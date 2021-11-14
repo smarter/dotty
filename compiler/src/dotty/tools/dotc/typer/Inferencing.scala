@@ -602,11 +602,11 @@ trait Inferencing { this: Typer =>
         type InstantiateQueue = mutable.ListBuffer[(TypeVar, Boolean)]
         val toInstantiate = new InstantiateQueue
         for tvar <- qualifying do
-          if tvar.nestingLevel < ctx.scope.nestingLevel then
+          if tvar.nestingLevel < ctx.nestingLevel then
             typr.println(i"skip $tvar (${if vs(tvar) != null then vs(tvar) else ""}) in $state")
           // is the state.reporter.hasUnreportedErrors even needed anymore?
-          if !tvar.isInstantiated && constraint.contains(tvar) && (tvar.nestingLevel >= ctx.scope.nestingLevel) &&
-             (!state.reporter.hasUnreportedErrors || tvar.nestingLevel > ctx.scope.nestingLevel) then
+          if !tvar.isInstantiated && constraint.contains(tvar) && (tvar.nestingLevel >= ctx.nestingLevel) &&
+             (!state.reporter.hasUnreportedErrors || tvar.nestingLevel > ctx.nestingLevel) then
 
             constrainIfDependentParamRef(tvar, tree)
             // Needs to be checked again, since previous interpolations could already have
@@ -624,9 +624,9 @@ trait Inferencing { this: Typer =>
               typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
               toInstantiate += ((tvar, v.intValue == 1))
             else
-              if tvar.nestingLevel > ctx.scope.nestingLevel then // needed for uninstVars in combination with nestingLevel check above
+              if tvar.nestingLevel > ctx.nestingLevel then // needed for uninstVars in combination with nestingLevel check above
                 comparing(cmp =>
-                  cmp.avoidNested(tvar, varianceBase = 0, maxLevel = ctx.scope.nestingLevel, i"[$tvar] -- interpolate $tree: ${tree.tpe.widen} in $state\n${state.constraint}")
+                  cmp.avoidNested(tvar, varianceBase = 0, maxLevel = ctx.nestingLevel, i"[$tvar] -- interpolate $tree: ${tree.tpe.widen} in $state\n${state.constraint}")
                 )
               typr.println(i"no interpolation for nonvariant $tvar in $state")
 
