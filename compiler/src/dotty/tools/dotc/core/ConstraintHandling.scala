@@ -358,33 +358,38 @@ trait ConstraintHandling {
   private def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
     constr.println(s"unifying $p1 $p2")
     assert(constraint.isLess(p1, p2))
-    constraint = constraint.addLess(p2, p1)
-    val down = constraint.exclusiveLower(p2, p1)
-    val up = constraint.exclusiveUpper(p1, p2)
 
     val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
     val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
 
-    // XX: is the reordering here breaking the assumption of `unifying` in OrderingConstraint#order?
-    // ... no because order is called from addLess above.
     val pL = if level1 <= level2 then p1 else p2
     val pR = if level1 <= level2 then p2 else p1
 
+    val bound1 = constraint.nonParamBounds(pL).substParam(pR, pL)
+    var bound2 = constraint.nonParamBounds(pR).substParam(pR, pL)
+
+    // println(i"unify($p1, $p2)")
+
+    if level1 != level2 then
+      // TODO?
+      // >: (x: Int) <: Singleton
+      // should be approxed to >: Int & Singleton <: Singleton
+      // and not >: Int <: Singleton
+      val saved = useNecessaryEither
+      useNecessaryEither = false
+      // "-1" because we want tighter bounds
+      bound2 = avoidNested(bound2, -1, level1, "")
+      useNecessaryEither = saved
+      val TypeBounds(lo, hi) = bound2
+      assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
+
+    constraint = constraint.asInstanceOf[OrderingConstraint].order(constraint.asInstanceOf[OrderingConstraint], p2, p1, keepParam2 = level1 <= level2)
+    // if level1 != level2 then println(s"~BB($p1, $p2): " + constraint.show)
+
+    val down = constraint.exclusiveLower(p2, p1)
+    val up = constraint.exclusiveUpper(p1, p2)
+
     constraint = {
-      val bound1 = constraint.nonParamBounds(pL).substParam(pR, pL)
-      var bound2 = constraint.nonParamBounds(pR).substParam(pR, pL)
-      if level1 < level2 then
-        // TODO?
-        // >: (x: Int) <: Singleton
-        // should be approxed to >: Int & Singleton <: Singleton
-        // and not >: Int <: Singleton
-        val saved = useNecessaryEither
-        useNecessaryEither = false
-        // "-1" because we want tighter bounds
-        bound2 = avoidNested(bound2, -1, level1, "")
-        useNecessaryEither = saved
-        val TypeBounds(lo, hi) = bound2
-        assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
       val pLBounds = bound1 & bound2
       constraint.updateEntry(pL, pLBounds).replace(pR, pL)
     }
