@@ -598,13 +598,16 @@ trait Inferencing { this: Typer =>
         //     found   : Int(1)
         //     required: String
         //     val y: List[List[String]] = List(List(1))
-        if state.reporter.hasUnreportedErrors then return tree
-
         def constraint = state.constraint
         type InstantiateQueue = mutable.ListBuffer[(TypeVar, Boolean)]
         val toInstantiate = new InstantiateQueue
         for tvar <- qualifying do
-          if !tvar.isInstantiated && constraint.contains(tvar) && (tvar.nestingLevel >= ctx.scope.nestingLevel) then
+          if tvar.nestingLevel < ctx.scope.nestingLevel then
+            typr.println(i"skip $tvar (${if vs(tvar) != null then vs(tvar) else ""}) in $state")
+          // is the state.reporter.hasUnreportedErrors even needed anymore?
+          if !tvar.isInstantiated && constraint.contains(tvar) && (tvar.nestingLevel >= ctx.scope.nestingLevel) &&
+             (!state.reporter.hasUnreportedErrors || tvar.nestingLevel > ctx.scope.nestingLevel) then
+
             constrainIfDependentParamRef(tvar, tree)
             // Needs to be checked again, since previous interpolations could already have
             // instantiated `tvar` through unification.
