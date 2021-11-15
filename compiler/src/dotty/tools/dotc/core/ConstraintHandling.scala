@@ -79,11 +79,6 @@ trait ConstraintHandling {
   def fullBounds(param: TypeParamRef)(using Context): TypeBounds =
     nonParamBounds(param).derivedTypeBounds(fullLowerBound(param), fullUpperBound(param))
 
-  /** If true, eliminate wildcards in bounds by avoidance, otherwise replace
-   *  them by fresh variables.
-   */
-  protected def approximateWildcards: Boolean = true
-
   protected var useNecessaryEither = false
 
   def lowerVar(tp: TypeVar, newLevel: Int)(using Context): TypeVar =
@@ -116,6 +111,8 @@ trait ConstraintHandling {
         // println("REPLACE: " + tp + " v: " + variance)
         // println(desc)
 
+        // TODO: check Mode.TypevarsMissContext
+
         def makeVar(isUpper: Boolean): TypeVar =
           // TODO: emptyPolyKind breaks i8900a4.scala
           // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
@@ -142,7 +139,7 @@ trait ConstraintHandling {
 
     override def mapWild(t: WildcardType) =
       // variance != 0 breaks tests/patmat/i4030.scala
-      if approximateWildcards /*|| (variance != 0)*/ then super.mapWild(t)
+      if ctx.mode.is(Mode.TypevarsMissContext) /*|| (variance != 0)*/ then super.mapWild(t)
       else
         val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
         tvar.nestingLevel = maxLevel
