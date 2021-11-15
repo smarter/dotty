@@ -371,17 +371,15 @@ trait ConstraintHandling {
     // println(i"unify($p1, $p2)")
 
     if level1 != level2 then
-      // TODO?
-      // >: (x: Int) <: Singleton
-      // should be approxed to >: Int & Singleton <: Singleton
-      // and not >: Int <: Singleton
       val saved = useNecessaryEither
       useNecessaryEither = false
       // "-1" because we want tighter bounds
       bound2 = avoidNested(bound2, -1, level1, "")
       useNecessaryEither = saved
       val TypeBounds(lo, hi) = bound2
-      assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
+      // assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
+      if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
+        bound2 = TypeBounds(lo & hi, hi)
 
     constraint = constraint.asInstanceOf[OrderingConstraint].order(constraint.asInstanceOf[OrderingConstraint], p2, p1, keepParam2 = level1 <= level2)
     // if level1 != level2 then println(s"~BB($p1, $p2): " + constraint.show)
