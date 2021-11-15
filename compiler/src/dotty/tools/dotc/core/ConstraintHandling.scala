@@ -103,84 +103,15 @@ trait ConstraintHandling {
   def avoidNested(tp: Type, varianceBase: Int, maxLevel: Int, desc: => String)(using Context): Type =
     AvoidNestedMap(varianceBase, maxLevel, desc)(tp)
 
-  class AvoidNestedMap(varianceBase: Int, val maxLevel: Int, desc: => String)(using Context) extends AvoidWildcardsMap:
-    @annotation.threadUnsafe lazy val localParamRefs = util.HashSet[Type]()
+  class AvoidNestedMap(varianceBase: Int, val maxLevel: Int, desc: => String)(using Context) extends TypeOps.AvoidMap:
+    variance = varianceBase
+    // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
+    if useNecessaryEither then variance = -variance
 
-     variance = varianceBase
-     // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
-     if useNecessaryEither then variance = -variance
+    def toAvoid(tp: NamedType): Boolean =
+      !ctx.isAfterTyper && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > maxLevel
 
-    // if isUpper then variance = -1
-
-    // override def apply(t: Type): Type = t match
-    //   case t: WildcardType => mapWild(t)
-    //   case _ =>
-    //     println(s"mapping[$variance]: " + t.show)
-    //     mapOver(t)
-
-    // copy from avoid
-    override def isStaticPrefix(pre: Type)(using Context): Boolean = pre match
-      case pre: NamedType =>
-        val sym = pre.currentSymbol
-        sym.is(Package) || sym.isStatic && isStaticPrefix(pre.prefix)
-      case _ => true
-    // copy from avoid, TODO: is this enough to avoid realizability check? same Q for regular avoid
-    override def derivedSelect(tp: NamedType, pre: Type) =
-      if (pre eq tp.prefix)
-        tp
-      else tryWiden(tp, tp.prefix).orElse {
-        if (tp.isTerm && variance > 0 && !pre.isSingleton)
-          apply(tp.info.widenExpr)
-        else if (upper(pre).member(tp.name).exists)
-          super.derivedSelect(tp, pre)
-        else
-          range(defn.NothingType, defn.AnyType)
-      }
-
-    // TODO: think about skolems/wildcards/wildcard capture
-    // val x: Foo[? >: Int <: String] = new Foo[s.T] // Valid locally, but what if it propagates out?
-    // Foo[? >: Int <: String] =capture=> Foo[?1.CAP] //?1.CAP can propagate out
-    //
-    // class A[T] { def foo: T }
-    // s => { var qual = s; qual.foo } // qual is skolemized, return ?1.T, as bad as x.M in try/i8900.scala ?
     override def apply(tp: Type): Type = tp match
-      // case tp: NamedType if (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.id > maxLevel =>
-      // Is nesting enough? What if comparing tvar from one branch and local symbol from other branch?
-      // TODO: instantiate all more nested vars when going out of a scope?
-      // - check what lionel does
-      // - check what https://okmij.org/ftp/ML/generalization.html says.
-      case tp: NamedType if !ctx.isAfterTyper && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > maxLevel =>
-        // println("param: " + maxLevel)
-        // println("tp: " + tp.show + " " + tp.symbol.nestingLevel + " owner: " + tp.symbol.owner + " at " + tp.symbol.owner.nestingLevel)
-        // println(desc)
-        // Adapted from avoid
-        tp match
-          case tp: TermRef =>
-            tp.info.widenExpr.dealias match
-              case info: SingletonType => apply(info)
-              case info => range(defn.NothingType, apply(info))
-          case tp: TypeRef =>
-            tp.info match
-              case info: AliasingBounds =>
-                apply(info.alias)
-              case TypeBounds(lo, hi) =>
-                range(atVariance(-variance)(apply(lo)), apply(hi))
-              case info: ClassInfo =>
-                range(defn.NothingType, apply(TypeOps.classBound(info)))
-              case _ =>
-                emptyRange // should happen only in error cases
-
-      // at the top-level in AndOrType we go through OrderingConstraint#dependentParams:
-      // ?A <: ?B & X becomes:
-      //   ?A <: ?B & X // not stripped actually?
-      //   ?A <: ?B
-      // Does that mean we don't need the avoidance?
-      // - New bounds on B will be approximated as they're propagated to A
-      // - Are existing bounds also approximated? Not sure because we're not
-      //   going through ConstraintHandling#addLess.
-      //     ==> isn't that lack of propagation already problematic on master?
-      //      ==> probably fine, it just means more recursion in subtype checking,
-      //          but it does mean we do have to avoid higher level tvars in AndOrTypes.
       case tp: TypeVar if !ctx.isAfterTyper && !tp.isInstantiated && tp.nestingLevel > maxLevel =>
         // println("REPLACE: " + tp + " v: " + variance)
         // println(desc)
@@ -205,30 +136,6 @@ trait ConstraintHandling {
           makeVar(isUpper = isUpper)
         else
           lowerVar(tp, maxLevel)
-          // val bounds = tvarBounds(tp)
-          // val tvar = newTypeVar(bounds)
-          // tvar.nestingLevel = maxLevel
-          // assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
-          // assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
-          // tvar
-
-      // For i8900pf / runST
-      // what if we're inside poly fun? then hoepfully constraint contains binder
-      // XX: no longer needed after avoidingTypeLambda improvement.
-      // case tp: TypeParamRef if !constraint.contains(tp.binder) =>
-      //   // assert binder is apply of polyfun
-      //   val TypeBounds(lo, hi) = tp.underlying.bounds
-      //   range(atVariance(-variance)(apply(lo)), apply(hi))
-
-      // Also copied from avoid to fix tests/pos/i11464.scala
-      case tp: LazyRef =>
-        if localParamRefs.contains(tp.ref) then tp
-        else if isExpandingBounds then emptyRange // XX: not kind-correct since upper-bounded by Any
-        else mapOver(tp)
-      case tl: HKTypeLambda =>
-        localParamRefs ++= tl.paramRefs
-        mapOver(tl)
-
       case _ =>
         // println(s"[$variance]map over: " + tp.show)
         super.apply(tp)
