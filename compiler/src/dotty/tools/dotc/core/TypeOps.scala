@@ -496,17 +496,8 @@ object TypeOps:
       def toAvoid(tp: NamedType) =
         val sym = tp.symbol
         !sym.isStatic && forbidden.contains(sym)
-      def partsToAvoid = new NamedPartsAccumulator(tp => toAvoid(tp))
 
       override def apply(tp: Type): Type = tp match
-        case tp: TermRef
-        if partsToAvoid(Nil, tp.info).nonEmpty =>
-          tp.info.widenExpr.dealias match {
-            case info: SingletonType => apply(info)
-            case info => range(defn.NothingType, apply(info))
-          }
-        case tp: SkolemType if partsToAvoid(Nil, tp.info).nonEmpty =>
-          range(defn.NothingType, apply(tp.info))
         case tp: TypeVar if mapCtx.typerState.constraint.contains(tp) =>
           val lo = TypeComparer.instanceType(
             tp.origin, fromBelow = variance > 0 || variance == 0 && tp.hasLowerBound)(using mapCtx)
