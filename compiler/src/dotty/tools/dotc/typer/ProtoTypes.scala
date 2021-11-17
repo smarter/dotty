@@ -628,7 +628,11 @@ object ProtoTypes {
    *  for each parameter.
    *  @return  The added type lambda, and the list of created type variables.
    */
-  def constrained(tl: TypeLambda, owningTree: untpd.Tree, alwaysAddTypeVars: Boolean)(using Context): (TypeLambda, List[TypeTree]) = {
+  def constrained(using Context)(
+    tl: TypeLambda, owningTree: untpd.Tree,
+    alwaysAddTypeVars: Boolean,
+    nestingLevel: Int = ctx.nestingLevel
+  ): (TypeLambda, List[TypeTree]) = {
     val state = ctx.typerState
     val addTypeVars = alwaysAddTypeVars || !owningTree.isEmpty
     if (tl.isInstanceOf[PolyType])
@@ -640,7 +644,7 @@ object ProtoTypes {
       for (paramRef <- tl.paramRefs)
       yield {
         val tt = InferredTypeTree().withSpan(owningTree.span)
-        val tvar = TypeVar(paramRef, state)
+        val tvar = TypeVar(paramRef, state, nestingLevel)
         state.ownedVars += tvar
         tt.withType(tvar)
       }
@@ -653,7 +657,7 @@ object ProtoTypes {
 
   def constrained(tl: TypeLambda, owningTree: untpd.Tree)(using Context): (TypeLambda, List[TypeTree]) =
     constrained(tl, owningTree,
-      alwaysAddTypeVars = tl.isInstanceOf[PolyType] && ctx.typerState.isCommittable)
+    alwaysAddTypeVars = tl.isInstanceOf[PolyType] && ctx.typerState.isCommittable)
 
   /**  Same as `constrained(tl, EmptyTree)`, but returns just the created type lambda */
   def constrained(tl: TypeLambda)(using Context): TypeLambda =
@@ -670,11 +674,25 @@ object ProtoTypes {
    *  If `represents` exists, it is stored in the result type of the PolyType
    *  that backs the TypeVar, to be retrieved by `representedParamRef`.
    */
-  def newTypeVar(bounds: TypeBounds, represents: Type = NoType)(using Context): TypeVar = {
+  def newTypeVar(using Context)(bounds: TypeBounds, represents: Type = NoType, nestingLevel: Int = ctx.nestingLevel): TypeVar = {
     val poly = PolyType(DepParamName.fresh().toTypeName :: Nil)(
         pt => bounds :: Nil,
         pt => represents.orElse(defn.AnyType))
-    constrained(poly, untpd.EmptyTree, alwaysAddTypeVars = true)
+    constrained(poly, untpd.EmptyTree, alwaysAddTypeVars = true, nestingLevel)
+      ._2.head.tpe.asInstanceOf[TypeVar]
+  }
+
+  def tvarBounds(tvar: TypeVar, isUpper: Boolean)(using Context): TypeBounds =
+    // TODO: keep avoided bounds of tvar? (without creating more tvars)
+    TypeBounds.upper(tvar.kindTop)
+
+  def newTypeVar2(oldVar: TypeVar, isUpper: Boolean, represents: Type = NoType, nestingLevel: Int)(using Context): TypeVar = {
+    val bounds = tvarBounds(oldVar, isUpper)
+    val name = (if isUpper then NameKinds.AvoidAboveNameKind else NameKinds.AvoidBelowNameKind)(oldVar.origin.paramName.toTermName).toTypeName
+    val poly = PolyType(name :: Nil)(
+        pt => bounds :: Nil,
+        pt => represents.orElse(defn.AnyType))
+    constrained(poly, untpd.EmptyTree, alwaysAddTypeVars = true, nestingLevel)
       ._2.head.tpe.asInstanceOf[TypeVar]
   }
 

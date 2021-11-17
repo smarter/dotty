@@ -350,7 +350,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
   /** Add the fact `param1 <: param2` to the constraint `current` and propagate
    *  `<:<` relationships between parameters ("edges") but not bounds.
    */
-  private def order(current: This, param1: TypeParamRef, param2: TypeParamRef)(using Context): This =
+  def order(current: This, param1: TypeParamRef, param2: TypeParamRef, keepParam2: Boolean = true)(using Context): This =
     if (param1 == param2 || current.isLess(param1, param2)) this
     else {
       assert(contains(param1), i"$param1")
@@ -362,7 +362,10 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         if unifying then
           // Since param2 <:< param1 already holds now, filter out param1 to avoid adding
           //   duplicated orderings.
-          param2 :: up.filterNot(_ eq param1)
+          if keepParam2 then
+            param2 :: up.filterNot(_ eq param1)
+          else
+            up.filterNot(_ eq param1)
         else
           param2 :: up
       }
@@ -372,7 +375,10 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           // Do not add bounds for param1 since it will be unified to param2 soon.
           // And, similarly filter out param2 from lowerly-ordered parameters
           //   to avoid duplicated orderings.
-          lower.filterNot(_ eq param2)
+          if keepParam2 then
+            lower.filterNot(_ eq param2)
+          else
+            param1 :: lower.filterNot(_ eq param2)
         else
           param1 :: lower
       }
@@ -418,12 +424,6 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 
   def addLess(param1: TypeParamRef, param2: TypeParamRef)(using Context): This =
     order(this, param1, param2).checkNonCyclic()
-
-  def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): This =
-    val bound1 = nonParamBounds(p1).substParam(p2, p1)
-    val bound2 = nonParamBounds(p2).substParam(p2, p1)
-    val p1Bounds = bound1 & bound2
-    updateEntry(p1, p1Bounds).replace(p2, p1)
 
 // ---------- Replacements and Removals -------------------------------------
 

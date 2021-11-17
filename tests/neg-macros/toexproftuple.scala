@@ -36,7 +36,7 @@ def mcrImpl(using ctx: Quotes): Expr[Any] = { // error // error
   // Required: quoted.Expr[((1 : Int), (3 : Int), (3 : Int))]
 
   val tpl2: (Expr[1], 2, Expr[3]) = ('{1}, 2, '{3})
-  '{val res = ${Expr.ofTuple(tpl2)}; res}  // error // error // error // error
+  '{val res = ${Expr.ofTuple(tpl2)}; res}  // error // error // error // error // error
   //                                 ^
   // Cannot prove that (quoted.Expr[(1 : Int)], (2 : Int), quoted.Expr[(3 : Int)]) =:= scala.Tuple.Map[
   //   scala.Tuple.InverseMap[

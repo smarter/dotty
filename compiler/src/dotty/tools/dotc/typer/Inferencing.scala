@@ -598,24 +598,36 @@ trait Inferencing { this: Typer =>
         //     found   : Int(1)
         //     required: String
         //     val y: List[List[String]] = List(List(1))
-        if state.reporter.hasUnreportedErrors then return tree
-
         def constraint = state.constraint
         type InstantiateQueue = mutable.ListBuffer[(TypeVar, Boolean)]
         val toInstantiate = new InstantiateQueue
         for tvar <- qualifying do
-          if !tvar.isInstantiated && constraint.contains(tvar) then
+          if tvar.nestingLevel < ctx.nestingLevel then
+            typr.println(i"skip $tvar (${if vs(tvar) != null then vs(tvar) else ""}) in $state")
+          // is the state.reporter.hasUnreportedErrors even needed anymore?
+          if !tvar.isInstantiated && constraint.contains(tvar) && (tvar.nestingLevel >= ctx.nestingLevel) &&
+             (!state.reporter.hasUnreportedErrors || tvar.nestingLevel > ctx.nestingLevel) then
+
             constrainIfDependentParamRef(tvar, tree)
             // Needs to be checked again, since previous interpolations could already have
             // instantiated `tvar` through unification.
             val v = vs(tvar)
             if v == null then
-              typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = ${tvar.hasLowerBound}, $constraint")
-              toInstantiate += ((tvar, tvar.hasLowerBound))
+              val fromBelow =
+              // tvar.origin.paramName.info match
+                tvar.origin.paramName.is(NameKinds.AvoidAboveNameKind) ||
+                !tvar.origin.paramName.is(NameKinds.AvoidBelowNameKind) &&
+                tvar.hasLowerBound
+              typr.println(i"interpolate non-occurring $tvar in $state in $tree: $tp, fromBelow = $fromBelow, $constraint")
+              toInstantiate += ((tvar, fromBelow))
             else if v.intValue != 0 then
               typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
               toInstantiate += ((tvar, v.intValue == 1))
             else
+              if tvar.nestingLevel > ctx.nestingLevel then // needed for uninstVars in combination with nestingLevel check above
+                comparing(cmp =>
+                  cmp.avoidNested(tvar, varianceBase = 0, maxLevel = ctx.nestingLevel, i"[$tvar] -- interpolate $tree: ${tree.tpe.widen} in $state\n${state.constraint}")
+                )
               typr.println(i"no interpolation for nonvariant $tvar in $state")
 
         /** Instantiate all type variables in `buf` in the indicated directions.
