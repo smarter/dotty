@@ -11,6 +11,7 @@ import collection.mutable
 import printing._
 
 import scala.annotation.internal.sharable
+import scala.annotation.unused
 
 /** Represents GADT constraints currently in scope */
 sealed abstract class GadtConstraint extends Showable {
@@ -232,12 +233,14 @@ final class ProperGadtConstraint private(
     }
     externalizeMap(constraint.nonParamBounds(param)).bounds
 
-  override def fullLowerBound(param: TypeParamRef)(using Context): Type =
+  override def fullLowerBound(param: TypeParamRef,
+      @unused("no level checking in GADT constraints") maxLevel: Int)(using Context): Type =
     constraint.minLower(param).foldLeft(nonParamBounds(param).lo) {
       (t, u) => t | externalize(u)
     }
 
-  override def fullUpperBound(param: TypeParamRef)(using Context): Type =
+  override def fullUpperBound(param: TypeParamRef,
+      @unused("no level checking in GADT constraints") maxLevel: Int)(using Context): Type =
     constraint.minUpper(param).foldLeft(nonParamBounds(param).hi) { (t, u) =>
       val eu = externalize(u)
       // Any as the upper bound means "no bound", but if F is higher-kinded,

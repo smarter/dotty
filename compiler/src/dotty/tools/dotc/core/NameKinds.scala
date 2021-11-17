@@ -358,6 +358,18 @@ object NameKinds {
   val ProtectedAccessorName: PrefixNameKind = new PrefixNameKind(PROTECTEDACCESSOR, "protected$")
   val InlineAccessorName: PrefixNameKind = new PrefixNameKind(INLINEACCESSOR, "inline$")
 
+  // XX: can't use the same tag for multiple instances,
+  // parent class does simpleNameKinds(tag) = this
+  class AvoidNameKind(isUpper: Boolean) extends PrefixNameKind(AVOID + (if isUpper then 1 else 0),
+      if isUpper then "(above)" else "(below)"):
+    override def definesNewName = true
+
+  // FromAbove // FromBelow?
+  val AvoidAboveNameKind = AvoidNameKind(isUpper = true)
+  val AvoidBelowNameKind = AvoidNameKind(isUpper = false)
+  val AvoidSameNameKind = new PrefixNameKind(AVOID + 2, "(same)"):
+    override def definesNewName = true
+
   val BodyRetainerName: SuffixNameKind = new SuffixNameKind(BODYRETAINER, "$retainedBody")
   val FieldName: SuffixNameKind = new SuffixNameKind(FIELD, "$$local") {
       override def mkString(underlying: TermName, info: ThisInfo) = underlying.toString

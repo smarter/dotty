@@ -4619,6 +4619,8 @@ object Types {
   object TypeVar:
     def apply(initOrigin: TypeParamRef, creatorState: TyperState)(using Context) =
       new TypeVar(initOrigin, creatorState, ctx.nestingLevel)
+    def apply(initOrigin: TypeParamRef, creatorState: TyperState, nestingLevel: Int)(using Context) =
+      new TypeVar(initOrigin, creatorState, nestingLevel)
 
   type TypeVars = SimpleIdentitySet[TypeVar]
 

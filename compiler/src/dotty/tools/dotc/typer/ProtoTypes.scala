@@ -628,7 +628,11 @@ object ProtoTypes {
    *  for each parameter.
    *  @return  The added type lambda, and the list of created type variables.
    */
-  def constrained(tl: TypeLambda, owningTree: untpd.Tree, alwaysAddTypeVars: Boolean)(using Context): (TypeLambda, List[TypeTree]) = {
+  def constrained(using Context)(
+    tl: TypeLambda, owningTree: untpd.Tree,
+    alwaysAddTypeVars: Boolean,
+    nestingLevel: Int = ctx.nestingLevel
+  ): (TypeLambda, List[TypeTree]) = {
     val state = ctx.typerState
     val addTypeVars = alwaysAddTypeVars || !owningTree.isEmpty
     if (tl.isInstanceOf[PolyType])
@@ -640,7 +644,7 @@ object ProtoTypes {
       for (paramRef <- tl.paramRefs)
       yield {
         val tt = InferredTypeTree().withSpan(owningTree.span)
-        val tvar = TypeVar(paramRef, state)
+        val tvar = TypeVar(paramRef, state, nestingLevel)
         state.ownedVars += tvar
         tt.withType(tvar)
       }
@@ -670,13 +674,14 @@ object ProtoTypes {
    *  If `represents` exists, it is stored in the result type of the PolyType
    *  that backs the TypeVar, to be retrieved by `representedParamRef`.
    */
-  def newTypeVar(bounds: TypeBounds, represents: Type = NoType)(using Context): TypeVar = {
-    val poly = PolyType(DepParamName.fresh().toTypeName :: Nil)(
+  def newTypeVar(using Context)(
+      bounds: TypeBounds, name: TypeName = DepParamName.fresh().toTypeName,
+      nestingLevel: Int = ctx.nestingLevel, represents: Type = NoType): TypeVar =
+    val poly = PolyType(name :: Nil)(
         pt => bounds :: Nil,
         pt => represents.orElse(defn.AnyType))
-    constrained(poly, untpd.EmptyTree, alwaysAddTypeVars = true)
+    constrained(poly, untpd.EmptyTree, alwaysAddTypeVars = true, nestingLevel)
       ._2.head.tpe.asInstanceOf[TypeVar]
-  }
 
   /** If `tvar` represents a parameter of a dependent function generated
    *  by `newDepVar` called from `resultTypeApprox, the term parameter reference
@@ -693,7 +698,7 @@ object ProtoTypes {
   def newDepTypeVar(ref: TermParamRef)(using Context): TypeVar =
     newTypeVar(
       TypeBounds.upper(AndType(ref.underlying.widenExpr, defn.SingletonClass.typeRef)),
-      ref)
+      represents = ref)
 
   /** The result type of `mt`, where all references to parameters of `mt` are
    *  replaced by either wildcards or TypeParamRefs.
