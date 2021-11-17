@@ -275,11 +275,11 @@ trait ConstraintHandling {
     // println(i"unify($p1, $p2)")
 
     if level1 != level2 then
-      val saved = useNecessaryEither
-      useNecessaryEither = false
+      // val saved = useNecessaryEither
+      // useNecessaryEither = false
       // "-1" because we want tighter bounds
-      bound2 = avoidNested(bound2, -1, level1, "")
-      useNecessaryEither = saved
+      bound2 = avoidNested(bound2, if useNecessaryEither then 1 else -1, level1, "")
+      // useNecessaryEither = saved
       val TypeBounds(lo, hi) = bound2
       // assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
       if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
