@@ -86,8 +86,7 @@ trait ConstraintHandling {
     // val tp2 = newTypeVar(TypeBounds.upper(tp.origin))
     // val tp2 = newTypeVar(TypeAlias(tp.origin))
     // val tp2 = newTypeVar(TypeBounds.emptyPolyKind)
-    val tp2 = newTypeVar(TypeBounds.upper(tp.kindTop))
-    tp2.nestingLevel = newLevel
+    val tp2 = newTypeVar(TypeBounds.upper(tp.kindTop), nestingLevel = newLevel)
     addLess(tp2.origin, tp.origin)
     addLess(tp.origin, tp2.origin)
     // calliny unify requires addLess(tp.origin, tp2.origin) first
@@ -116,8 +115,7 @@ trait ConstraintHandling {
         def makeVar(isUpper: Boolean): TypeVar =
           // TODO: emptyPolyKind breaks i8900a4.scala
           // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
-          val tvar = newTypeVar2(tp, isUpper)
-          tvar.nestingLevel = maxLevel
+          val tvar = newTypeVar2(tp, isUpper, nestingLevel = maxLevel)
           if isUpper then
             assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
           else
@@ -141,8 +139,7 @@ trait ConstraintHandling {
       // variance != 0 breaks tests/patmat/i4030.scala
       if ctx.mode.is(Mode.TypevarsMissContext) /*|| (variance != 0)*/ then super.mapWild(t)
       else
-        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
-        tvar.nestingLevel = maxLevel
+        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds, nestingLevel = maxLevel)
         tvar
 
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =

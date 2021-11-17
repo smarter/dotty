@@ -4518,7 +4518,7 @@ object Types {
    *  @param  origin        The parameter that's tracked by the type variable.
    *  @param  creatorState  The typer state in which the variable was created.
    */
-  final class TypeVar private(initOrigin: TypeParamRef, creatorState: TyperState, var nestingLevel: Int) extends CachedProxyType with ValueType {
+  final class TypeVar private(initOrigin: TypeParamRef, creatorState: TyperState, val nestingLevel: Int) extends CachedProxyType with ValueType {
     private var currentOrigin = initOrigin
 
     def origin: TypeParamRef = currentOrigin
@@ -4627,6 +4627,8 @@ object Types {
   object TypeVar:
     def apply(initOrigin: TypeParamRef, creatorState: TyperState)(using Context) =
       new TypeVar(initOrigin, creatorState, ctx.nestingLevel)
+    def apply(initOrigin: TypeParamRef, creatorState: TyperState, nestingLevel: Int)(using Context) =
+      new TypeVar(initOrigin, creatorState, nestingLevel)
 
   type TypeVars = SimpleIdentitySet[TypeVar]
 
