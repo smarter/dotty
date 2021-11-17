@@ -10,7 +10,7 @@ import Flags._
 import config.Config
 import config.Printers.typr
 import reporting.trace
-import typer.ProtoTypes.newTypeVar
+import typer.ProtoTypes.{tvarBounds, newTypeVar, newTypeVar2}
 import StdNames.tpnme
 
 /** Methods for adding constraints and solving them.
@@ -85,6 +85,19 @@ trait ConstraintHandling {
 
   protected var useNecessaryEither = false
 
+  def lowerVar(tp: TypeVar, newLevel: Int)(using Context): TypeVar =
+    // println("bef: " + ctx.typerState.constraint.show)
+    // val tp2 = newTypeVar(TypeBounds.upper(tp.origin))
+    // val tp2 = newTypeVar(TypeAlias(tp.origin))
+    // val tp2 = newTypeVar(TypeBounds.emptyPolyKind)
+    val tp2 = newTypeVar(TypeBounds.upper(tp.kindTop), nestingLevel = newLevel)
+    addLess(tp2.origin, tp.origin)
+    addLess(tp.origin, tp2.origin)
+    // calliny unify requires addLess(tp.origin, tp2.origin) first
+    // unify(tp2.origin, tp.origin)
+    // println("aft: " + ctx.typerState.constraint.show)
+    tp2
+
   def avoidNested(tp: Type, varianceBase: Int, maxLevel: Int, desc: => String)(using Context): Type =
     AvoidNestedMap(varianceBase, maxLevel, desc)(tp)
 
@@ -99,10 +112,38 @@ trait ConstraintHandling {
     def toAvoid(tp: NamedType): Boolean =
       mustAvoidNested && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > maxLevel
 
+    override def apply(tp: Type): Type = tp match
+      case tp: TypeVar if mustAvoidNested && !tp.isInstantiated && tp.nestingLevel > maxLevel =>
+        // println("REPLACE: " + tp + " v: " + variance)
+        // println(desc)
+
+        def makeVar(isUpper: Boolean): TypeVar =
+          // TODO: emptyPolyKind breaks i8900a4.scala
+          // val bounds = if tp frozen_<:< defn.AnyType then TypeBounds.empty else TypeBounds.emptyPolyKind
+          val tvar = newTypeVar2(tp, isUpper, nestingLevel = maxLevel)
+          if isUpper then
+            assert(tp <:< tvar, i"$tp <:< $tvar -- $desc")
+          else
+            assert(tvar <:< tp, i"$tvar <:< $tp -- $desc")
+          tvar
+
+        if variance != 0 then
+          var isUpper = variance >= 0
+
+          // Fixes PL.scala
+          if useNecessaryEither then isUpper = !isUpper
+
+          makeVar(isUpper = isUpper)
+        else
+          lowerVar(tp, maxLevel)
+      case _ =>
+        // println(s"[$variance]map over: " + tp.show)
+        super.apply(tp)
+
     override def mapWild(t: WildcardType) =
       if ctx.mode.is(Mode.TypevarsMissContext) then super.mapWild(t)
       else
-        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds)
+        val tvar = newTypeVar(apply(t.effectiveBounds).toBounds, nestingLevel = maxLevel)
         tvar
 
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
@@ -219,16 +260,50 @@ trait ConstraintHandling {
   private def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
     constr.println(s"unifying $p1 $p2")
     assert(constraint.isLess(p1, p2))
-    constraint = constraint.addLess(p2, p1)
+
+    val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
+    val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
+
+    val pL = if level1 <= level2 then p1 else p2
+    val pR = if level1 <= level2 then p2 else p1
+
+    val bound1 = constraint.nonParamBounds(pL).substParam(pR, pL)
+    var bound2 = constraint.nonParamBounds(pR).substParam(pR, pL)
+
+    // println(i"unify($p1, $p2)")
+
+    if level1 != level2 then
+      // val saved = useNecessaryEither
+      // useNecessaryEither = false
+      // "-1" because we want tighter bounds
+      bound2 = avoidNested(bound2, if useNecessaryEither then 1 else -1, level1, "")
+      // useNecessaryEither = saved
+      val TypeBounds(lo, hi) = bound2
+      // assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
+      if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
+        bound2 = TypeBounds(lo & hi, hi)
+
+    constraint = constraint.asInstanceOf[OrderingConstraint].order(constraint.asInstanceOf[OrderingConstraint], p2, p1, keepParam2 = level1 <= level2)
+    // if level1 != level2 then println(s"~BB($p1, $p2): " + constraint.show)
+
     val down = constraint.exclusiveLower(p2, p1)
     val up = constraint.exclusiveUpper(p1, p2)
-    constraint = constraint.unify(p1, p2)
-    val bounds = constraint.nonParamBounds(p1)
+
+    constraint = {
+      val pLBounds = bound1 & bound2
+      constraint.updateEntry(pL, pLBounds).replace(pR, pL)
+    }
+
+    val bounds = constraint.nonParamBounds(pL)
     val lo = bounds.lo
     val hi = bounds.hi
+    // println(i"%bef: ${ctx.typerState.constraint}")
+    val z = 
     isSub(lo, hi) &&
     down.forall(addOneBound(_, hi, isUpper = true)) &&
     up.forall(addOneBound(_, lo, isUpper = false))
+    // println(i"%aft: ${ctx.typerState.constraint}")
+    z
   }
 
   protected def isSubType(tp1: Type, tp2: Type, whenFrozen: Boolean)(using Context): Boolean =
@@ -278,8 +353,44 @@ trait ConstraintHandling {
   final def approximation(param: TypeParamRef, fromBelow: Boolean)(using Context): Type =
     constraint.entry(param) match
       case entry: TypeBounds =>
+        val nestingLevel = constraint.typeVarOfParam(param) match
+          // turned off for gadtconstraint, same reasoning as in addOneBound
+          case tvar: TypeVar if !this.isInstanceOf[GadtConstraint] => tvar.nestingLevel
+          case _ => -1
+
+        // todo: testcases
+        // could we run into an infinite with lowerVar creating new variables?
+        def flb(param: TypeParamRef)(using Context): Type =
+          val los0 = constraint.minLower(param)
+          val los = if nestingLevel == -1 then los0 else los0.map(p =>
+            val pVar = constraint.typeVarOfParam(p).asInstanceOf[TypeVar]
+            val pLevel = pVar.nestingLevel
+            if pLevel > nestingLevel then
+              assert(ctx.nestingLevel + 1 >= pLevel, i"$param -- $los0 -- ctx: ${ctx.nestingLevel}")
+              lowerVar(pVar, nestingLevel)
+              p
+            else
+              p
+          )
+          los.foldLeft(nonParamBounds(param).lo)(_ | _)
+      
+        def fub(param: TypeParamRef)(using Context): Type =
+          val his0 = constraint.minUpper(param)
+          val his = if nestingLevel == -1 then his0 else his0.map(p =>
+            val pVar = constraint.typeVarOfParam(p).asInstanceOf[TypeVar]
+            val pLevel = pVar.nestingLevel
+            if pLevel > nestingLevel then
+              assert(ctx.nestingLevel + 1 >= pLevel, i"$param -- $his0 -- ctx: ${ctx.nestingLevel}")
+              lowerVar(pVar, nestingLevel)
+              p
+            else
+              p
+          )
+          his.foldLeft(nonParamBounds(param).hi)(_ & _)
+
+
         val useLowerBound = fromBelow || param.occursIn(entry.hi)
-        val inst = if useLowerBound then fullLowerBound(param) else fullUpperBound(param)
+        val inst = if useLowerBound then flb(param) else fub(param)
         typr.println(s"approx ${param.show}, from below = $fromBelow, inst = ${inst.show}")
         inst
       case inst =>

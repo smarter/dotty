@@ -4621,6 +4621,8 @@ object Types {
   object TypeVar:
     def apply(initOrigin: TypeParamRef, creatorState: TyperState)(using Context) =
       new TypeVar(initOrigin, creatorState, ctx.nestingLevel)
+    def apply(initOrigin: TypeParamRef, creatorState: TyperState, nestingLevel: Int)(using Context) =
+      new TypeVar(initOrigin, creatorState, nestingLevel)
 
   type TypeVars = SimpleIdentitySet[TypeVar]
 
@@ -5296,7 +5298,7 @@ object Types {
   abstract class VariantTraversal:
     protected[core] var variance: Int = 1
 
-    inline protected def atVariance[T](v: Int)(op: => T): T = {
+    inline def atVariance[T](v: Int)(op: => T): T = {
       val saved = variance
       variance = v
       val res = op
