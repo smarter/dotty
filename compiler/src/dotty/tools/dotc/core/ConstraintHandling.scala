@@ -102,11 +102,14 @@ trait ConstraintHandling {
     // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
     if useNecessaryEither then variance = -variance
 
+    def mustAvoidNested: Boolean =
+      !ctx.isAfterTyper && ctx.typerState.isCommittable
+
     def toAvoid(tp: NamedType): Boolean =
-      !ctx.isAfterTyper && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > maxLevel
+      mustAvoidNested && tp.prefix == NoPrefix && (tp.symbol ne defn.TypeBox_CAP) && !tp.symbol.isStatic && tp.symbol.nestingLevel > maxLevel
 
     override def apply(tp: Type): Type = tp match
-      case tp: TypeVar if !ctx.isAfterTyper && !tp.isInstantiated && tp.nestingLevel > maxLevel =>
+      case tp: TypeVar if mustAvoidNested && !tp.isInstantiated && tp.nestingLevel > maxLevel =>
         // println("REPLACE: " + tp + " v: " + variance)
         // println(desc)
 
