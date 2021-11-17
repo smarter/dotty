@@ -102,6 +102,8 @@ trait ConstraintHandling {
     // This breaks PL.scala / scalaz PLens.scala because less stuff is propagated
     if useNecessaryEither then variance = -variance
 
+    assert(!ctx.mode.is(Mode.TypevarsMissContext))
+
     def mustAvoidNested: Boolean =
       !ctx.isAfterTyper && ctx.typerState.isCommittable
 
