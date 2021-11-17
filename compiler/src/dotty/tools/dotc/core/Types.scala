@@ -4666,6 +4666,14 @@ object Types {
    *
    *  @param  origin        The parameter that's tracked by the type variable.
    *  @param  creatorState  The typer state in which the variable was created.
+   *  @param  nestingLevel  Symbols with a nestingLevel strictly greater than this
+   *                        will not appear in the instantiation of this type variable.
+   *                        This is enforced in `ConstraintHandling` by:
+   *                        - Maintaining the invariant that the `nonParamBounds`
+   *                          of a type variable never refer to a type with a
+   *                          greater `nestingLevel`.
+   *                        - Passing the appropriate level to `fullLowerBounds`/`fullUpperBounds`
+   *                          when actually instantiating the type variable.
    */
   final class TypeVar private(initOrigin: TypeParamRef, creatorState: TyperState, val nestingLevel: Int) extends CachedProxyType with ValueType {
     private var currentOrigin = initOrigin
@@ -4774,7 +4782,7 @@ object Types {
     }
   }
   object TypeVar:
-    def apply(initOrigin: TypeParamRef, creatorState: TyperState)(using Context) =
+    def apply(using Context)(initOrigin: TypeParamRef, creatorState: TyperState, nestingLevel: Int = ctx.nestingLevel) =
       new TypeVar(initOrigin, creatorState, ctx.nestingLevel)
 
   type TypeVars = SimpleIdentitySet[TypeVar]
