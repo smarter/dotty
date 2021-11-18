@@ -355,7 +355,7 @@ trait ConstraintHandling {
             val pVar = constraint.typeVarOfParam(p).asInstanceOf[TypeVar]
             val pLevel = pVar.nestingLevel
             if pLevel > nestingLevel then
-              assert(ctx.nestingLevel + 1 >= pLevel, i"$param -- $los0 -- ctx: ${ctx.nestingLevel}")
+              // assert(ctx.nestingLevel + 1 >= pLevel, i"$param -- $los0 -- ctx: ${ctx.nestingLevel}")
               lowerVar(pVar, nestingLevel)
               p
             else
@@ -369,7 +369,7 @@ trait ConstraintHandling {
             val pVar = constraint.typeVarOfParam(p).asInstanceOf[TypeVar]
             val pLevel = pVar.nestingLevel
             if pLevel > nestingLevel then
-              assert(ctx.nestingLevel + 1 >= pLevel, i"$param -- $his0 -- ctx: ${ctx.nestingLevel}")
+              // assert(ctx.nestingLevel + 1 >= pLevel, i"$param -- $his0 -- ctx: ${ctx.nestingLevel}")
               lowerVar(pVar, nestingLevel)
               p
             else
