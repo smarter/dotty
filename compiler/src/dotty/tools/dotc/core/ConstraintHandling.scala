@@ -254,54 +254,45 @@ trait ConstraintHandling {
 
   def location(using Context) = "" // i"in ${ctx.typerState.stateChainStr}" // use for debugging
 
-  /** Make p2 = p1, transfer all bounds of p2 to p1
-   *  @pre  less(p1)(p2)
+  /** Unify p1 with p2: one parameter will be kept in the constraint, the
+   *  other will be removed and its bounds transferred to the remaining one.
+   *
+   *  If p1 and p2 have different `nestingLevel`, the parameter with the lowest
+   *  level will be kept and the transferred bounds from the other parameter
+   *  will be adjusted for level-correctness.
+   *
+   *  @pre  isLess(p1, p2)
    */
   private def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
     constr.println(s"unifying $p1 $p2")
     assert(constraint.isLess(p1, p2))
     constraint = constraint.addLess(p2, p1)
 
-    val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
-    val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
+    val level1 = nestingLevel(p1)
+    val level2 = nestingLevel(p2)
+    val pKept    = if level1 <= level2 then p1 else p2
+    val pRemoved = if level1 <= level2 then p2 else p1
 
-    val pL = if level1 <= level2 then p1 else p2
-    val pR = if level1 <= level2 then p2 else p1
-
-    val bound1 = constraint.nonParamBounds(pL).substParam(pR, pL)
-    var bound2 = constraint.nonParamBounds(pR).substParam(pR, pL)
-
-    // println(i"unify($p1, $p2)")
+    val boundKept    = constraint.nonParamBounds(pKept).substParam(pRemoved, pKept)
+    var boundRemoved = constraint.nonParamBounds(pRemoved).substParam(pRemoved, pKept)
 
     if level1 != level2 then
-      // val saved = useNecessaryEither
-      // useNecessaryEither = false
-      // "-1" because we want tighter bounds
-      bound2 = avoidNested(bound2, if useNecessaryEither then 1 else -1, level1, "")
-      // useNecessaryEither = saved
-      val TypeBounds(lo, hi) = bound2
-      // assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
+      boundRemoved = avoidNested(boundRemoved, if useNecessaryEither then 1 else -1, level1, "")
+      val TypeBounds(lo, hi) = boundRemoved
       if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
-        bound2 = TypeBounds(lo & hi, hi)
+        boundRemoved = TypeBounds(lo & hi, hi)
 
     val down = constraint.exclusiveLower(p2, p1)
     val up = constraint.exclusiveUpper(p1, p2)
 
-    constraint = {
-      val pLBounds = bound1 & bound2
-      constraint.updateEntry(pL, pLBounds).replace(pR, pL)
-    }
+    val newBounds = (boundKept & boundRemoved).bounds
+    constraint = constraint.updateEntry(pKept, newBounds).replace(pRemoved, pKept)
 
-    val bounds = constraint.nonParamBounds(pL)
-    val lo = bounds.lo
-    val hi = bounds.hi
-    // println(i"%bef: ${ctx.typerState.constraint}")
-    val z = 
+    val lo = newBounds.lo
+    val hi = newBounds.hi
     isSub(lo, hi) &&
     down.forall(addOneBound(_, hi, isUpper = true)) &&
     up.forall(addOneBound(_, lo, isUpper = false))
-    // println(i"%aft: ${ctx.typerState.constraint}")
-    z
   }
 
   protected def isSubType(tp1: Type, tp2: Type, whenFrozen: Boolean)(using Context): Boolean =
