@@ -266,12 +266,13 @@ trait ConstraintHandling {
   private def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
     constr.println(s"unifying $p1 $p2")
     assert(constraint.isLess(p1, p2))
-    constraint = constraint.addLess(p2, p1)
 
     val level1 = nestingLevel(p1)
     val level2 = nestingLevel(p2)
     val pKept    = if level1 <= level2 then p1 else p2
     val pRemoved = if level1 <= level2 then p2 else p1
+
+    constraint = constraint.asInstanceOf[OrderingConstraint].order(constraint.asInstanceOf[OrderingConstraint], p2, p1, keepParam2 = level1 <= level2)
 
     val boundKept    = constraint.nonParamBounds(pKept).substParam(pRemoved, pKept)
     var boundRemoved = constraint.nonParamBounds(pRemoved).substParam(pRemoved, pKept)
