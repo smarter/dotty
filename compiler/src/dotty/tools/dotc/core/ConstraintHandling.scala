@@ -260,6 +260,7 @@ trait ConstraintHandling {
   private def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
     constr.println(s"unifying $p1 $p2")
     assert(constraint.isLess(p1, p2))
+    constraint = constraint.addLess(p2, p1)
 
     val level1 = constraint.typeVarOfParam(p1).asInstanceOf[TypeVar].nestingLevel
     val level2 = constraint.typeVarOfParam(p2).asInstanceOf[TypeVar].nestingLevel
@@ -282,9 +283,6 @@ trait ConstraintHandling {
       // assert(isSub(lo, hi), s"unify($p1, $p2) but !isSub($lo, $hi)")
       if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
         bound2 = TypeBounds(lo & hi, hi)
-
-    constraint = constraint.asInstanceOf[OrderingConstraint].order(constraint.asInstanceOf[OrderingConstraint], p2, p1, keepParam2 = level1 <= level2)
-    // if level1 != level2 then println(s"~BB($p1, $p2): " + constraint.show)
 
     val down = constraint.exclusiveLower(p2, p1)
     val up = constraint.exclusiveUpper(p1, p2)
