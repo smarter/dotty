@@ -605,9 +605,7 @@ trait Inferencing { this: Typer =>
           if tvar.nestingLevel < ctx.nestingLevel then
             typr.println(i"skip $tvar (${if vs(tvar) != null then vs(tvar) else ""}) in $state")
           // is the state.reporter.hasUnreportedErrors even needed anymore?
-          if !tvar.isInstantiated && constraint.contains(tvar) && (tvar.nestingLevel >= ctx.nestingLevel) &&
-             (!state.reporter.hasUnreportedErrors || tvar.nestingLevel > ctx.nestingLevel) then
-
+          if !tvar.isInstantiated && constraint.contains(tvar) && tvar.nestingLevel >= ctx.nestingLevel then
             constrainIfDependentParamRef(tvar, tree)
             // Needs to be checked again, since previous interpolations could already have
             // instantiated `tvar` through unification.
