@@ -277,7 +277,7 @@ trait ConstraintHandling {
     var boundRemoved = constraint.nonParamBounds(pRemoved).substParam(pRemoved, pKept)
 
     if level1 != level2 then
-      boundRemoved = avoidNested(boundRemoved, if useNecessaryEither then 1 else -1, level1, "")
+      boundRemoved = avoidNested(boundRemoved, if useNecessaryEither then 1 else -1, math.min(level1, level2), "")
       val TypeBounds(lo, hi) = boundRemoved
       if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
         boundRemoved = TypeBounds(lo & hi, hi)
