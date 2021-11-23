@@ -89,19 +89,23 @@ trait ConstraintHandling {
   // Move to ProtoTypes? or to TypeVar#withLevel? but this calls addLess so
   // kind of makes sense here.
   // ... but in TypeVar means we could mutate if this is safe as an optimization
-  def atLevel(maxLevel: Int, tvar: TypeVar)(using Context): TypeVar =
+  /** If `tvar` is nested deeper than `maxLevel`, try to instantiate it to a
+   *  fresh type variable of level `maxLevel` and return the fresh
+   *  variable. If this is not possible, return NoType instead.
+   */
+  def atLevel(maxLevel: Int, tvar: TypeVar)(using Context): Type =
     if tvar.nestingLevel <= maxLevel then return tvar
-    val newVar = newTypeVar(TypeBounds.upper(tvar.kindTop), NameKinds.AvoidSameNameKind(tvar.origin.paramName.toTermName).toTypeName, nestingLevel = maxLevel)
-    val ok =
-      addLess(newVar.origin, tvar.origin) &&
-      addLess(tvar.origin, newVar.origin)
-    if !ok then
-      throw new TypeError(i"Could not decrease the nesting level of ${tvar.origin} from ${tvar.nestingLevel} to $maxLevel in $constraint")
-    newVar
+    val name = NameKinds.AvoidSameNameKind(tvar.origin.paramName.toTermName).toTypeName
+    val freshVar = newTypeVar(TypeBounds.upper(tvar.kindTop), name, nestingLevel = maxLevel)
+    if addLess(freshVar.origin, tvar.origin) && addLess(tvar.origin, freshVar.origin) then
+      freshVar
+    else
+      // tvar.instantiate(...)
+      NoType
 
   def atLevel(maxLevel: Int, param: TypeParamRef)(using Context): TypeParamRef =
     constraint.typeVarOfParam(param) match
-      case tvar: TypeVar if tvar.nestingLevel > maxLevel =>
+      case tvar: TypeVar =>
         atLevel(maxLevel, tvar).origin
       case _ =>
         param
@@ -111,6 +115,8 @@ trait ConstraintHandling {
   def fullLowerBound(param: TypeParamRef, maxLevel: Int = Int.MaxValue)(using Context): Type =
     var loParams = constraint.minLower(param)
     if maxLevel != Int.MaxValue then
+      val correct = atLevel(maxLevel, lo)
+      if !correct.exists then avoidNested(lo.instantiate(fromBelow = false), 1)
       loParams = loParams.mapConserve(atLevel(maxLevel, _))
     loParams.foldLeft(nonParamBounds(param).lo)(_ | _)
 
@@ -184,7 +190,7 @@ trait ConstraintHandling {
           var isUpper = variance >= 0
           makeVar(tp, isUpper = isUpper)
         else
-          atLevel(maxLevel, tp)
+          atLevel(maxLevel, tp).orElse(emptyRange)
       // TypeParamRef can occur in tl bounds
       case tp: TypeParamRef =>
         constraint.typeVarOfParam(tp) match
