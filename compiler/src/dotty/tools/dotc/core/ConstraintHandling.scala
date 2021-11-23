@@ -86,37 +86,22 @@ trait ConstraintHandling {
     case tv: TypeVar => tv.nestingLevel
     case _ => Int.MaxValue
 
-  // Move to ProtoTypes? or to TypeVar#withLevel? but this calls addLess so
-  // kind of makes sense here.
-  // ... but in TypeVar means we could mutate if this is safe as an optimization
-  /** If `tvar` is nested deeper than `maxLevel`, try to instantiate it to a
-   *  fresh type variable of level `maxLevel` and return the fresh
-   *  variable. If this is not possible, return NoType instead.
+  /** If `param` is nested deeper than `maxLevel`, instantiate it to a fresh type
+   *  variable of level `maxLevel` and return the new variable. XXX
    */
-  def atLevel(maxLevel: Int, tvar: TypeVar)(using Context): Type =
-    if tvar.nestingLevel <= maxLevel then return tvar
-    val name = NameKinds.AvoidSameNameKind(tvar.origin.paramName.toTermName).toTypeName
-    val freshVar = newTypeVar(TypeBounds.upper(tvar.kindTop), name, nestingLevel = maxLevel)
-    if addLess(freshVar.origin, tvar.origin) && addLess(tvar.origin, freshVar.origin) then
-      freshVar
-    else
-      // tvar.instantiate(...)
-      NoType
-
   def atLevel(maxLevel: Int, param: TypeParamRef)(using Context): TypeParamRef =
-    constraint.typeVarOfParam(param) match
-      case tvar: TypeVar =>
-        atLevel(maxLevel, tvar).origin
-      case _ =>
-        param
+    // turn off for gadt constraints?
+    if nestingLevel(param) <= maxLevel then return param
+    LevelAvoidMap(0, maxLevel)(param) match
+      case freshVar: TypeVar => freshVar.origin
+      case _ =>  throw new TypeError(
+      i"Could not decrease the nesting level of ${param} from ${nestingLevel(param)} to $maxLevel in $constraint")
 
   def nonParamBounds(param: TypeParamRef)(using Context): TypeBounds = constraint.nonParamBounds(param)
 
   def fullLowerBound(param: TypeParamRef, maxLevel: Int = Int.MaxValue)(using Context): Type =
     var loParams = constraint.minLower(param)
     if maxLevel != Int.MaxValue then
-      val correct = atLevel(maxLevel, lo)
-      if !correct.exists then avoidNested(lo.instantiate(fromBelow = false), 1)
       loParams = loParams.mapConserve(atLevel(maxLevel, _))
     loParams.foldLeft(nonParamBounds(param).lo)(_ | _)
 
@@ -149,22 +134,21 @@ trait ConstraintHandling {
     def toAvoid(tp: NamedType): Boolean =
       tp.prefix == NoPrefix && !tp.symbol.isStatic && !levelOK(tp.symbol.nestingLevel)
 
-    def makeVar(tp: TypeVar, isUpper: Boolean): TypeVar =
-      val nameKind = if isUpper then NameKinds.AvoidAboveNameKind else NameKinds.AvoidBelowNameKind
+    def makeVar(tp: TypeVar): Type =
+      val nameKind =
+        if variance > 0 then NameKinds.AvoidAboveNameKind
+        else if variance < 0 then NameKinds.AvoidBelowNameKind
+        else NameKinds.AvoidSameNameKind
       val name = nameKind(tp.origin.paramName.toTermName).toTypeName
 
-      // val params = if isUpper then constraint.upper(tp.origin) else constraint.lower(tp.origin)
-      // ++ to search for AvoidSameNameKind in both bounds
-      val params = constraint.upper(tp.origin) ++ constraint.lower(tp.origin)
-      val candidate = params.find(p =>
-        nestingLevel(p) <= maxLevel &&
-        (p.paramName.is(nameKind) || p.paramName.is(NameKinds.AvoidSameNameKind)) && 
-        /*&& p.paramName.exclude(nameKind).toTypeName == tp.origin.paramName*/
-        p.paramName.toTermName.match
-          case Names.DerivedName(u, _) =>
-            u.toTypeName eq tp.origin.paramName
-          case _ => false
-      )
+      val tpName = tp.origin.paramName
+      def findParam(params: List[TypeParamRef]): Option[TypeParamRef] =
+        params.find(p =>
+          nestingLevel(p) <= maxLevel &&
+          p.paramName.exclude(nameKind).exclude(NameKinds.AvoidSameNameKind) == tpName)
+
+      val candidate = findParam(constraint.lower(tp.origin)).orElse(findParam(constraint.upper(tp.origin)))
+
       candidate match
         case Some(cand) =>
           // println("cand: " + cand + " --> " + cand.paramName.exclude(nameKind).toTypeName.debugString)
@@ -173,24 +157,19 @@ trait ConstraintHandling {
         case _ =>
 
       val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel)
-      // No need for assert?
-      if isUpper then
+      if variance >= 0 then
         if !(tp <:< tvar) then
-          throw new TypeError(i"$tp <:< $tvar")
-      else
+          return emptyRange
+      if variance <= 0 then
         if !(tvar <:< tp) then
-          throw new TypeError(i"$tvar <:< $tp")
+          return emptyRange
       tvar
 
     override def apply(tp: Type): Type = tp match
       case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel) =>
         // println(s"REPLACE: $tp")
         // check if there is already avoiding tvar of correct level?
-        if variance != 0 then
-          var isUpper = variance >= 0
-          makeVar(tp, isUpper = isUpper)
-        else
-          atLevel(maxLevel, tp).orElse(emptyRange)
+        makeVar(tp)
       // TypeParamRef can occur in tl bounds
       case tp: TypeParamRef =>
         constraint.typeVarOfParam(tp) match
@@ -229,10 +208,10 @@ trait ConstraintHandling {
           // flip the variance to under-approximate.
           if necessaryConstraintsOnly then variance = -variance
           val approx = new LevelAvoidMap(variance, nestingLevel(param)):
-            override def makeVar(tp: TypeVar, isUpper0: Boolean): TypeVar =
+            override def makeVar(tp: TypeVar): Type =
               // EXPLAIN
-              val isUpper = if necessaryConstraintsOnly then !isUpper0 else isUpper0
-              super.makeVar(tp, isUpper)
+              val v = if necessaryConstraintsOnly then -this.variance else this.variance
+              atVariance(v)(super.makeVar(tp))
           approx(rawBound)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound

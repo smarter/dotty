@@ -621,7 +621,7 @@ trait Inferencing { this: Typer =>
               toInstantiate += ((tvar, v.intValue == 1))
             else
               if tvar.nestingLevel > ctx.nestingLevel then // needed for uninstVars in combination with nestingLevel check above
-                comparing(_.atLevel(ctx.nestingLevel, tvar))
+                comparing(_.atLevel(ctx.nestingLevel, tvar.origin))
               typr.println(i"no interpolation for nonvariant $tvar in $state")
 
         /** Instantiate all type variables in `buf` in the indicated directions.
