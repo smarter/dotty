@@ -4921,6 +4921,7 @@ object Types {
         that
       else if (this.lo frozen_<:< that.lo) && (that.hi frozen_<:< this.hi) then that
       else if (that.lo frozen_<:< this.lo) && (this.hi frozen_<:< that.hi) then this
+      // XX: check that lo <:< hi here?
       else TypeBounds(this.lo | that.lo, this.hi & that.hi)
 
     def | (that: TypeBounds)(using Context): TypeBounds =

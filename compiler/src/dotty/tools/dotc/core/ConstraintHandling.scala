@@ -157,12 +157,16 @@ trait ConstraintHandling {
         case _ =>
 
       val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel)
+      // println("orig: " + constraint.show)
+      // XX: do variance <= 0, like done previously?
       if variance >= 0 then
-        if !(tp <:< tvar) then
+        if !(addLess(tp.origin, tvar.origin)) then
           return emptyRange
+      // println("orig1: " + constraint.show)
       if variance <= 0 then
-        if !(tvar <:< tp) then
+        if !(addLess(tvar.origin, tp.origin)) then
           return emptyRange
+      // println("orig2: " + constraint.show)
       tvar
 
     override def apply(tp: Type): Type = tp match
@@ -330,16 +334,25 @@ trait ConstraintHandling {
     val boundKept    = constraint.nonParamBounds(pKept).substParam(pRemoved, pKept)
     var boundRemoved = constraint.nonParamBounds(pRemoved).substParam(pRemoved, pKept)
 
+    // println(s"bKept: " + boundKept.show)
+    // println(s"bR: " + boundRemoved.show)
     if level1 != level2 then
       boundRemoved = LevelAvoidMap(-1, math.min(level1, level2))(boundRemoved)
-      val TypeBounds(lo, hi) = boundRemoved
-      if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
-        boundRemoved = TypeBounds(lo & hi, hi)
+    // println(s"bR2: " + boundRemoved.show)
 
     val down = constraint.exclusiveLower(p2, p1)
     val up = constraint.exclusiveUpper(p1, p2)
 
-    val newBounds = (boundKept & boundRemoved).bounds
+    var newBounds = (boundKept & boundRemoved).bounds
+
+    // doing this earlier in level1 != level2 not good enough due to TypeBounds#& simplifications
+    {
+      val TypeBounds(lo, hi) = newBounds
+      if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
+        newBounds = TypeBounds(lo & hi, hi)
+    }
+
+    // println(s"newBounds: " + newBounds.show)
     constraint = constraint.updateEntry(pKept, newBounds).replace(pRemoved, pKept)
 
     val lo = newBounds.lo
