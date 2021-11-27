@@ -168,7 +168,7 @@ trait ConstraintHandling {
             else if variance > 0 then
               addLess(tp.origin, tvar.origin)
             else
-              constraint = constraint.addLess(tvar.origin, tp.origin).addLess(tp.origin, tvar.origin)
+              constraint = constraint.addLess(tvar.origin, tp.origin)
               unify(tvar.origin, tp.origin)
           if ok then tvar else emptyRange
 
