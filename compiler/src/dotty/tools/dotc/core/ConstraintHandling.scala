@@ -134,49 +134,49 @@ trait ConstraintHandling {
     def toAvoid(tp: NamedType): Boolean =
       tp.prefix == NoPrefix && !tp.symbol.isStatic && !levelOK(tp.symbol.nestingLevel)
 
-    def makeVar(tp: TypeVar): Type =
+    /** Return a (possibly fresh) type variable of a level no greater than `maxLevel` which is:
+     *  - lower-bounded by `tp` if variance >= 0
+     *  - upper-bounded by `tp` if variance <= 0
+     *  If this isn't possible, return the empty range.
+     */
+    def legalVar(tp: TypeVar): Type =
       val nameKind =
         if variance > 0 then NameKinds.AvoidAboveNameKind
         else if variance < 0 then NameKinds.AvoidBelowNameKind
         else NameKinds.AvoidSameNameKind
       val name = nameKind(tp.origin.paramName.toTermName).toTypeName
 
-      val tpName = tp.origin.paramName
+      /** Returncall `legalVar` has already been called on this type variable  */
       def findParam(params: List[TypeParamRef]): Option[TypeParamRef] =
         params.find(p =>
           nestingLevel(p) <= maxLevel &&
-          p.paramName.exclude(nameKind).exclude(NameKinds.AvoidSameNameKind) == tpName)
+          p.paramName.exclude(nameKind).exclude(NameKinds.AvoidSameNameKind) == tp.origin.paramName)
 
-      val candidate = findParam(constraint.lower(tp.origin)).orElse(findParam(constraint.upper(tp.origin)))
-
-      candidate match
-        case Some(cand) =>
-          // println("cand: " + cand + " --> " + cand.paramName.exclude(nameKind).toTypeName.debugString)
-          // println("base: " + tp + " --> " + tp.origin.paramName.debugString)
-          return constraint.typeVarOfParam(cand).asInstanceOf[TypeVar]
+      findParam(constraint.lower(tp.origin)).orElse(findParam(constraint.upper(tp.origin))) match
+        case Some(param) =>
+          constraint.typeVarOfParam(param)
         case _ =>
-
-      val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel)
-      // println("orig: " + constraint.show)
-      // XX: do variance <= 0, like done previously?
-      // println("orig1: " + constraint.show)
-
-      // ?X >: Inv[? >: local.type <: Singleton]
-      val ok =
-        if variance < 0 then
-          addLess(tvar.origin, tp.origin)
-        else if variance > 0 then
-          addLess(tp.origin, tvar.origin)
-        else
-          constraint = constraint.addLess(tvar.origin, tp.origin).addLess(tp.origin, tvar.origin)
-          unify(tvar.origin, tp.origin)
-      if ok then tvar else emptyRange
+          val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel)
+          // println("orig: " + constraint.show)
+          // XX: do variance <= 0, like done previously?
+          // println("orig1: " + constraint.show)
+    
+          // ?X >: Inv[? >: local.type <: Singleton]
+          val ok =
+            if variance < 0 then
+              addLess(tvar.origin, tp.origin)
+            else if variance > 0 then
+              addLess(tp.origin, tvar.origin)
+            else
+              constraint = constraint.addLess(tvar.origin, tp.origin).addLess(tp.origin, tvar.origin)
+              unify(tvar.origin, tp.origin)
+          if ok then tvar else emptyRange
 
     override def apply(tp: Type): Type = tp match
       case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel) =>
         // println(s"REPLACE: $tp")
         // check if there is already avoiding tvar of correct level?
-        makeVar(tp)
+        legalVar(tp)
       // TypeParamRef can occur in tl bounds
       case tp: TypeParamRef =>
         constraint.typeVarOfParam(tp) match
@@ -215,10 +215,10 @@ trait ConstraintHandling {
           // flip the variance to under-approximate.
           if necessaryConstraintsOnly then variance = -variance
           val approx = new LevelAvoidMap(variance, nestingLevel(param)):
-            override def makeVar(tp: TypeVar): Type =
+            override def legalVar(tp: TypeVar): Type =
               // EXPLAIN
               val v = if necessaryConstraintsOnly then -this.variance else this.variance
-              atVariance(v)(super.makeVar(tp))
+              atVariance(v)(super.legalVar(tp))
           approx(rawBound)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
       val equalBounds = (if isUpper then lo else hi) eq bound
@@ -351,7 +351,7 @@ trait ConstraintHandling {
       //    pre: pRemoved <: pKept
       //         loRemoved <: loKept
       //         loKept <: pKept <: avoid(hiRemoved) & hiKept
-      // is -1 still needed if we avoid doing this avoidance if it was already done in makeVar?
+      // is -1 still needed if we avoid doing this avoidance if it was already done in legalVar?
       boundRemoved = LevelAvoidMap(-1, math.min(level1, level2))(boundRemoved)
       val TypeBounds(lo, hi) = boundRemoved
       if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
