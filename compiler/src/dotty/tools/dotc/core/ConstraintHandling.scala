@@ -159,15 +159,18 @@ trait ConstraintHandling {
       val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel)
       // println("orig: " + constraint.show)
       // XX: do variance <= 0, like done previously?
-      if variance >= 0 then
-        if !(addLess(tp.origin, tvar.origin)) then
-          return emptyRange
       // println("orig1: " + constraint.show)
-      if variance <= 0 then
-        if !(addLess(tvar.origin, tp.origin)) then
-          return emptyRange
-      // println("orig2: " + constraint.show)
-      tvar
+
+      // ?X >: Inv[? >: local.type <: Singleton]
+      val ok =
+        if variance < 0 then
+          addLess(tvar.origin, tp.origin)
+        else if variance > 0 then
+          addLess(tp.origin, tvar.origin)
+        else
+          constraint = constraint.addLess(tvar.origin, tp.origin).addLess(tp.origin, tvar.origin)
+          unify(tvar.origin, tp.origin)
+      if ok then tvar else emptyRange
 
     override def apply(tp: Type): Type = tp match
       case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel) =>
@@ -334,23 +337,32 @@ trait ConstraintHandling {
     val boundKept    = constraint.nonParamBounds(pKept).substParam(pRemoved, pKept)
     var boundRemoved = constraint.nonParamBounds(pRemoved).substParam(pRemoved, pKept)
 
+    // println("ctx: " + constraint.show)
     // println(s"bKept: " + boundKept.show)
     // println(s"bR: " + boundRemoved.show)
     if level1 != level2 then
+      // if level1 < level2 then
+      //   pre: pKept <: pRemoved
+      //        loKept <: pKept <: pRemoved <: hiRemoved
+      //                  pKept <: hiRemoved
+      //                  pKept <: hiKept <: hiRemoved
+      //        loKept | avoid(loRemoved) <: pKept <: hiKept
+      // if level1 > level2 then
+      //    pre: pRemoved <: pKept
+      //         loRemoved <: loKept
+      //         loKept <: pKept <: avoid(hiRemoved) & hiKept
+      // is -1 still needed if we avoid doing this avoidance if it was already done in makeVar?
       boundRemoved = LevelAvoidMap(-1, math.min(level1, level2))(boundRemoved)
+      val TypeBounds(lo, hi) = boundRemoved
+      if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
+        boundRemoved = TypeBounds(lo & hi, hi)
     // println(s"bR2: " + boundRemoved.show)
 
     val down = constraint.exclusiveLower(p2, p1)
     val up = constraint.exclusiveUpper(p1, p2)
 
-    var newBounds = (boundKept & boundRemoved).bounds
-
-    // doing this earlier in level1 != level2 not good enough due to TypeBounds#& simplifications
-    {
-      val TypeBounds(lo, hi) = newBounds
-      if !isSub(lo, hi) then // testcase: tests/pos/i8900-uninst-inv.scala
-        newBounds = TypeBounds(lo & hi, hi)
-    }
+    val newBounds = (boundKept & boundRemoved).bounds
+    // println("new: " + newBounds.show)
 
     // println(s"newBounds: " + newBounds.show)
     constraint = constraint.updateEntry(pKept, newBounds).replace(pRemoved, pKept)
