@@ -150,7 +150,12 @@ trait ConstraintHandling {
       def findParam(params: List[TypeParamRef]): Option[TypeParamRef] =
         params.find(p =>
           nestingLevel(p) <= maxLevel &&
-          p.paramName.exclude(nameKind).exclude(NameKinds.AvoidSameNameKind) == tp.origin.paramName)
+          p.paramName.toTermName.match
+            case Names.DerivedName(u, i) =>
+              (i.kind == nameKind || i.kind == NameKinds.AvoidSameNameKind) &&
+              u == tp.origin.paramName.toTermName
+            case _ =>
+              false)
 
       findParam(constraint.lower(tp.origin)).orElse(findParam(constraint.upper(tp.origin))) match
         case Some(param) =>
