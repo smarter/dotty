@@ -153,7 +153,8 @@ trait ConstraintHandling {
           p.paramName.toTermName.match
             case Names.DerivedName(u, i) =>
               (i.kind == nameKind || i.kind == NameKinds.AvoidSameNameKind) &&
-              u == tp.origin.paramName.toTermName
+              // u == tp.origin.paramName.toTermName
+              p.binder.resultType == tp.origin
             case _ =>
               false)
 
@@ -161,7 +162,7 @@ trait ConstraintHandling {
         case Some(param) =>
           constraint.typeVarOfParam(param)
         case _ =>
-          val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel)
+          val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel, represents = tp.origin)
           // println("orig: " + constraint.show)
           // XX: do variance <= 0, like done previously?
           // println("orig1: " + constraint.show)
