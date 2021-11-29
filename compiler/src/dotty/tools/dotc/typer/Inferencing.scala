@@ -682,26 +682,26 @@ trait Inferencing { this: Typer =>
    *  type if necessary to make it a Singleton.
    */
   private def constrainIfDependentParamRef(tvar: TypeVar, call: Tree)(using Context): Unit =
-    representedParamRef(tvar) match
-      case ref: TermParamRef =>
-
-        def findArg(tree: Tree)(using Context): Tree = tree match
-          case Apply(fn, args) =>
-            if fn.tpe.widen eq ref.binder then
-              if ref.paramNum < args.length then args(ref.paramNum)
-              else EmptyTree
-            else findArg(fn)
-          case TypeApply(fn, _) => findArg(fn)
-          case Block(_, expr) => findArg(expr)
-          case Inlined(_, _, expr) => findArg(expr)
-          case _ => EmptyTree
-
-        val arg = findArg(call)
-        if !arg.isEmpty then
-          var argType = arg.tpe.widenIfUnstable
-          if !argType.isSingleton then argType = SkolemType(argType)
-          argType <:< tvar
-      case _ =>
+    if tvar.origin.paramName.is(NameKinds.DepParamName) then
+      representedParamRef(tvar.origin) match
+        case ref: TermParamRef =>
+          def findArg(tree: Tree)(using Context): Tree = tree match
+            case Apply(fn, args) =>
+              if fn.tpe.widen eq ref.binder then
+                if ref.paramNum < args.length then args(ref.paramNum)
+                else EmptyTree
+              else findArg(fn)
+            case TypeApply(fn, _) => findArg(fn)
+            case Block(_, expr) => findArg(expr)
+            case Inlined(_, _, expr) => findArg(expr)
+            case _ => EmptyTree
+    
+          val arg = findArg(call)
+          if !arg.isEmpty then
+            var argType = arg.tpe.widenIfUnstable
+            if !argType.isSingleton then argType = SkolemType(argType)
+            argType <:< tvar
+        case _ =>
   end constrainIfDependentParamRef
 }
 

@@ -10,7 +10,7 @@ import Flags._
 import config.Config
 import config.Printers.typr
 import reporting.trace
-import typer.ProtoTypes.newTypeVar
+import typer.ProtoTypes.{newTypeVar, representedParamRef}
 import StdNames.tpnme
 import UnificationDirection.*
 
@@ -140,43 +140,36 @@ trait ConstraintHandling {
      *  If this isn't possible, return the empty range.
      */
     def legalVar(tp: TypeVar): Type =
+      val oldParam = tp.origin
       val nameKind =
         if variance > 0 then NameKinds.AvoidAboveNameKind
         else if variance < 0 then NameKinds.AvoidBelowNameKind
         else NameKinds.AvoidSameNameKind
-      val name = nameKind(tp.origin.paramName.toTermName).toTypeName
 
-      /** Returncall `legalVar` has already been called on this type variable  */
+      /** If an existing variable was created in a previous call to `legalVar(tp)`
+       *  with the appropriate level and variance, return it.
+       */
       def findParam(params: List[TypeParamRef]): Option[TypeParamRef] =
         params.find(p =>
-          nestingLevel(p) <= maxLevel &&
-          p.paramName.toTermName.match
-            case Names.DerivedName(u, i) =>
-              (i.kind == nameKind || i.kind == NameKinds.AvoidSameNameKind) &&
-              // u == tp.origin.paramName.toTermName
-              p.binder.resultType == tp.origin
-            case _ =>
-              false)
+          nestingLevel(p) <= maxLevel && representedParamRef(p) == oldParam &&
+          (p.paramName.is(NameKinds.AvoidSameNameKind) ||
+           variance != 0 && p.paramName.is(nameKind)))
 
-      findParam(constraint.lower(tp.origin)).orElse(findParam(constraint.upper(tp.origin))) match
+      findParam(constraint.lower(oldParam)).orElse(findParam(constraint.upper(oldParam))) match
         case Some(param) =>
           constraint.typeVarOfParam(param)
         case _ =>
-          val tvar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel, represents = tp.origin)
-          // println("orig: " + constraint.show)
-          // XX: do variance <= 0, like done previously?
-          // println("orig1: " + constraint.show)
-    
-          // ?X >: Inv[? >: local.type <: Singleton]
+          val name = nameKind(oldParam.paramName.toTermName).toTypeName
+          val freshVar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel, represents = oldParam)
           val ok =
             if variance < 0 then
-              addLess(tvar.origin, tp.origin)
+              addLess(freshVar.origin, oldParam)
             else if variance > 0 then
-              addLess(tp.origin, tvar.origin)
+              addLess(oldParam, freshVar.origin)
             else
-              constraint = constraint.addLess(tvar.origin, tp.origin)
-              unify(tvar.origin, tp.origin)
-          if ok then tvar else emptyRange
+              unify(freshVar.origin, oldParam)
+          if ok then freshVar else emptyRange
+    end legalVar
 
     override def apply(tp: Type): Type = tp match
       case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel) =>
@@ -331,7 +324,8 @@ trait ConstraintHandling {
    */
   private def unify(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
     constr.println(s"unifying $p1 $p2")
-    assert(constraint.isLess(p1, p2))
+    if !constraint.isLess(p1, p2) then
+      constraint = constraint.addLess(p1, p2)
 
     val level1 = nestingLevel(p1)
     val level2 = nestingLevel(p2)
