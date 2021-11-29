@@ -146,8 +146,8 @@ trait ConstraintHandling {
         else if variance < 0 then NameKinds.AvoidBelowNameKind
         else NameKinds.AvoidSameNameKind
 
-      /** If an existing variable was created in a previous call to `legalVar(tp)`
-       *  with the appropriate level and variance, return it.
+      /** If it exists, return the first param in the list created in a previous call to `legalVar(tp)`
+       *  with the appropriate level and variance.
        */
       def findParam(params: List[TypeParamRef]): Option[TypeParamRef] =
         params.find(p =>
@@ -155,12 +155,17 @@ trait ConstraintHandling {
           (p.paramName.is(NameKinds.AvoidSameNameKind) ||
            variance != 0 && p.paramName.is(nameKind)))
 
+      // First, check if we can reuse an existing parameter, this is more than an optimization
+      // since it avoids an infinite loop in tests/pos/rectvar.scala
       findParam(constraint.lower(oldParam)).orElse(findParam(constraint.upper(oldParam))) match
         case Some(param) =>
           constraint.typeVarOfParam(param)
         case _ =>
+          // Otherwise, try to return a fresh type variable at `maxLevel` with
+          // the appropriate constraints.
           val name = nameKind(oldParam.paramName.toTermName).toTypeName
-          val freshVar = newTypeVar(TypeBounds.upper(tp.kindTop), name, nestingLevel = maxLevel, represents = oldParam)
+          val freshVar = newTypeVar(TypeBounds.upper(tp.kindTop), name,
+            nestingLevel = maxLevel, represents = oldParam)
           val ok =
             if variance < 0 then
               addLess(freshVar.origin, oldParam)
@@ -173,19 +178,14 @@ trait ConstraintHandling {
 
     override def apply(tp: Type): Type = tp match
       case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel) =>
-        // println(s"REPLACE: $tp")
-        // check if there is already avoiding tvar of correct level?
         legalVar(tp)
       // TypeParamRef can occur in tl bounds
       case tp: TypeParamRef =>
         constraint.typeVarOfParam(tp) match
           case tvar: TypeVar =>
             apply(tvar)
-            // val tvar2 = apply(tvar).asInstanceOf[TypeVar]
-            // if tvar2 ne tvar then tvar2.origin else tp
           case _ => super.apply(tp)
       case _ =>
-        // println(s"#KEEP: $tp")
         super.apply(tp)
 
     override def mapWild(t: WildcardType) =
