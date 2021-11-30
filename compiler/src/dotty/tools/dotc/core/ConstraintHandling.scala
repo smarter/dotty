@@ -178,7 +178,7 @@ trait ConstraintHandling {
 
     override def apply(tp: Type): Type = tp match
       case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel) =>
-        legalVar(tp)
+        atVariance(0)(legalVar(tp))
       // TypeParamRef can occur in tl bounds
       case tp: TypeParamRef =>
         constraint.typeVarOfParam(tp) match
