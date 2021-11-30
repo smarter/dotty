@@ -216,7 +216,7 @@ trait ConstraintHandling {
           val approx = new LevelAvoidMap(variance, nestingLevel(param)):
             override def legalVar(tp: TypeVar): Type =
               // EXPLAIN
-              val v = if necessaryConstraintsOnly then -this.variance else this.variance
+              val v = if necessaryConstraintsOnly then 0 /*-this.variance*/ else this.variance
               atVariance(v)(super.legalVar(tp))
           approx(rawBound)
       val oldBounds @ TypeBounds(lo, hi) = constraint.nonParamBounds(param)
