@@ -959,14 +959,14 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   /** Read an annotation argument, which is pickled either
    *  as a Constant or a Tree.
    */
-  protected def readAnnotArg(i: Int)(using Context): untpd.Tree = bytes(index(i)) match {
-    case TREE => at(i, () => untpd.TypedSplice(readTree()))
+  protected def readAnnotArg(i: Int)(using Context): untpd.Tree = untpd.TypedSplice(bytes(index(i)) match {
+    case TREE => at(i, () => readTree())
     case _ => at(i, () =>
       readConstant() match
-        case c: Constant => untpd.Literal(c)
-        case tp: TermRef => untpd.TypedSplice(ref(tp))
+        case c: Constant => Literal(c)
+        case tp: TermRef => ref(tp)
     )
-  }
+  })
 
   /** Read a ClassfileAnnotArg (argument to a classfile annotation)
    */
