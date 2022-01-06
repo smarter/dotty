@@ -959,14 +959,14 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   /** Read an annotation argument, which is pickled either
    *  as a Constant or a Tree.
    */
-  protected def readAnnotArg(i: Int)(using Context): untpd.Tree = untpd.TypedSplice(bytes(index(i)) match {
+  protected def readAnnotArg(i: Int)(using Context): untpd.Tree = untpd.TypedSplice(bytes(index(i)) match
     case TREE => at(i, () => readTree())
     case _ => at(i, () =>
       readConstant() match
         case c: Constant => Literal(c)
         case tp: TermRef => ref(tp)
     )
-  })
+  )
 
   /** Read a ClassfileAnnotArg (argument to a classfile annotation)
    */
@@ -979,14 +979,14 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
       untpd.TypeTree())
   }
 
-  private def readAnnotInfoArg()(using Context): Tree = {
+  private def readAnnotInfoArg()(using Context): untpd.Tree = untpd.TypedSplice {
     readByte() // skip the `annotinfo` tag
     val end = readNat() + readIndex
     readAnnotationContents(end)
   }
 
   protected def readClassfileAnnotArg(i: Int)(using Context): untpd.Tree = bytes(index(i)) match {
-    case ANNOTINFO => at(i, () => untpd.TypedSplice(readAnnotInfoArg()))
+    case ANNOTINFO => at(i, () => readAnnotInfoArg())
     case ANNOTARGARRAY => at(i, () => readArrayAnnotArg())
     case _ => readAnnotArg(i)
   }
