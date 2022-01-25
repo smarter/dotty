@@ -48,10 +48,11 @@ object ProtoTypes {
         // println("const: " + ctx.typerState.constraint.show)
         // println("view from: " + tpn.show)
         // println("to: " + pt.show)
-        // val v = viewExists(tpn, pt)
+        // Thread.dumpStack
+        val v = viewExists(tpn, pt)
         // println("v: " + v)
-        // v
-        false
+        v
+        // false
       }
 
     /** Test compatibility after normalization.

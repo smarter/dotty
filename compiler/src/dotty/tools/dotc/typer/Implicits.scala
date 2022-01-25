@@ -999,7 +999,12 @@ trait Implicits:
             (searchCtx.scope eq ctx.scope) && (searchCtx.owner eq ctx.owner.owner)
           do ()
 
-        try ImplicitSearch(pt, argument, span)(using searchCtx).bestImplicit
+        try
+          val i = ImplicitSearch(pt, argument, span)(using searchCtx)
+          // println(s"##search implicit ${pt.show}, arg = ${argument.show}: ${argument.tpe.show}; w = ${i.wildProto}")
+          // println("all: " + ctx.implicits)
+          // println(s"%%${ctx.implicits.eligible(i.wildProto)}")
+          i.bestImplicit
         catch case ce: CyclicReference =>
           ce.inImplicitSearch = true
           throw ce

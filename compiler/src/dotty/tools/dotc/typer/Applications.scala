@@ -435,7 +435,9 @@ trait Applications extends Compatibility {
       case methType: MethodType =>
         // apply the result type constraint, unless method type is dependent
         val resultApprox = resultTypeApprox(methType)
-        if (!constrainResult(methRef.symbol, resultApprox, resultType))
+        val obj: Compatibility = if (ctx.typerState.isCommittable) NoViewsAllowed else Applications.this
+
+        if (!obj.constrainResult(methRef.symbol, resultApprox, resultType))
           if (ctx.typerState.isCommittable)
             // defer the problem until after the application;
             // it might be healed by an implicit conversion
