@@ -61,7 +61,6 @@ object Implicits:
   /** An eligible implicit candidate, consisting of an implicit reference and a nesting level */
   case class Candidate(implicitRef: ImplicitRef, kind: Candidate.Kind, level: Int) extends RefAndLevel {
     def ref: TermRef = implicitRef.underlyingRef
-
     def isExtension = (kind & Candidate.Extension) != 0
     def isConversion = (kind & Candidate.Conversion) != 0
   }
@@ -1167,6 +1166,8 @@ trait Implicits:
       */
     def tryImplicit(cand: Candidate, contextual: Boolean): SearchResult =
       if checkDivergence(cand) then
+        // println("diverged: " + cand)
+        // println("history: " + ctx.searchHistory)
         SearchFailure(new DivergingImplicit(cand.ref, wideProto, argument), span)
       else if searchTooLarge() then
         ImplicitSearchTooLargeFailure
@@ -1174,6 +1175,9 @@ trait Implicits:
         val history = ctx.searchHistory.nest(cand, pt)
         val typingCtx =
           nestedContext().setNewTyperState().setFreshGADTBounds.setSearchHistory(history)
+        // println("cand: " + cand)
+        // println("pt: " + pt.show)
+        // println("argument: " + argument.show)
         val result = typedImplicit(cand, pt, argument, span)(using typingCtx)
         result match
           case res: SearchSuccess =>

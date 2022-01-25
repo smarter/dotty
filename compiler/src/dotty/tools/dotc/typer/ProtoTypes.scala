@@ -44,7 +44,15 @@ object ProtoTypes {
      */
     def necessarilyCompatible(tp: Type, pt: Type)(using Context): Boolean =
       val tpn = normalize(tp, pt, followIFT = !defn.isContextFunctionType(pt))
-      necessarySubType(tpn, pt) || tpn.isValueSubType(pt) || viewExists(tpn, pt)
+      necessarySubType(tpn, pt) || tpn.isValueSubType(pt) || {
+        // println("const: " + ctx.typerState.constraint.show)
+        // println("view from: " + tpn.show)
+        // println("to: " + pt.show)
+        // val v = viewExists(tpn, pt)
+        // println("v: " + v)
+        // v
+        false
+      }
 
     /** Test compatibility after normalization.
      *  If `keepConstraint` is false, the current constraint set will not be modified by this call.
