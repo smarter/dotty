@@ -145,20 +145,19 @@ class ClassfileParser(
         // println("#classRoot: " + classRoot)
         // println("#outerName: " + outerName)
         val outerSym = classNameToSymbol(outerName)
-        // println("#outerSym: " + outerSym.denot.infoOrCompleter)
-        outerSym match
+        outerSym.denot.infoOrCompleter match
+          // If the outer class C cannot be found, look for a top-level class C$D
+          case _: StubInfo =>
+            lookupTopLevel()
           // We have a java-defined class name C$D and look for a member D of C. But we don't know if
           // D is declared static or not, so we have to search both in class C and its companion.
-          case outerSym: ClassSymbol =>
-            // TODO: we need a non ClassSymbol "Symbol" of  outerSym, to test if it is a class symbol or not
-            // TODO: maybe a way to go from Name to Symbol?
-            // Note: use symbol.asClass when needed
+          case _ =>
             val innerName = innerNameStr.toTypeName
             val r =
               if outerSym eq classRoot.symbol then
                 instanceScope.lookup(innerName).orElse(staticScope.lookup(innerName))
               else
-                outerSym.info.member(innerName).orElse(outerSym.companionModule.info.member(innerName)).symbol
+                outerSym.info.member(innerName).orElse(outerSym.asClass.companionModule.info.member(innerName)).symbol
             r.orElse(lookupTopLevel())
           //   staticRef(outerName).requiredSymbol("class", outerName)(_.isClass) match
           //     case owner: ClassSymbol => staticScope.lookup(innerName) match
@@ -166,8 +165,6 @@ class ClassfileParser(
           //       case _ => requiredClass(localizedName).copy(owner = owner) // instanceScope.lookup(innerName)
           //     case _ =>
           //        requiredClass(localizedName).copy(owner = owner) // TODO: not sure if this is what we want
-          // // If the outer class C cannot be found, look for a top-level class C$D
-          case _ => lookupTopLevel()
       else
         lookupTopLevel()
       // debugCD(name, (), printErr(s"classNameToSymbol (no inner) name=$name has symbol ${classSym} and loc=${classSym.showLocated}"))
