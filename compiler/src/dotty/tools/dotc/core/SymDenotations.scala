@@ -2299,7 +2299,7 @@ object SymDenotations {
             .installAfter(phase)
       }
 
-    private var myCompanion: Symbol = NoSymbol
+    /*private*/ var myCompanion: Symbol = NoSymbol
 
     /** Register companion class */
     override def registerCompanion(companion: Symbol)(using Context) =

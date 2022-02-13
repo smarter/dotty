@@ -707,11 +707,23 @@ class TreeUnpickler(reader: TastyReader,
      */
     def indexStats(end: Addr)(using Context): FlagSet = {
       var initsFlags = NoInitsInterface
+      var lastCls: Symbol = NoSymbol
       while (currentAddr.index < end.index)
         nextByte match {
           case VALDEF | DEFDEF | TYPEDEF | TYPEPARAM | PARAM =>
             val sym = symbolAtCurrent()
             skipTree()
+
+            if sym.isClass then
+              // println("@sym: " + sym + " " + sym.name.debugString)
+              // println("@lastCls: " + lastCls + " " + lastCls.name.exclude(ModuleClassName).debugString)
+              if !sym.is(Module) then
+                lastCls = sym
+              else if lastCls.name eq sym.name.exclude(ModuleClassName) then
+                // println("registering: " + sym + " " + lastCls)
+                lastCls.registerCompanion(sym)
+                sym.registerCompanion(lastCls)
+
             if (sym.isTerm && !sym.isOneOf(DeferredOrLazyOrMethod))
               initsFlags = EmptyFlags
             else if (sym.isClass ||
@@ -844,16 +856,24 @@ class TreeUnpickler(reader: TastyReader,
           ValDef(tpt)
         case TYPEDEF | TYPEPARAM =>
           if (sym.isClass) {
-            sym.owner.ensureCompleted() // scalacLinkedClass uses unforcedDecls. Make sure it does not miss anything.
-            val companion = sym.scalacLinkedClass
-
-            // Is the companion defined in the same Tasty file as `sym`?
-            // The only case to check here is if `sym` is a root. In this case
-            // `companion` might have been entered by the environment but it might
-            // be missing from the Tasty file. So we check explicitly for that.
-            def isCodefined = roots.contains(companion.denot) == seenRoots.contains(companion)
-
-            if (companion.exists && isCodefined) sym.registerCompanion(companion)
+            if !sym.asClass.myCompanion.exists then
+              sym.owner.ensureCompleted() // scalacLinkedClass uses unforcedDecls. Make sure it does not miss anything.
+              val companion = sym.scalacLinkedClass
+  
+              // Is the companion defined in the same Tasty file as `sym`?
+              // The only case to check here is if `sym` is a root. In this case
+              // `companion` might have been entered by the environment but it might
+              // be missing from the Tasty file. So we check explicitly for that.
+              def isCodefined = roots.contains(companion.denot) == seenRoots.contains(companion)
+  
+              if (companion.exists && isCodefined) {
+                // println(i"sym $sym -- companion: $companion")
+                sym.registerCompanion(companion)
+              } else {
+                // println(i"~~sym $sym -- companion: $companion")
+                // println("r: " + roots.contains(companion.denot))
+                // println("sr: " + seenRoots.contains(companion))
+              }
             TypeDef(readTemplate(using localCtx))
           }
           else {
