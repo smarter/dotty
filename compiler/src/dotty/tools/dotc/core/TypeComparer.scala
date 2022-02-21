@@ -2277,7 +2277,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
    *  ExprType, LambdaType). Also, when forming an `|`,
    *  instantiated TypeVars are dereferenced and annotations are stripped.
    *
-   *  @param isSoft   If the result is a union, this determines whether it's a soft union.
+   *  @param isSoft   If the result is a union, this determines whether it's a soft union,
+   *                  except if the union is distributed inside the type, in which
+   *                  case we always produce a hard union.
    *  @param isErased Apply erasure semantics. If erased is true, instead of creating
    *                  an OrType, the lub will be computed using TypeCreator#erasedLub.
    */
@@ -2288,7 +2290,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       val t2 = distributeOr(tp2, tp1, isSoft)
       if (t2.exists) t2
       else if (isErased) erasedLub(tp1, tp2)
-      else liftIfHK(tp1, tp2, OrType.balanced(_, _, soft = isSoft), _ | _, _ & _)
+      else liftIfHK(tp1, tp2, OrType.balanced(_, _, soft = false), _ | _, _ & _)
     }
   }
 
