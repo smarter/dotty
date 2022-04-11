@@ -79,6 +79,8 @@ class TyperState() {
 
   private var isCommitted: Boolean = _
 
+  var inLazyRef: Boolean = false
+
   /** The set of uninstantiated type variables which have this state as their owning state.
    *
    *  Invariant:
@@ -141,9 +143,19 @@ class TyperState() {
     Stats.record("typerState.commit")
     assert(isCommittable, s"$this is not committable")
     assert(!isCommitted, s"$this is already committed")
+
+    if (constraint eq ctx.typerState.constraint) && reporter.pendingMessages.isEmpty then
+      assert(ownedVars.isEmpty)
+      setCommittable(false)
+      isCommitted = true
+      ctx.typerState.gc() // why is this needed?
+      return
+
     reporter.flush()
     setCommittable(false)
     val targetState = ctx.typerState
+
+    assert(!targetState.inLazyRef, s"#ILR $this ----> $targetState")
 
     // Committing into an already committed TyperState usually doesn't make
     // sense since it means the constraints we're committing won't be propagated

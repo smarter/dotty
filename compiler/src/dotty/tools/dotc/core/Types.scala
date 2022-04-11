@@ -5624,7 +5624,13 @@ object Types {
           LazyRef { refCtx =>
             given Context = refCtx
             val ref1 = tp.ref
-            if refCtx.runId == mapCtx.runId then this(ref1)
+            if refCtx.runId == mapCtx.runId then
+              val savedInLazyRef = mapCtx.typerState.inLazyRef
+              try
+                mapCtx.typerState.inLazyRef = true
+                this(ref1)
+              finally
+                mapCtx.typerState.inLazyRef = savedInLazyRef
             else // splice in new run into map context
               val saved = mapCtx
               mapCtx = mapCtx.fresh
