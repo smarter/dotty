@@ -148,7 +148,8 @@ class TyperState() {
       assert(ownedVars.isEmpty)
       setCommittable(false)
       isCommitted = true
-      ctx.typerState.gc() // why is this needed?
+      // Thread.dumpStack
+      // ctx.typerState.gc() // why is this needed?
       return
 
     reporter.flush()

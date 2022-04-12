@@ -533,7 +533,7 @@ class SpaceEngine(using Context) extends SpaceLogic {
     val mt: MethodType = unapp.widen match {
       case mt: MethodType => mt
       case pt: PolyType   =>
-        inContext(ctx.fresh.setExploreTyperState()) {
+        // inContext(ctx.fresh.setExploreTyperState()) {
           val tvars = pt.paramInfos.map(newTypeVar(_))
           val mt = pt.instantiate(tvars).asInstanceOf[MethodType]
           scrutineeTp <:< mt.paramInfos(0)
@@ -542,7 +542,7 @@ class SpaceEngine(using Context) extends SpaceLogic {
           mt.paramInfos(0) <:< scrutineeTp
           isFullyDefined(mt, ForceDegree.all)
           mt
-        }
+        // }
     }
 
     // Case unapply:
