@@ -81,9 +81,9 @@ trait ConstraintHandling {
     assert(homogenizeArgs == false)
     assert(comparedTypeLambdas == Set.empty)
 
-  def nestingLevel(param: TypeParamRef) = constraint.typeVarOfParam(param) match
+  def nestingLevel(param: TypeParamRef)(using Context) = constraint.typeVarOfParam(param) match
     case tv: TypeVar => tv.nestingLevel
-    case _ => 0//Int.MaxValue
+    case _ => ctx.nestingLevel
 
   /** If `param` is nested deeper than `maxLevel`, try to instantiate it to a
    *  fresh type variable of level `maxLevel` and return the new variable.
@@ -93,8 +93,9 @@ trait ConstraintHandling {
     if nestingLevel(param) <= maxLevel then return param
     LevelAvoidMap(0, maxLevel)(param) match
       case freshVar: TypeVar => freshVar.origin
-      case _ => throw new TypeError(
-        i"Could not decrease the nesting level of ${param} from ${nestingLevel(param)} to $maxLevel in $constraint")
+      case x =>
+        throw new TypeError(
+        i"$x -- Could not decrease the nesting level of ${param} from ${nestingLevel(param)} to $maxLevel")
 
   def nonParamBounds(param: TypeParamRef)(using Context): TypeBounds = constraint.nonParamBounds(param)
 
@@ -107,16 +108,14 @@ trait ConstraintHandling {
   def fullLowerBound(param: TypeParamRef)(using Context): Type =
     val maxLevel = nestingLevel(param)
     var loParams = constraint.minLower(param)
-    if maxLevel != Int.MaxValue then
-      loParams = loParams.mapConserve(atLevel(maxLevel, _))
+    loParams = loParams.mapConserve(atLevel(maxLevel, _))
     loParams.foldLeft(nonParamBounds(param).lo)(_ | _)
 
   /** The full upper bound of `param`, see the documentation of `fullLowerBounds` above. */
   def fullUpperBound(param: TypeParamRef)(using Context): Type =
     val maxLevel = nestingLevel(param)
     var hiParams = constraint.minUpper(param)
-    if maxLevel != Int.MaxValue then
-      hiParams = hiParams.mapConserve(atLevel(maxLevel, _))
+    hiParams = hiParams.mapConserve(atLevel(maxLevel, _))
     hiParams.foldLeft(nonParamBounds(param).hi)(_ & _)
 
   /** Full bounds of `param`, including other lower/upper params.
