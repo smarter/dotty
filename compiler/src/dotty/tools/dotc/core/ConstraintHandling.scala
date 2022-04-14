@@ -90,11 +90,13 @@ trait ConstraintHandling {
    *  If this isn't possible, throw a TypeError.
    */
   def atLevel(maxLevel: Int, param: TypeParamRef)(using Context): TypeParamRef =
-    if nestingLevel(param) <= maxLevel then return param
+    val paramLevel = nestingLevel(param)
+    if paramLevel == Int.MaxValue || paramLevel <= maxLevel then return param
     LevelAvoidMap(0, maxLevel)(param) match
       case freshVar: TypeVar => freshVar.origin
-      case _ => throw new TypeError(
-        i"Could not decrease the nesting level of ${param} from ${nestingLevel(param)} to $maxLevel in $constraint")
+      case _ =>
+        throw new TypeError(
+          i"Could not decrease the nesting level of ${param} from ${nestingLevel(param)} to $maxLevel in $constraint")
 
   def nonParamBounds(param: TypeParamRef)(using Context): TypeBounds = constraint.nonParamBounds(param)
 
