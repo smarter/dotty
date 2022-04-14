@@ -83,7 +83,7 @@ trait ConstraintHandling {
 
   def nestingLevel(param: TypeParamRef) = constraint.typeVarOfParam(param) match
     case tv: TypeVar => tv.nestingLevel
-    case _ => Int.MaxValue
+    case _ => 0//Int.MaxValue
 
   /** If `param` is nested deeper than `maxLevel`, try to instantiate it to a
    *  fresh type variable of level `maxLevel` and return the new variable.
