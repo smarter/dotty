@@ -1017,7 +1017,13 @@ class Namer { typer: Typer =>
           tp
 
       val rhs1 = typedAheadType(rhs)
-      val rhsBodyType: TypeBounds = addVariances(rhs1.tpe).toBounds
+      val rhsBodyType: TypeBounds = addVariances(rhs1.tpe) match
+        case tp: TypeBounds => tp
+        case tp =>
+          if rhs1.isInstanceOf[MatchTypeTree] then
+            MatchAlias(tp)
+          else
+            TypeAlias(tp)
       val unsafeInfo = if (isDerived) rhsBodyType else abstracted(rhsBodyType)
 
       def opaqueToBounds(info: Type): Type =
