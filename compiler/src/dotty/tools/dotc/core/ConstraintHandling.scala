@@ -85,13 +85,18 @@ trait ConstraintHandling {
     case tv: TypeVar => tv.nestingLevel
     case _ => Int.MaxValue
 
+  def levelOK(level: Int, maxLevel: Int)(using Context): Boolean =
+    level <= maxLevel || level == Int.MaxValue ||
+    ctx.isAfterTyper || !ctx.typerState.isCommittable
+
+
   /** If `param` is nested deeper than `maxLevel`, try to instantiate it to a
    *  fresh type variable of level `maxLevel` and return the new variable.
    *  If this isn't possible, throw a TypeError.
    */
   def atLevel(maxLevel: Int, param: TypeParamRef)(using Context): TypeParamRef =
     val paramLevel = nestingLevel(param)
-    if paramLevel == Int.MaxValue || paramLevel <= maxLevel then return param
+    if levelOK(paramLevel, maxLevel) then return param
     LevelAvoidMap(0, maxLevel)(param) match
       case freshVar: TypeVar => freshVar.origin
       case _ =>
@@ -433,7 +438,6 @@ trait ConstraintHandling {
   final def approximation(param: TypeParamRef, fromBelow: Boolean)(using Context): Type =
     constraint.entry(param) match
       case entry: TypeBounds =>
-        val maxLevel = nestingLevel(param)
         val useLowerBound = fromBelow || param.occursIn(entry.hi)
         val inst = if useLowerBound then fullLowerBound(param) else fullUpperBound(param)
         typr.println(s"approx ${param.show}, from below = $fromBelow, inst = ${inst.show}")

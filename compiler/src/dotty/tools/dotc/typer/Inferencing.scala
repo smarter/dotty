@@ -637,7 +637,7 @@ trait Inferencing { this: Typer =>
             else if v.intValue != 0 then
               typr.println(i"interpolate $tvar in $state in $tree: $tp, fromBelow = ${v.intValue == 1}, $constraint")
               toInstantiate += ((tvar, v.intValue == 1))
-            else if tvar.nestingLevel > ctx.nestingLevel then
+            else if !comparing(_.levelOK(tvar.nestingLevel, ctx.nestingLevel)) then
               // Invariant: a type variable of level N can only appear
               // in the type of a tree whose enclosing scope is level <= N.
               typr.println(i"instantiate nonvariant $tvar of level ${tvar.nestingLevel} to a type variable of level <= ${ctx.nestingLevel}, $constraint")
