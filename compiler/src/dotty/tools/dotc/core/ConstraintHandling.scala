@@ -85,6 +85,8 @@ trait ConstraintHandling {
     case tv: TypeVar => tv.nestingLevel
     case _ => Int.MaxValue
 
+  /** Is `level` less than `maxLevel` or always */
+  /** Are we allowed to refer to types of the given `level`? */
   def levelOK(level: Int, maxLevel: Int)(using Context): Boolean =
     level <= maxLevel || level == Int.MaxValue ||
     ctx.isAfterTyper || !ctx.typerState.isCommittable
@@ -142,12 +144,8 @@ trait ConstraintHandling {
   class LevelAvoidMap(topLevelVariance: Int, maxLevel: Int)(using Context) extends TypeOps.AvoidMap:
     variance = topLevelVariance
 
-    /** Are we allowed to refer to types of the given `level`? */
-    private def levelOK(level: Int): Boolean =
-      level <= maxLevel || ctx.isAfterTyper || !ctx.typerState.isCommittable
-
     def toAvoid(tp: NamedType): Boolean =
-      tp.prefix == NoPrefix && !tp.symbol.isStatic && !levelOK(tp.symbol.nestingLevel)
+      tp.prefix == NoPrefix && !tp.symbol.isStatic && !levelOK(tp.symbol.nestingLevel, maxLevel)
 
     /** Return a (possibly fresh) type variable of a level no greater than `maxLevel` which is:
      *  - lower-bounded by `tp` if variance >= 0
@@ -192,7 +190,7 @@ trait ConstraintHandling {
     end legalVar
 
     override def apply(tp: Type): Type = tp match
-      case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel) =>
+      case tp: TypeVar if !tp.isInstantiated && !levelOK(tp.nestingLevel, maxLevel) =>
         legalVar(tp)
       // TypeParamRef can occur in tl bounds
       case tp: TypeParamRef =>
