@@ -85,20 +85,18 @@ trait ConstraintHandling {
     case tv: TypeVar => tv.nestingLevel
     case _ => Int.MaxValue
 
-  /** Is `level` less than `maxLevel` or always */
-  /** Are we allowed to refer to types of the given `level`? */
+  /** Is `level` <= `maxLevel` or always legal in the current context? */
   def levelOK(level: Int, maxLevel: Int)(using Context): Boolean =
     level <= maxLevel || level == Int.MaxValue ||
     ctx.isAfterTyper || !ctx.typerState.isCommittable
-
 
   /** If `param` is nested deeper than `maxLevel`, try to instantiate it to a
    *  fresh type variable of level `maxLevel` and return the new variable.
    *  If this isn't possible, throw a TypeError.
    */
   def atLevel(maxLevel: Int, param: TypeParamRef)(using Context): TypeParamRef =
-    val paramLevel = nestingLevel(param)
-    if levelOK(paramLevel, maxLevel) then return param
+    if levelOK(nestingLevel(param), maxLevel) then
+      return param
     LevelAvoidMap(0, maxLevel)(param) match
       case freshVar: TypeVar => freshVar.origin
       case _ =>
