@@ -137,7 +137,7 @@ trait ConstraintHandling {
   /** An approximating map that prevents types nested deeper than maxLevel as
    *  well as WildcardTypes from leaking into the constraint.
    *  Note that level-checking is turned off after typer and in uncommitable
-   *  TyperState since these leaks should be safe.
+   *  TyperState since these leaks should be safe. <== move to levelOK (rename it to levelCheck?)
    */
   class LevelAvoidMap(topLevelVariance: Int, maxLevel: Int)(using Context) extends TypeOps.AvoidMap:
     variance = topLevelVariance
