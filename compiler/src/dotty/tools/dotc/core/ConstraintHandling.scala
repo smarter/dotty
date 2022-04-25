@@ -82,10 +82,10 @@ trait ConstraintHandling {
     assert(homogenizeArgs == false)
     assert(comparedTypeLambdas == Set.empty)
 
-  def nestingLevel(param: TypeParamRef) = constraint.typeVarOfParam(param) match
+  def nestingLevel(param: TypeParamRef)(using Context) = constraint.typeVarOfParam(param) match
     case tv: TypeVar => tv.nestingLevel
     case _ =>
-      assert(reducingMatchType, i"$param -- ${param.binder} -- $constraint")
+      assert(reducingMatchType || ctx.isAfterTyper || !ctx.typerState.isCommittable, i"$param -- ${param.binder} -- $constraint")
       Int.MaxValue
 
   /** Is `level` <= `maxLevel` or always legal in the current context? */
