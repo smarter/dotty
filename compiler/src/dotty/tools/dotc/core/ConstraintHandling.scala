@@ -25,6 +25,7 @@ import NameKinds.AvoidNameKind
  * Constraint handlers update the current constraint as a side effect.
  */
 trait ConstraintHandling {
+  var reducingMatchType: Boolean = false
 
   def constr: config.Printers.Printer = config.Printers.constr
 
@@ -83,7 +84,9 @@ trait ConstraintHandling {
 
   def nestingLevel(param: TypeParamRef) = constraint.typeVarOfParam(param) match
     case tv: TypeVar => tv.nestingLevel
-    case _ => Int.MaxValue
+    case _ =>
+      assert(reducingMatchType, i"$param -- ${param.binder} -- $constraint")
+      Int.MaxValue
 
   /** Is `level` <= `maxLevel` or always legal in the current context? */
   def levelOK(level: Int, maxLevel: Int)(using Context): Boolean =
