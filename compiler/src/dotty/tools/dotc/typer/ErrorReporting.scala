@@ -245,9 +245,9 @@ class ImplicitSearchError(
   paramSymWithMethodCallTree: Option[(Symbol, tpd.Tree)] = None,
   ignoredInstanceNormalImport: => Option[SearchSuccess],
   importSuggestionAddendum: => String
-)(using ctx: Context) {
+) {
 
-  def missingArgMsg = arg.tpe match {
+  def missingArgMsg(using Context) = arg.tpe match {
     case ambi: AmbiguousImplicits =>
       (ambi.alt1, ambi.alt2) match {
         case (alt @ AmbiguousImplicitMsg(msg), _) =>
@@ -266,7 +266,7 @@ class ImplicitSearchError(
       ++ ErrorReporting.matchReductionAddendum(pt)
   }
 
-  private def formatMsg(shortForm: String)(headline: String = shortForm) = arg match {
+  private def formatMsg(shortForm: String)(headline: String = shortForm)(using Context) = arg match {
     case arg: Trees.SearchFailureIdent[?] =>
       shortForm
     case _ =>
@@ -285,7 +285,7 @@ class ImplicitSearchError(
       }
   }
 
-  private def userDefinedErrorString(raw: String, paramNames: List[String], args: List[Type]): String = {
+  private def userDefinedErrorString(raw: String, paramNames: List[String], args: List[Type])(using Context): String = {
     def translate(name: String): Option[String] = {
       val idx = paramNames.indexOf(name)
       if (idx >= 0) Some(ex"${args(idx)}") else None
@@ -299,25 +299,25 @@ class ImplicitSearchError(
   /** Extract a user defined error message from a symbol `sym`
    *  with an annotation matching the given class symbol `cls`.
    */
-  private def userDefinedMsg(sym: Symbol, cls: Symbol) = for {
+  private def userDefinedMsg(sym: Symbol, cls: Symbol)(using Context) = for {
     ann <- sym.getAnnotation(cls)
     msg <- ann.argumentConstantString(0)
   } yield msg
 
   private def location(preposition: String) = if (where.isEmpty) "" else s" $preposition $where"
 
-  private def defaultAmbiguousImplicitMsg(ambi: AmbiguousImplicits) =
+  private def defaultAmbiguousImplicitMsg(ambi: AmbiguousImplicits)(using Context) =
     formatMsg(s"ambiguous given instances: ${ambi.explanation}${location("of")}")(
       s"ambiguous given instances of type ${pt.show} found${location("for")}"
     )
 
-  private def defaultImplicitNotFoundMessage =
+  private def defaultImplicitNotFoundMessage(using Context) =
     ex"no given instance of type $pt was found${location("for")}"
 
   /** Construct a custom error message given an ambiguous implicit
    *  candidate `alt` and a user defined message `raw`.
    */
-  private def userDefinedAmbiguousImplicitMsg(alt: SearchSuccess, raw: String) = {
+  private def userDefinedAmbiguousImplicitMsg(alt: SearchSuccess, raw: String)(using Context): String = {
     val params = alt.ref.underlying match {
       case p: PolyType => p.paramNames.map(_.toString)
       case _           => Nil
@@ -338,17 +338,18 @@ class ImplicitSearchError(
 
     val call = tpd.closureBody(alt.tree) // the tree itself if not a closure
     val targs = tpd.typeArgss(call).flatten
-    val args = resolveTypes(targs)(using ctx.fresh.setTyperState(alt.tstate))
-    userDefinedErrorString(raw, params, args)
+    inContext(ctx.fresh.setTyperState(alt.tstate)) {
+      val args = resolveTypes(targs)
+      userDefinedErrorString(raw, params, args)
+    }
   }
 
   /** @param rawMsg           Message template with variables, e.g. "Variable A is ${A}"
    *  @param sym              Symbol of the annotated type or of the method whose parameter was annotated
    *  @param substituteType   Function substituting specific types for abstract types associated with variables, e.g A -> Int
    */
-  private def formatAnnotationMessage(rawMsg: String, sym: Symbol, substituteType: Type => Type): String = {
+  private def formatAnnotationMessage(rawMsg: String, sym: Symbol, substituteType: Type => Type)(using Context): String = {
     val substitutableTypesSymbols = ErrorReporting.substitutableTypeSymbolsInScope(sym)
-
     userDefinedErrorString(
       rawMsg,
       paramNames = substitutableTypesSymbols.map(_.name.unexpandedName.toString),
@@ -362,7 +363,7 @@ class ImplicitSearchError(
    *
    *  def foo(implicit @annotation.implicitNotFound("Foo is missing") foo: Foo): Any = ???
    */
-  private def userDefinedImplicitNotFoundParamMessage: Option[String] = paramSymWithMethodCallTree.flatMap { (sym, applTree) =>
+  private def userDefinedImplicitNotFoundParamMessage(using Context): Option[String] = paramSymWithMethodCallTree.flatMap { (sym, applTree) =>
     userDefinedMsg(sym, defn.ImplicitNotFoundAnnot).map { rawMsg =>
       val fn = tpd.funPart(applTree)
       val targs = tpd.typeArgss(applTree).flatten
@@ -382,7 +383,7 @@ class ImplicitSearchError(
    *
    *  def foo(implicit foo: Foo): Any = ???
    */
-  private def userDefinedImplicitNotFoundTypeMessage: Option[String] =
+  private def userDefinedImplicitNotFoundTypeMessage(using Context): Option[String] =
     def recur(tp: Type): Option[String] = tp match
       case tp: TypeRef =>
         val sym = tp.symbol
@@ -399,7 +400,7 @@ class ImplicitSearchError(
         None
     recur(pt)
 
-  private def userDefinedImplicitNotFoundTypeMessage(sym: Symbol): Option[String] =
+  private def userDefinedImplicitNotFoundTypeMessage(sym: Symbol)(using Context): Option[String] =
     for
       rawMsg <- userDefinedMsg(sym, defn.ImplicitNotFoundAnnot)
       if Feature.migrateTo3 || sym != defn.Function1
@@ -408,7 +409,7 @@ class ImplicitSearchError(
       val substituteType = (_: Type).asSeenFrom(pt, sym)
       formatAnnotationMessage(rawMsg, sym, substituteType)
 
-  private def hiddenImplicitsAddendum: String =
+  private def hiddenImplicitsAddendum(using Context): String =
     def hiddenImplicitNote(s: SearchSuccess) =
       em"\n\nNote: ${s.ref.symbol.showLocated} was not considered because it was not imported with `import given`."
 
@@ -418,7 +419,7 @@ class ImplicitSearchError(
   end hiddenImplicitsAddendum
 
   private object AmbiguousImplicitMsg {
-    def unapply(search: SearchSuccess): Option[String] =
+    def unapply(search: SearchSuccess)(using Context): Option[String] =
       userDefinedMsg(search.ref.symbol, defn.ImplicitAmbiguousAnnot)
   }
 }
