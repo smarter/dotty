@@ -144,17 +144,15 @@ class TyperState() {
     assert(isCommittable, s"$this is not committable")
     assert(!isCommitted, s"$this is already committed")
 
-    if (constraint eq ctx.typerState.constraint) && reporter.pendingMessages.isEmpty then
-      assert(ownedVars.isEmpty)
+    val targetState = ctx.typerState
+
+    if (constraint eq targetState.constraint) && !reporter.hasUnreportedMessages then
       setCommittable(false)
       isCommitted = true
-      // Thread.dumpStack
-      // ctx.typerState.gc() // why is this needed?
       return
 
     reporter.flush()
     setCommittable(false)
-    val targetState = ctx.typerState
 
     assert(!targetState.inLazyRef, s"#ILR $this ----> $targetState")
 

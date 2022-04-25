@@ -244,6 +244,10 @@ abstract class Reporter extends interfaces.ReporterResult {
    */
   def hasUnreportedErrors: Boolean = false
 
+  /** Does this reporter contain any message that have yet to be reported by its outer reporter ? */
+  def hasUnreportedMessages(using Context): Boolean =
+    pendingMessages.nonEmpty || unreportedWarnings.nonEmpty
+
   /** If this reporter buffers messages, remove and return all buffered messages. */
   def removeBufferedMessages(using Context): List[Diagnostic] = Nil
 
