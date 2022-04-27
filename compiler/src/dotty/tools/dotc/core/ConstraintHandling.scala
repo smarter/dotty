@@ -677,6 +677,11 @@ trait ConstraintHandling {
             case t @ TypeParamRef(tl: TypeLambda, n) if comparedTypeLambdas contains tl =>
               val bounds = tl.paramInfos(n)
               range(bounds.lo, bounds.hi)
+            case tl: TypeLambda =>
+              val saved = comparedTypeLambdas
+              comparedTypeLambdas -= tl
+              try mapOver(tl)
+              finally comparedTypeLambdas = saved
             case _ =>
               mapOver(t)
           }

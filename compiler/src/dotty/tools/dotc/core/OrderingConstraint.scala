@@ -354,7 +354,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *  `<:<` relationships between parameters ("edges") but not bounds.
    */
   def order(current: This, param1: TypeParamRef, param2: TypeParamRef, direction: UnificationDirection = NoUnification)(using Context): This =
-    if (param1 == param2 || current.isLess(param1, param2)) this
+    if (param1 == param2 || current.isLess(param1, param2)) current
     else {
       assert(contains(param1), i"$param1")
       assert(contains(param2), i"$param2")
