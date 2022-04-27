@@ -407,9 +407,17 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     case param: TypeParamRef if contains(param) =>
       param :: (if (isUpper) upper(param) else lower(param))
     case tp: AndType if isUpper  =>
+      // Q <: P1 & P2 implies Q <: P1, Q <: P2
       dependentParams(tp.tp1, isUpper) | (dependentParams(tp.tp2, isUpper))
-    case tp: OrType if !isUpper =>
+    case tp: AndType if !isUpper  =>
+      // P3 <: P1, P3 <: P2, P1 & P2 <: Q implies P3 <: Q
       dependentParams(tp.tp1, isUpper).intersect(dependentParams(tp.tp2, isUpper))
+    case tp: OrType if isUpper =>
+      // Q <: P1 | P2, P1 <: P3, P2 <: P3 implies Q <: P3
+      dependentParams(tp.tp1, isUpper).intersect(dependentParams(tp.tp2, isUpper))
+    case tp: OrType if !isUpper =>
+      // P1 | P2 <: Q implies P1 <: Q, P2 <: Q
+      dependentParams(tp.tp1, isUpper) | dependentParams(tp.tp2, isUpper)
     case EtaExpansion(tycon) =>
       dependentParams(tycon, isUpper)
     case _ =>
