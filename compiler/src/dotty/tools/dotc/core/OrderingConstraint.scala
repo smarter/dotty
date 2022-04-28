@@ -360,7 +360,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       assert(contains(param2), i"$param2")
       val unifying = direction != NoUnification
       val newUpper = {
-        val up = exclusiveUpper(param2, param1)
+        val up = current.exclusiveUpper(param2, param1)
         if unifying then
           // Since param2 <:< param1 already holds now, filter out param1 to avoid adding
           //   duplicated orderings.
@@ -374,7 +374,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           param2 :: up
       }
       val newLower = {
-        val lower = exclusiveLower(param1, param2)
+        val lower = current.exclusiveLower(param1, param2)
         if unifying then
           // Similarly, filter out param2 from lowerly-ordered parameters
           //   to avoid duplicated orderings.
