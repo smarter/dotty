@@ -289,7 +289,11 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     while (i < poly.paramNames.length) {
       val param = poly.paramRefs(i)
       val bounds = dropWildcards(nonParamBounds(param))
-      val stripped = stripParams(bounds, todos, isUpper = true)
+      // stripParams needed for avoidance? But it's not enough,
+      // we'd keep ?P <: ?P1 | ?P2, but maybe we never add bounds like that?
+      // Or maybe stripParams just lets us delay avoidance more, so
+      // not doing only worsens inference but isn't unsound?
+      val stripped = bounds //stripParams(bounds, todos, isUpper = true)
       current = updateEntry(current, param, stripped)
       while todos.nonEmpty do
         current = todos.head(current, param)
