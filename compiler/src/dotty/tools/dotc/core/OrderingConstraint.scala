@@ -398,36 +398,9 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     end if
   end order
 
-  /** The list of parameters P such that, for a fresh type parameter Q:
-   *
-   *    Q <: tp  implies  Q <: P      and isUpper = true, or
-   *    tp <: Q  implies  P <: Q      and isUpper = false
-   */
-  private def dependentParams(tp: Type, isUpper: Boolean)(using Context): List[TypeParamRef] = tp match
-    case param: TypeParamRef if contains(param) =>
-      param :: (if (isUpper) upper(param) else lower(param))
-    case tp: AndType if isUpper  =>
-      dependentParams(tp.tp1, isUpper) | (dependentParams(tp.tp2, isUpper))
-    case tp: OrType if !isUpper =>
-      dependentParams(tp.tp1, isUpper).intersect(dependentParams(tp.tp2, isUpper))
-    case EtaExpansion(tycon) =>
-      dependentParams(tycon, isUpper)
-    case _ =>
-      Nil
-
-  private def updateEntry(current: This, param: TypeParamRef, tp: Type)(using Context): This = {
+  private def updateEntry(current: This, param: TypeParamRef, tp: Type)(using Context): This =
     if Config.checkNoWildcardsInConstraint then assert(!tp.containsWildcardTypes)
-    var current1 = boundsLens.update(this, current, param, tp)
-    tp match {
-      case TypeBounds(lo, hi) =>
-        for p <- dependentParams(lo, isUpper = false) do
-          current1 = order(current1, p, param)
-        for p <- dependentParams(hi, isUpper = true) do
-          current1 = order(current1, param, p)
-      case _ =>
-    }
-    current1
-  }
+    boundsLens.update(this, current, param, tp)
 
   /** The public version of `updateEntry`. Guarantees that there are no cycles */
   def updateEntry(param: TypeParamRef, tp: Type)(using Context): This =
