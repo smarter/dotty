@@ -290,7 +290,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       val param = poly.paramRefs(i)
       val bounds = dropWildcards(nonParamBounds(param))
       val stripped = stripParams(bounds, todos, isUpper = true)
-      current = updateEntry(current, param, stripped)
+      current = updateEntry(current, param, bounds/*stripped*/)
       while todos.nonEmpty do
         current = todos.head(current, param)
         todos.dropInPlace(1)
