@@ -400,6 +400,10 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 
   private def updateEntry(current: This, param: TypeParamRef, tp: Type)(using Context): This =
     if Config.checkNoWildcardsInConstraint then assert(!tp.containsWildcardTypes)
+    if tp.isInstanceOf[TypeBounds] then
+      val todos = new mutable.ListBuffer[(OrderingConstraint, TypeParamRef) => OrderingConstraint]
+      val stripped = stripParams(tp, todos, isUpper = true)
+      assert(tp eq stripped, i"tp: $tp\nstripped: $stripped\nctx: $this")
     boundsLens.update(this, current, param, tp)
 
   /** The public version of `updateEntry`. Guarantees that there are no cycles */
