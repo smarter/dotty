@@ -131,7 +131,7 @@ final class ProperGadtConstraint private(
     }
 
     // The replaced symbols are picked up here.
-    addToConstraint(poly1, tvars)
+    addToConstraint2(poly1, tvars)
       .showing(i"added to constraint: [$poly1] $params%, %\n$debugBoundsDescription", gadts)
   }
 

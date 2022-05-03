@@ -71,7 +71,7 @@ case class Signature(paramsSig: List[ParamSig], resSig: TypeName) {
     else if (!this.paramsSig.hasSameLengthAs(that.paramsSig)) that
     else {
       val mapped = Signature(
-          this.paramsSig.zipWithConserve(that.paramsSig)(update),
+          this.paramsSig.zipWithConserve(that.paramsSig)((name1: ParamSig, name2: ParamSig) => update(name1, name2)),
           update(this.resSig, that.resSig))
       if (mapped == this) this else mapped
     }

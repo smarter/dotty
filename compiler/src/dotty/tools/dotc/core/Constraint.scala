@@ -78,6 +78,7 @@ abstract class Constraint extends Showable {
    *                 type variables.
    */
   def add(poly: TypeLambda, tvars: List[TypeVar])(using Context): (This, List[TypeBounds])
+  def add2(poly: TypeLambda, tvars: List[TypeVar])(using Context): This
 
   /** A new constraint which is derived from this constraint by updating
    *  the entry for parameter `param` to `tp`.

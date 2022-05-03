@@ -774,7 +774,7 @@ object Build {
     },
 
     // Note: bench/profiles/projects.yml should be updated accordingly.
-    Compile / scalacOptions ++= Seq("-Yexplicit-nulls"),
+    // Compile / scalacOptions ++= Seq("-Yexplicit-nulls"),
 
     repl := (Compile / console).value,
     Compile / console / scalacOptions := Nil, // reset so that we get stock REPL behaviour!  E.g. avoid -unchecked being enabled
@@ -813,7 +813,7 @@ object Build {
     (Compile / scalacOptions) ++= Seq(
       // Needed so that the library sources are visible when `dotty.tools.dotc.core.Definitions#init` is called
       "-sourcepath", (Compile / sourceDirectories).value.map(_.getAbsolutePath).distinct.mkString(File.pathSeparator),
-      "-Yexplicit-nulls",
+      // "-Yexplicit-nulls",
     ),
   )
 
