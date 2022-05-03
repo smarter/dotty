@@ -268,7 +268,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       tp
   }
 
-  def add(poly: TypeLambda, tvars: List[TypeVar])(using Context): This = {
+  def add(poly: TypeLambda, tvars: List[TypeVar])(using Context): (This, List[TypeBounds]) = {
     assert(!contains(poly))
     val nparams = poly.paramNames.length
     val entries1 = new Array[Type](nparams * 2)
@@ -281,22 +281,26 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *  Update all bounds to be normalized and update ordering to account for
    *  dependent parameters.
    */
-  private def init(poly: TypeLambda)(using Context): This = {
+  private def init(poly: TypeLambda)(using Context): (This, List[TypeBounds]) = {
     var current = this
     val todos = new mutable.ListBuffer[(OrderingConstraint, TypeParamRef) => OrderingConstraint]
     var i = 0
     val dropWildcards = AvoidWildcardsMap()
+    val obounds =
+      poly.paramRefs.map(p => dropWildcards(nonParamBounds(p)).bounds)
     while (i < poly.paramNames.length) {
       val param = poly.paramRefs(i)
-      val bounds = dropWildcards(nonParamBounds(param))
-      val stripped = stripParams(bounds, todos, isUpper = true)
-      current = updateEntry(current, param, stripped)
-      while todos.nonEmpty do
-        current = todos.head(current, param)
-        todos.dropInPlace(1)
+      current = updateEntry(current, param, TypeBounds(defn.NothingType, obounds(i).hi.topType))
       i += 1
     }
-    current.checkNonCyclic()
+    // i = 0
+    // while (i < poly.paramNames.length) {
+    //   val param = poly.paramRefs(i)
+    //   val obound = obounds(i)
+    //   param <:< obound
+    //   obound <:< param
+    // }
+    (current.checkNonCyclic(), obounds)
   }
 
 // ---------- Updates ------------------------------------------------------------
