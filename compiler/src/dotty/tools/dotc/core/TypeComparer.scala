@@ -763,7 +763,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       })
       val base = nonExprBaseType(tp1, cls2)
       if (base.exists && base.ne(tp1) && allowBaseType)
-        isSubType(base, tp2, if (tp1.isRef(cls2)) approx else approx.addLow) ||
+        isSubType(base, tp2, if (tp1.isRef(cls2) || !necessaryConstraintsOnly) approx else approx.addLow) ||
         base.isInstanceOf[OrType] && fourthTry
           // if base is a disjunction, this might have come from a tp1 type that
           // expands to a match type. In this case, we should try to reduce the type
