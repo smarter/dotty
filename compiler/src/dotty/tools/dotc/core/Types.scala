@@ -4751,6 +4751,9 @@ object Types {
       assert(!myInst.exists, i"$origin is already instantiated to $myInst but we attempted to instantiate it to $tp")
       typr.println(i"instantiating $this with $tp")
 
+      if origin.occursIn(tp) then
+        throw new TypeError(i"cyclic instantiation of $origin to $tp")
+
       if Config.checkConstraintsSatisfiable then
         assert(currentEntry.bounds.contains(tp),
           i"$origin is constrained to be $currentEntry but attempted to instantiate it to $tp")
