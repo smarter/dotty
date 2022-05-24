@@ -317,6 +317,13 @@ trait ConstraintHandling {
     def others = if isUpper then constraint.lower(param) else constraint.upper(param)
     val bound = adjust(rawBound)
     { bound.exists
+      // C[?X] <: ?A
+      // ?B <: ?A
+      // C[?Y] <: ?B
+      // C[?X] <: ?B
+      // ==> ?Y := ?X
+      // ?Z <: ?X
+      // ?Y <: ?A
       && addOneBound(param, bound, isUpper) && {
         val o1 = others
         val ret = o1.forall(addOneBound(_, bound, isUpper))

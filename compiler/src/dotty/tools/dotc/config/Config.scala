@@ -107,7 +107,7 @@ object Config {
    *
    *  For more info, see the comment in `TypeComparer#glbArgs`.
    */
-  inline val alignArgsInAnd = true
+  inline val alignArgsInAnd = false//true
 
   /** If this flag is set, higher-kinded applications are checked for validity
    */
