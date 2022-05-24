@@ -316,9 +316,15 @@ trait ConstraintHandling {
       else report.log(msg)
     def others = if isUpper then constraint.lower(param) else constraint.upper(param)
     val bound = adjust(rawBound)
-    bound.exists
-    && addOneBound(param, bound, isUpper) && others.forall(addOneBound(_, bound, isUpper))
-        .showing(i"added $description = $result$location", constr)
+    { bound.exists
+      && addOneBound(param, bound, isUpper) && {
+        val o1 = others
+        val ret = o1.forall(addOneBound(_, bound, isUpper))
+        val o2 = others
+        assert(o1 == o2, i"before: $o1\nafter: $o2")
+        ret
+      }
+    }.showing(i"added $description = $result$location", constr)
   end addBoundTransitively
 
   protected def addLess(p1: TypeParamRef, p2: TypeParamRef)(using Context): Boolean = {
