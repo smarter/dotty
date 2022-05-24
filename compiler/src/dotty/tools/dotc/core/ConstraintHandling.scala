@@ -321,7 +321,7 @@ trait ConstraintHandling {
         val o1 = others
         val ret = o1.forall(addOneBound(_, bound, isUpper))
         val o2 = others
-        assert(o1 == o2, i"before: $o1\nafter: $o2")
+        assert(o2.forall(o1.contains), i"before: $o1\nafter: $o2")
         ret
       }
     }.showing(i"added $description = $result$location", constr)
