@@ -874,9 +874,10 @@ object JavaParsers {
       }
       val constr = DefDef(nme.CONSTRUCTOR,
         List(constructorParams), TypeTree(), EmptyTree).withMods(Modifiers(Flags.JavaDefined))
-      val templ = makeTemplate(annotationParents, constr :: body, List(), true)
+      // val templ = makeTemplate(annotationParents, constr :: body, List(), true)
+      val templ = Template(makeConstructor(Nil, Nil), annotationParents, Nil, EmptyValDef, constr :: body)
       val annot = atSpan(start, nameOffset) {
-        TypeDef(name, templ).withMods(mods | Flags.Abstract)
+        TypeDef(name, templ).withMods(mods | Flags.Trait | Flags.JavaInterface | Flags.Abstract)
       }
       addCompanionObject(statics, annot)
     }

@@ -353,9 +353,9 @@ object ClassfileConstants {
       if (jflag == 0) base else base | translateFlag(jflag)
 
     private def translateFlags(jflags: Int, baseFlags: FlagSet): FlagSet = {
-      val nflags =
-        if ((jflags & JAVA_ACC_ANNOTATION) == 0) jflags
-        else jflags & ~(JAVA_ACC_ABSTRACT | JAVA_ACC_INTERFACE) // annotations are neither abstract nor interfaces
+      val nflags = jflags
+        // if ((jflags & JAVA_ACC_ANNOTATION) == 0) jflags
+        // else jflags & ~(JAVA_ACC_ABSTRACT | JAVA_ACC_INTERFACE) // annotations are neither abstract nor interfaces
       var res: FlagSet = baseFlags | JavaDefined
       res = addFlag(res, nflags & JAVA_ACC_PRIVATE)
       res = addFlag(res, nflags & JAVA_ACC_PROTECTED)
