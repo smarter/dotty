@@ -826,7 +826,7 @@ class ClassfileParser(
     newSymbol(
       owner = classRoot.symbol,
       name = nme.CONSTRUCTOR,
-      flags = Flags.Synthetic | Flags.JavaDefined | Flags.Method,
+      flags = Flags.Synthetic | Flags.JavaDefined | Flags.Method | Flags.Protected,
       info = MethodType(Nil, Nil, classRoot.typeRef)
     ).entered
     newSymbol(
