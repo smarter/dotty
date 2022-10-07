@@ -1,5 +1,6 @@
 class Foo extends Ann {
-  def value = 1
+  override def bar = 3
+  override def baz = 4
   def annotationType = classOf[Ann]
 }
 
@@ -8,6 +9,7 @@ object Test {
     val x = new Foo
     val y: Ann = x
     val z: Int @Ann(1) = 1
+    val zz: Int @Ann() = 1
     // val x: scala.annotation.Annotation = new Ann {
     // // val x: java.lang.annotation.Annotation = new Ann {
     //   def annotationType = classOf[Ann]

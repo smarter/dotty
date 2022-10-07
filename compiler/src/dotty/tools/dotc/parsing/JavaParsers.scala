@@ -875,7 +875,7 @@ object JavaParsers {
       val constr = DefDef(nme.CONSTRUCTOR,
         List(constructorParams), TypeTree(), EmptyTree).withMods(Modifiers(Flags.JavaDefined))
       // val templ = makeTemplate(annotationParents, constr :: body, List(), true)
-      val templ = Template(makeConstructor(Nil, Nil, Flags.JavaDefined | Flags.Protected), annotationParents, Nil, EmptyValDef, constr :: body)
+      val templ = Template(makeConstructor(Nil, Nil, Flags.JavaDefined | Flags.PrivateLocal), annotationParents, Nil, EmptyValDef, constr :: body)
       val annot = atSpan(start, nameOffset) {
         TypeDef(name, templ).withMods(mods | Flags.Trait | Flags.JavaInterface | Flags.Abstract)
       }

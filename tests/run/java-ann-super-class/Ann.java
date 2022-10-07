@@ -1,3 +1,4 @@
 public @interface Ann {
-  int value();
+  int bar() default 1;
+  int baz() default 2;
 }
