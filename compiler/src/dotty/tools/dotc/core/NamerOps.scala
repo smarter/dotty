@@ -95,6 +95,9 @@ object NamerOps:
   def needsConstructorProxies(sym: Symbol)(using Context): Boolean =
     sym.isClass
     && (!sym.flagsUNSAFE.isOneOf(NoConstructorProxyNeededFlags))
+      // || sym.flagsUNSAFE.is(Trait | JavaDefined) // if a java interface has a constructor, it must be an annotation (this is enforced by ...),
+                                                    // these get proxies which only work in annotation context (TODO: enforce or give up on proxy for annot constr)
+                                                    // XX: actually to keep tree in canonical form, we probably shouldn't insert proxies.
         // || sym.flagsUNSAFE.is(Trait))
     && !sym.isAnonymousClass
     ||
