@@ -822,7 +822,7 @@ object JavaParsers {
       val iface = atSpan(start, nameOffset) {
         TypeDef(
           name,
-          makeTemplate(parents, body, tparams, false)).withMods(mods | Flags.Trait | Flags.JavaInterface | Flags.Abstract)
+          makeTemplate(parents, body, tparams, false)).withMods(mods | Flags.Trait | Flags.JavaInterface/* | Flags.Abstract*/)
       }
       addCompanionObject(statics, iface)
     }
@@ -877,7 +877,7 @@ object JavaParsers {
       val templ = makeTemplate(annotationParents, constr :: body, List(), true)
       // val templ = Template(makeConstructor(Nil, Nil, Flags.JavaDefined | Flags.PrivateLocal), annotationParents, Nil, EmptyValDef, constr :: body)
       val annot = atSpan(start, nameOffset) {
-        TypeDef(name, templ).withMods(mods | Flags.Trait | Flags.JavaInterface | Flags.Abstract)
+        TypeDef(name, templ).withMods(mods | Flags.Trait | Flags.JavaInterface/* | Flags.Abstract*/)
       }
       addCompanionObject(statics, annot)
     }
