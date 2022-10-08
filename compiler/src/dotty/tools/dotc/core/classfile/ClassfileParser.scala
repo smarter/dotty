@@ -219,6 +219,10 @@ class ClassfileParser(
 
       setClassInfo(classRoot, classInfo, fromScala2 = false)
       NamerOps.addConstructorProxies(moduleRoot.classSymbol)
+      // if (isAnnotation)
+      //   NamerOps.addConstructorApplies(staticScope,
+      //     classRoot.classSymbol, moduleRoot.classSymbol)
+
     }
     else if (result == Some(NoEmbedded))
       for (sym <- List(moduleRoot.sourceModule, moduleRoot.symbol, classRoot.symbol)) {
@@ -822,12 +826,13 @@ class ClassfileParser(
    *  parameters. For Java annotations we need to fake it by making up the constructor.
    */
   def addAnnotationConstructor(classInfo: TempClassInfoType)(using Context): Unit =
-    newSymbol(
+    val constr = newSymbol(
       owner = classRoot.symbol,
       name = nme.CONSTRUCTOR,
       flags = Flags.Synthetic | Flags.JavaDefined | Flags.Method,
       info = new AnnotConstructorCompleter(classInfo)
     ).entered
+    NamerOps.constructorProxy(constr, classRoot.symbol.linkedClass).entered
 
   class AnnotConstructorCompleter(classInfo: TempClassInfoType) extends LazyType {
     def complete(denot: SymDenotation)(using Context): Unit = {

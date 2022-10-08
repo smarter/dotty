@@ -94,7 +94,8 @@ object NamerOps:
   /** Does symbol `sym` need constructor proxies to be generated? */
   def needsConstructorProxies(sym: Symbol)(using Context): Boolean =
     sym.isClass
-    && !sym.flagsUNSAFE.isOneOf(NoConstructorProxyNeededFlags)
+    && (!sym.flagsUNSAFE.isOneOf(NoConstructorProxyNeededFlags))
+        // || sym.flagsUNSAFE.is(Trait))
     && !sym.isAnonymousClass
     ||
     sym.isType && sym.is(Exported)
@@ -105,16 +106,17 @@ object NamerOps:
     def complete(denot: SymDenotation)(using Context): Unit =
       denot.info = constr.info
 
+  def constructorProxy(constr: Symbol, modcls: Symbol)(using Context): Symbol =
+    newSymbol(
+      modcls, nme.apply, ApplyProxyFlags | (constr.flagsUNSAFE & AccessFlags),
+      ApplyProxyCompleter(constr), coord = constr.coord)
+
   /** Add constructor proxy apply methods to `scope`. Proxies are for constructors
    *  in `cls` and they reside in `modcls`.
    */
   def addConstructorApplies(scope: MutableScope, cls: ClassSymbol, modcls: ClassSymbol)(using Context): scope.type =
-    def proxy(constr: Symbol): Symbol =
-      newSymbol(
-        modcls, nme.apply, ApplyProxyFlags | (constr.flagsUNSAFE & AccessFlags),
-        ApplyProxyCompleter(constr), coord = constr.coord)
     for dcl <- cls.info.decls do
-      if dcl.isConstructor then scope.enter(proxy(dcl))
+      if dcl.isConstructor then scope.enter(constructorProxy(dcl, modcls))
     scope
   end addConstructorApplies
 
