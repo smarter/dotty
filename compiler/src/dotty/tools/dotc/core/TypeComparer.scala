@@ -1049,6 +1049,11 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
      *  example, if `fromBelow = false` and we're comparing:
      *
      *    ?F[A] <:< Either[String, B] where `?F <: [X] =>> Any`
+
+?F[Nothing] <: Abs[Nothing, Nothing, Nothing]
+adaptedTycon = [X] =>> Abs[Nothing, Nothing, X]
+
+
      *
      *  we will choose:
      *
@@ -1089,18 +1094,30 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       val otherTycon = other.tycon
       val otherArgs = other.args
 
+      // println("tycon: " + tycon.show)
+      // println("args: " + args.map(_.show))
+      // println("other: " + other.show)
+
       val d = otherArgs.length - args.length
+      // println("d: " + d)
       d >= 0 && {
         val tparams = tycon.typeParams
         val remainingTparams = otherTycon.typeParams.drop(d)
         variancesConform(remainingTparams, tparams) && {
           val adaptedTycon =
             if d > 0 then
+              def fullArgs(tl: HKTypeLambda) = otherArgs.take(d) ++ tl.paramRefs
+              def instantiatedRemainingInfos(tl: HKTypeLambda) =
+                (remainingTparams: @unchecked) match
+                  case LambdaParam(lam, _) :: _ => remainingTparams.map(_.paramInfo).mapconserve(_.substParams(lam, fullArgs(tl)).bounds)
+                  case params: List[Symbol @unchecked] => remainingTparams.map(_.paramInfo).mapconserve(_.subst(params, fullArgs(tl)).bounds)
+                
               HKTypeLambda(remainingTparams.map(_.paramName))(
-                tl => remainingTparams.map(remainingTparam =>
-                  tl.integrate(remainingTparams, remainingTparam.paramInfo).bounds),
-                tl => otherTycon.appliedTo(
-                  otherArgs.take(d) ++ tl.paramRefs))
+                instantiatedRemainingInfos,
+                // tl => remainingTparams.map(remainingTparam =>
+                //   // remainingTparam.paramInfo.substParams(otherTycon, otherArgs.take(d) ++ tl.paramRefs)),
+                //   tl.integrate(remainingTparams, remainingTparam.paramInfo).bounds),
+                tl => otherTycon.appliedTo(fullArgs(tl)))
             else
               otherTycon
           (assumedTrue(tycon) || directionalIsSubType(tycon, adaptedTycon)) &&
