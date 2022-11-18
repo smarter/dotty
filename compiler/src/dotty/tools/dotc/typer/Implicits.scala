@@ -1500,7 +1500,7 @@ trait Implicits:
 
     private def isUnderspecified(tp: Type): Boolean = tp.stripTypeVar match
       case tp: WildcardType =>
-        !tp.optBounds.exists || isUnderspecified(tp.optBounds.hiBound)
+        !tp.optBounds.exists
       case tp: ViewProto =>
         isUnderspecified(tp.resType)
         || tp.resType.isRef(defn.UnitClass)
