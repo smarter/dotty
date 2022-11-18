@@ -3535,7 +3535,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
       assert(wtp.isImplicitMethod)
       val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
       def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToInstantiate)
+        // instantiateSelected(tp, tvarsToInstantiate)
         replaceSingletons(tp)
       }
       wtp.paramInfos.foreach(instantiate)

@@ -1153,6 +1153,20 @@ trait Implicits:
         SearchSuccess(adapted, ref, cand.level, cand.isExtension)(ctx.typerState, ctx.gadt)
     }
 
+  final def moreSpecific(c1: Constraint, c2: Constraint, pre: Constraint)(using Context): Boolean = {
+    /*if (c2 eq pre) true
+    else if (c1 eq pre) false
+    else*/
+    pre.forallParams(p =>
+      val i1 = c1.instType(c1.typeVarOfParam(p).asInstanceOf[TypeVar])
+      val i2 = c2.instType(c2.typeVarOfParam(p).asInstanceOf[TypeVar])
+      if i1.exists && i2.exists then i1 frozen_<:< i2
+      else if i1.exists then true
+      else if i2.exists then false
+      else true // compare bounds?
+    )
+  }
+
   /** An implicit search; parameters as in `inferImplicit` */
   class ImplicitSearch(protected val pt: Type, protected val argument: Tree, span: Span)(using Context):
     assert(argument.isEmpty || argument.tpe.isValueType || argument.tpe.isInstanceOf[ExprType],
@@ -1271,12 +1285,12 @@ trait Implicits:
           if diff < 0 then alt2
           else if diff > 0 then alt1
           else
-            // XX: nope, subsumes means that alt1 refines alt2, but if T(alt1)= Int and T(alt2)= Any, then there's no refinement.
-            if TypeComparer.subsumes(alt1.tstate.constraint, alt2.tstate.constraint, ctx.typerState.constraint) then
+            if moreSpecific(alt1.tstate.constraint, alt2.tstate.constraint, ctx.typerState.constraint) then
               alt1
-            else if TypeComparer.subsumes(alt2.tstate.constraint, alt1.tstate.constraint, ctx.typerState.constraint) then
+            else if moreSpecific(alt2.tstate.constraint, alt1.tstate.constraint, ctx.typerState.constraint) then
               alt2
-            else SearchFailure(new AmbiguousImplicits(alt1, alt2, pt, argument), span)
+            else
+              SearchFailure(new AmbiguousImplicits(alt1, alt2, pt, argument), span)
         case _: SearchFailure => alt2
 
       /** Try to find a best matching implicit term among all the candidates in `pending`.

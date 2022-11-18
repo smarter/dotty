@@ -746,7 +746,7 @@ trait ConstraintHandling {
           && c2.upper(p).forall(c1.isLess(p, _))
           && isSubTypeWhenFrozen(c1.nonParamBounds(p), c2.nonParamBounds(p))
         )
-      finally constraint = saved
+      finally constraint = saved //TODO: is that a no-op?
     }
 
   /** The current bounds of type parameter `param` */
