@@ -730,7 +730,7 @@ trait ConstraintHandling {
    *  Both `c1` and `c2` are required to derive from constraint `pre`, without adding
    *  any new type variables but possibly narrowing already registered ones with further bounds.
    */
-  protected final def subsumes(c1: Constraint, c2: Constraint, pre: Constraint)(using Context): Boolean =
+  final def subsumes(c1: Constraint, c2: Constraint, pre: Constraint)(using Context): Boolean =
     if (c2 eq pre) true
     else if (c1 eq pre) false
     else {

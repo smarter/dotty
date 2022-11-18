@@ -3002,6 +3002,9 @@ object TypeComparer {
   def fullBounds(param: TypeParamRef)(using Context): TypeBounds =
     comparing(_.fullBounds(param))
 
+  def subsumes(c1: Constraint, c2: Constraint, pre: Constraint)(using Context): Boolean =
+    comparing(_.subsumes(c1, c2, pre))
+
   def fullLowerBound(param: TypeParamRef)(using Context): Type =
     comparing(_.fullLowerBound(param))
 
