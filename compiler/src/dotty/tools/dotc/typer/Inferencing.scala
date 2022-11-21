@@ -164,6 +164,8 @@ object Inferencing {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
       // val inst = tvar.instantiate(fromBelow)
+      // println("tvar: " + tvar + " fromBelow: " + fromBelow)
+      // println("BEF: " + ctx.typerState.constraint.show)
 
       val bounds = ctx.typerState.constraint.nonParamBounds(tvar.origin)
       val approx = (if fromBelow then bounds.lo else bounds.hi).simplified
@@ -180,9 +182,11 @@ object Inferencing {
           approx
         
       assert(tvar =:= inst, i"Cannot instantiate ${tvar.origin} to $inst, ${ctx.typerState.constraint}")
-      // tvar.instantiateWith(inst)
+      tvar.instantiateWith(inst)
       // println("c: " + ctx.typerState.constraint.show)
-      typr.println(i"forced instantiation of ${tvar.origin} = $inst")
+      // println(i"forced instantiation of ${tvar.origin} = $inst")
+      // println("AFT: " + ctx.typerState.constraint.show)
+
       inst
     }
 
