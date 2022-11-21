@@ -852,6 +852,8 @@ trait ConstraintHandling {
       && (tparams1.isEmpty || kindCompatible(tp1.hkResult, tp2.hkResult))
       || tp1.hasAnyKind
       || tp2.hasAnyKind
+      || tp1.hasClassSymbol(defn.NothingClass)
+      || tp2.hasClassSymbol(defn.NothingClass)
 
     def description = i"constr $param ${if (fromBelow) ">:" else "<:"} $bound:\n$constraint"
 
