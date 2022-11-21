@@ -174,13 +174,16 @@ object Inferencing {
       val inst =
         if fromBelow then
           val widened = TypeComparer.widenInferred(approx, tvar.origin, widenUnions)
+          // println("w: " + widened + " " + widenUnions)
           if ctx.typerState.constraint.occursAtToplevel(tvar.origin, widened) then
             assert(false, s"${tvar.origin} -> $widened")
           else
             widened
         else
           approx
-        
+
+      // println("inst: " + inst)
+      // println("MID: " + ctx.typerState.constraint.show)
       assert(tvar =:= inst, i"Cannot instantiate ${tvar.origin} to $inst, ${ctx.typerState.constraint}")
       tvar.instantiateWith(inst)
       // println("c: " + ctx.typerState.constraint.show)

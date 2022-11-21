@@ -647,7 +647,7 @@ trait ConstraintHandling {
     def widenOr(tp: Type) =
       if widenUnions then
         val tpw = tp.widenUnion
-        if (tpw ne tp) && (tpw <:< bound) then tpw else tp
+        if (tpw ne tp) && !isTransparent(tpw, traitOnly = false) && (tpw <:< bound) then tpw else tp
       else tp.hardenUnions
 
     def widenSingle(tp: Type) =
@@ -663,11 +663,9 @@ trait ConstraintHandling {
       else
         val widenedFromSingle = widenSingle(inst)
         val widenedFromUnion = widenOr(widenedFromSingle)
+        // println("wfu: " + widenedFromUnion)
         val widened =
-          if (widenedFromUnion ne widenedFromSingle) && isTransparent(widenedFromUnion, traitOnly = false) then
-            widenedFromSingle
-          else
-            dropTransparentTraits(widenedFromUnion, bound)
+          dropTransparentTraits(widenedFromUnion, bound)
         widenIrreducible(widened)
 
     wideInst match
