@@ -163,7 +163,25 @@ object Inferencing {
     (using Context) extends TypeAccumulator[Boolean] {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
-      val inst = tvar.instantiate(fromBelow)
+      // val inst = tvar.instantiate(fromBelow)
+
+      val bounds = ctx.typerState.constraint.nonParamBounds(tvar.origin)
+      val approx = (if fromBelow then bounds.lo else bounds.hi).simplified
+
+      val widenUnions = !ctx.typerState.constraint.isHard(tvar)
+      val inst =
+        if fromBelow then
+          val widened = TypeComparer.widenInferred(approx, tvar.origin, widenUnions)
+          if ctx.typerState.constraint.occursAtToplevel(tvar.origin, widened) then
+            assert(false, s"${tvar.origin} -> $widened")
+          else
+            widened
+        else
+          approx
+        
+      assert(tvar =:= inst, i"Cannot instantiate ${tvar.origin} to $inst, ${ctx.typerState.constraint}")
+      // tvar.instantiateWith(inst)
+      // println("c: " + ctx.typerState.constraint.show)
       typr.println(i"forced instantiation of ${tvar.origin} = $inst")
       inst
     }
