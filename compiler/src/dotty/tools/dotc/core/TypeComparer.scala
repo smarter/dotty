@@ -3002,6 +3002,9 @@ object TypeComparer {
   def fullBounds(param: TypeParamRef)(using Context): TypeBounds =
     comparing(_.fullBounds(param))
 
+  def fixLevels(tp: Type, fromBelow: Boolean, maxLevel: Int, param: TypeParamRef)(using Context) =
+    comparing(_.fixLevels(tp, fromBelow, maxLevel, param))
+
   def fullLowerBound(param: TypeParamRef)(using Context): Type =
     comparing(_.fullLowerBound(param))
 

@@ -480,7 +480,7 @@ trait ConstraintHandling {
    *  @param maxLevel   the maximum level of references allowed
    *  @param param      the parameter that was instantiated
    */
-  private def fixLevels(tp: Type, fromBelow: Boolean, maxLevel: Int, param: TypeParamRef)(using Context) =
+  def fixLevels(tp: Type, fromBelow: Boolean, maxLevel: Int, param: TypeParamRef)(using Context) =
 
     def needsFix(tp: NamedType) =
       (tp.prefix eq NoPrefix) && tp.symbol.nestingLevel > maxLevel

@@ -168,7 +168,9 @@ object Inferencing {
       // println("BEF: " + ctx.typerState.constraint.show)
 
       val bounds = ctx.typerState.constraint.nonParamBounds(tvar.origin)
-      val approx = (if fromBelow then bounds.lo else bounds.hi).simplified
+      val rawInst = (if fromBelow then bounds.lo else bounds.hi)
+      val levelInst = TypeComparer.fixLevels(rawInst, fromBelow, ctx.typerState.nestingLevel(tvar), tvar.origin)
+      val approx = levelInst.simplified
 
       val widenUnions = !ctx.typerState.constraint.isHard(tvar)
       val inst =
