@@ -472,9 +472,10 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       val lo1 = stripParams(tp.lo, todos, !isUpper).orElse(defn.NothingType)
       val hi1 = stripParams(tp.hi, todos, isUpper).orElse(tp.topType)
       tp.derivedTypeBounds(lo1, hi1)
-    case tp: TypeVar =>
-      val underlying1 = stripParams(tp.underlying, todos, isUpper)
-      if underlying1 ne tp.underlying then underlying1 else tp
+    // i6126 needed but breaks i12211
+    // case tp: TypeVar =>
+    //   val underlying1 = stripParams(tp.underlying, todos, isUpper)
+    //   if underlying1 ne tp.underlying then underlying1 else tp
     case tp: AndType if isUpper =>
       val tp1 = stripParams(tp.tp1, todos, isUpper)
       val tp2 = stripParams(tp.tp2, todos, isUpper)

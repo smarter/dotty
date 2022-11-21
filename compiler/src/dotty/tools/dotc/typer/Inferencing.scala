@@ -186,13 +186,16 @@ object Inferencing {
 
       // println("inst: " + inst)
       // println("MID: " + ctx.typerState.constraint.show)
-      assert(tvar =:= inst, i"Cannot instantiate ${tvar.origin} to $inst, ${ctx.typerState.constraint}")
-      tvar.instantiateWith(inst)
+      if tvar =:= inst then
+        tvar.instantiateWith(inst)
+        inst
+      else
+        // assert(false, i"Cannot instantiate ${tvar.origin} to $inst, ${ctx.typerState.constraint}")
+        tvar.instantiate(fromBelow)
+      
       // println("c: " + ctx.typerState.constraint.show)
       // println(i"forced instantiation of ${tvar.origin} = $inst")
       // println("AFT: " + ctx.typerState.constraint.show)
-
-      inst
     }
 
     private var toMaximize: List[TypeVar] = Nil
