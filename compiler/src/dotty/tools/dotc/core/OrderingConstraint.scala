@@ -537,7 +537,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
    *  References can be direct or indirect through instantiations of other
    *  parameters in the constraint.
    */
-  private def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
+  def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
 
     def recur(tp: Type, fromBelow: Boolean): Type = tp match
       case tp: AndOrType =>

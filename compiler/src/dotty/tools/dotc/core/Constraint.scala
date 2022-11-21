@@ -172,6 +172,8 @@ abstract class Constraint extends Showable {
    */
   def occursAtToplevel(param: TypeParamRef, tp: Type)(using Context): Boolean
 
+  def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type
+
   /** A string that shows the reverse dependencies maintained by this constraint
    *  (coDeps and contraDeps for OrderingConstraints).
    */

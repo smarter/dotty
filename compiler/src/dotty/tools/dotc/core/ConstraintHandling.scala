@@ -415,6 +415,7 @@ trait ConstraintHandling {
 
     val boundKept    = constraint.nonParamBounds(pKept).substParam(pRemoved, pKept)
     var boundRemoved = constraint.nonParamBounds(pRemoved).substParam(pRemoved, pKept)
+    boundRemoved = constraint.ensureNonCyclic(pKept, boundRemoved)
 
     if level1 != level2 then
       boundRemoved = LevelAvoidMap(-1, math.min(level1, level2))(boundRemoved)
