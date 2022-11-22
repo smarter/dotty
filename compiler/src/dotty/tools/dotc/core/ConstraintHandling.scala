@@ -305,15 +305,18 @@ trait ConstraintHandling {
         // Narrow one of the bounds of type parameter `param`
         // If `isUpper` is true, ensure that `param <: `bound`, otherwise ensure
         // that `param >: bound`.
+        // println("old: " + oldBounds.show)
+        // println("new: " + bound.show)
         val narrowedBounds =
           val saved = homogenizeArgs
           homogenizeArgs = Config.alignArgsInAnd
           try
             withUntrustedBounds(
-              if isUpper then oldBounds.derivedTypeBounds(lo, hi & bound)
-              else oldBounds.derivedTypeBounds(lo | bound, hi))
+              if isUpper then oldBounds.derivedTypeBounds(lo, AndType.makeHk(hi, bound))
+              else oldBounds.derivedTypeBounds(OrType.makeHk(lo, bound), hi))
           finally
             homogenizeArgs = saved
+        // println("n: " + narrowedBounds.show)
         //println(i"narrow bounds for $param from $oldBounds to $narrowedBounds")
         val c1 = constraint.updateEntry(param, narrowedBounds)
         (c1 eq constraint)
@@ -428,12 +431,12 @@ trait ConstraintHandling {
       // by replacing the lower-bound to get:
       //     >: Int & Singleton <: Singleton
       if !isSub(lo, hi) then
-        boundRemoved = TypeBounds(lo & hi, hi)
+        boundRemoved = TypeBounds(AndType.makeHk(lo, hi), hi)
 
-    println("k: " + boundKept.show)
-    println("r: " + boundRemoved.show)
+    // println("k: " + boundKept.show)
+    // println("r: " + boundRemoved.show)
     val newBounds = (boundKept safe_& boundRemoved).bounds
-    println("n:"  + newBounds.show)
+    // println("n:"  + newBounds.show)
     constraint = constraint.updateEntry(pKept, newBounds).replace(pRemoved, pKept)
 
     val lo = newBounds.lo

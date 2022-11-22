@@ -54,15 +54,28 @@ class ConstraintsTest:
     }
   end mergeBoundsTransitivity
 
+  @Test def initPreserveBounds: Unit =
+    inCompilerContext(TestConfiguration.basicClasspath,
+        scalaSources = "trait A { def foo[S >: T <: T | Int, T <: String]: Any  }") {
+      val tvars = constrained(requiredClass("A").typeRef.select("foo".toTermName).info.asInstanceOf[TypeLambda], EmptyTree, alwaysAddTypeVars = true)._2
+      val List(s, t) = tvars.tpes
+
+      (ctx.typerState.constraint.entry(t.asInstanceOf[TypeVar].origin): @unchecked) match
+        case TypeBounds(lo, hi) =>
+          assert(lo =:= defn.NothingType, lo)
+          assert(hi =:= defn.StringType, hi)
+    }
+
   @Test def unifyPreserveBounds: Unit =
     inCompilerContext(TestConfiguration.basicClasspath,
         scalaSources = "trait A { def foo[S >: T <: T | Int, T <: String | Int]: Any  }") {
       val tvars = constrained(requiredClass("A").typeRef.select("foo".toTermName).info.asInstanceOf[TypeLambda], EmptyTree, alwaysAddTypeVars = true)._2
       val List(s, t) = tvars.tpes
 
-      // String | Int upper-bound is already lost here!
-      println("c0: " + ctx.typerState.constraint.show)
       s <:< t
-      println("c: " + ctx.typerState.constraint.show)
+
+      (ctx.typerState.constraint.entry(t.asInstanceOf[TypeVar].origin): @unchecked) match
+        case TypeBounds(lo, hi) =>
+          assert(lo =:= defn.NothingType, lo)
+          assert(hi =:= (defn.StringType | defn.IntType), hi)
     }
-    
