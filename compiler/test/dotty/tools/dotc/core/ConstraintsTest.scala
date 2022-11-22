@@ -53,3 +53,16 @@ class ConstraintsTest:
         i"Merging constraints `?S <: ?T` and `Int <: ?S` should result in `Int <:< ?T`: ${ctx.typerState.constraint}")
     }
   end mergeBoundsTransitivity
+
+  @Test def unifyPreserveBounds: Unit =
+    inCompilerContext(TestConfiguration.basicClasspath,
+        scalaSources = "trait A { def foo[S >: T <: T | Int, T <: String | Int]: Any  }") {
+      val tvars = constrained(requiredClass("A").typeRef.select("foo".toTermName).info.asInstanceOf[TypeLambda], EmptyTree, alwaysAddTypeVars = true)._2
+      val List(s, t) = tvars.tpes
+
+      // String | Int upper-bound is already lost here!
+      println("c0: " + ctx.typerState.constraint.show)
+      s <:< t
+      println("c: " + ctx.typerState.constraint.show)
+    }
+    

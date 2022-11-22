@@ -430,7 +430,10 @@ trait ConstraintHandling {
       if !isSub(lo, hi) then
         boundRemoved = TypeBounds(lo & hi, hi)
 
-    val newBounds = (boundKept & boundRemoved).bounds
+    println("k: " + boundKept.show)
+    println("r: " + boundRemoved.show)
+    val newBounds = (boundKept safe_& boundRemoved).bounds
+    println("n:"  + newBounds.show)
     constraint = constraint.updateEntry(pKept, newBounds).replace(pRemoved, pKept)
 
     val lo = newBounds.lo
