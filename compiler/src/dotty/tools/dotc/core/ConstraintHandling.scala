@@ -82,7 +82,7 @@ trait ConstraintHandling {
   protected def necessaryConstraintsOnly(using Context): Boolean =
     ctx.mode.is(Mode.GadtConstraintInference) || myNecessaryConstraintsOnly
 
-  /** If `trustBounds = false` we perform comparisons in a pessimistic way as follows:
+  /** If `myUpdatingParams` is non-empty, we perform comparisons in a pessimistic way as follows:
    *  Given an abstract type `A >: L <: H`, a subtype comparison of any type
    *  with `A` will compare against both `L` and `H`. E.g.
    *
@@ -105,20 +105,48 @@ trait ConstraintHandling {
    *  it is alreay too late, we'd get `Int & String` as instance, which does not
    *  satisfy the original constraint `X >: 1`.
    *
-   *  But if `trustBounds` is false, we do not conclude the `x.M >: 1` since
+   *  But if `myUpdatingParams` is non-empty, we do not conclude the `x.M >: 1` since
    *  we compare both bounds and the upper bound `Int & String` is not a supertype
    *  of `1`. So the lower bound is `1 | x.M` and when we level-avoid that we
    *  get `1 | Int & String`, which simplifies to `Int`.
+   *
+   *
+   *  Additionally, `assumedFalse` will return true for members of `myUpdatingParams`,
+   *  this is motivated by ConstraintsTest#initPreserveBounds:
+   * 
+   *     def foo[S >: T <: T | Int, T <: String]: Any
+   *
+   *  When `foo` is added to the current constraints, the constraint `S <: T | Int`
+   *  is propagated to the lower bound `T` of `S`. The updated upper bound of `T`
+   *  is then set to:
+   *
+   *     String & (T | Int)
+   *
+   *  after distribution, this is:
+   *
+   *     (String & T) | (String & Int)
+   *
+   *
+   *  and since `&` performs simplifications, it is important that `T <: String`
+   *  return false at this point. Otherwise, the bound would be simplified to
+   *  `T | Int`
+   *
+   *  this prevents invalid simplifications when updating the bounds of a parameter,
+   *  see ConstraintsTest#initPreserveBounds.
    */
-  private var myTrustBounds: SimpleIdentitySet[TypeParamRef] = SimpleIdentitySet.empty
+  private var myUpdatingParams: SimpleIdentitySet[TypeParamRef] = SimpleIdentitySet.empty
 
-  inline def withUntrustedBounds(param: TypeParamRef, op: => Type): Type =
-    val saved = myTrustBounds
-    myTrustBounds += param
-    try op finally myTrustBounds = saved
+  /** Perform `op` with `param` added to `myUpdatingParams`.
+   *  This should be used when `op` computes updated bounds for
+   *  `param` to prevent invalid simplifications.
+   */
+  inline def withUpdatingParam(param: TypeParamRef, op: => Type): Type =
+    val saved = myUpdatingParams
+    myUpdatingParams += param
+    try op finally myUpdatingParams = saved
 
   def trustBounds: Boolean =
-    !Config.checkLevelsOnInstantiation || myTrustBounds.isEmpty
+    !Config.checkLevelsOnInstantiation || myUpdatingParams.isEmpty
 
   def checkReset() =
     assert(addConstraintInvocations == 0)
@@ -309,7 +337,7 @@ trait ConstraintHandling {
           val saved = homogenizeArgs
           homogenizeArgs = Config.alignArgsInAnd
           try
-            withUntrustedBounds(param,
+            withUpdatingParam(param,
               if isUpper then oldBounds.derivedTypeBounds(lo, hi & bound)
               else oldBounds.derivedTypeBounds(lo | bound, hi))
           finally
@@ -544,7 +572,7 @@ trait ConstraintHandling {
     constraint.entry(param) match
       case entry: TypeBounds =>
         val useLowerBound = fromBelow || param.occursIn(entry.hi)
-        val rawInst = withUntrustedBounds(param,
+        val rawInst = withUpdatingParam(param,
           if useLowerBound then fullLowerBound(param) else fullUpperBound(param))
         val levelInst = fixLevels(rawInst, fromBelow, maxLevel, param)
         if levelInst ne rawInst then
@@ -790,15 +818,19 @@ trait ConstraintHandling {
   final def canConstrain(param: TypeParamRef): Boolean =
     (!frozenConstraint || (caseLambda `eq` param.binder)) && constraint.contains(param)
 
+  /** Is `param` assumed to never be a sub- or super-type of any other type?
+   *  This is true if we're currently updating the bounds of `param`,
+   *  see `myUpdatingParams`.
+   */
+  final def assumedFalse(param: TypeParamRef)(using Context): Boolean =
+    myUpdatingParams.contains(param)
+
   /** Is `param` assumed to be a sub- and super-type of any other type?
    *  This holds if `TypeVarsMissContext` is set unless `param` is a part
    *  of a MatchType that is currently normalized.
    */
   final def assumedTrue(param: TypeParamRef)(using Context): Boolean =
     ctx.mode.is(Mode.TypevarsMissContext) && (caseLambda `ne` param.binder)
-
-  final def assumedFalse(param: TypeParamRef)(using Context): Boolean =
-    myTrustBounds.contains(param)
 
   /** Add constraint `param <: bound` if `fromBelow` is false, `param >: bound` otherwise.
    *  `bound` is assumed to be in normalized form, as specified in `firstTry` and

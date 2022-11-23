@@ -53,3 +53,15 @@ class ConstraintsTest:
         i"Merging constraints `?S <: ?T` and `Int <: ?S` should result in `Int <:< ?T`: ${ctx.typerState.constraint}")
     }
   end mergeBoundsTransitivity
+
+  /** See ConstraintHandling#myUpdatingParams */
+  @Test def initPreserveBounds: Unit = inCompilerContext(TestConfiguration.basicClasspath,
+    scalaSources = "trait A { def foo[S >: T <: T | Int, T <: String]: Any  }") {
+      val tvars = constrained(requiredClass("A").typeRef.select("foo".toTermName).info.asInstanceOf[TypeLambda], EmptyTree, alwaysAddTypeVars = true)._2
+      val List(s, t) = tvars.tpes
+
+      (ctx.typerState.constraint.entry(t.asInstanceOf[TypeVar].origin): @unchecked) match
+        case TypeBounds(lo, hi) =>
+          assert(lo =:= defn.NothingType, lo)
+          assert(hi =:= defn.StringType, hi)
+  }
