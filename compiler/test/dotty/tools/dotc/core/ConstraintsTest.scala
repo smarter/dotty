@@ -65,3 +65,17 @@ class ConstraintsTest:
           assert(lo =:= defn.NothingType, lo)
           assert(hi =:= defn.StringType, hi)
   }
+
+  @Test def unifyPreserveBounds: Unit = inCompilerContext(
+    TestConfiguration.basicClasspath,
+    scalaSources = "trait A { def foo[S >: T <: T | Int, T <: String | Int]: Any  }") {
+      val tvars = constrained(requiredClass("A").typeRef.select("foo".toTermName).info.asInstanceOf[TypeLambda], EmptyTree, alwaysAddTypeVars = true)._2
+      val List(s, t) = tvars.tpes
+
+      s <:< t
+
+      (ctx.typerState.constraint.entry(t.asInstanceOf[TypeVar].origin): @unchecked) match
+        case TypeBounds(lo, hi) =>
+          assert(lo =:= defn.NothingType, lo)
+          assert(hi =:= (defn.StringType | defn.IntType), hi)
+  }

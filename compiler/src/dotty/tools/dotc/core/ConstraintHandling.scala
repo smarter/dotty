@@ -456,9 +456,9 @@ trait ConstraintHandling {
       // by replacing the lower-bound to get:
       //     >: Int & Singleton <: Singleton
       if !isSub(lo, hi) then
-        boundRemoved = TypeBounds(lo & hi, hi)
+        boundRemoved = TypeBounds(withUpdatingParam(pKept, lo & hi), hi)
 
-    val newBounds = (boundKept & boundRemoved).bounds
+    val newBounds = withUpdatingParam(pKept, boundKept & boundRemoved).bounds
     constraint = constraint.updateEntry(pKept, newBounds).replace(pRemoved, pKept)
 
     val lo = newBounds.lo
