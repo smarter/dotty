@@ -110,15 +110,15 @@ trait ConstraintHandling {
    *  of `1`. So the lower bound is `1 | x.M` and when we level-avoid that we
    *  get `1 | Int & String`, which simplifies to `Int`.
    */
-  private var myTrustBounds = true
+  private var myTrustBounds: SimpleIdentitySet[TypeParamRef] = SimpleIdentitySet.empty
 
-  inline def withUntrustedBounds(op: => Type): Type =
+  inline def withUntrustedBounds(param: TypeParamRef, op: => Type): Type =
     val saved = myTrustBounds
-    myTrustBounds = false
+    myTrustBounds += param
     try op finally myTrustBounds = saved
 
   def trustBounds: Boolean =
-    !Config.checkLevelsOnInstantiation || myTrustBounds
+    !Config.checkLevelsOnInstantiation || myTrustBounds.isEmpty
 
   def checkReset() =
     assert(addConstraintInvocations == 0)
@@ -309,7 +309,7 @@ trait ConstraintHandling {
           val saved = homogenizeArgs
           homogenizeArgs = Config.alignArgsInAnd
           try
-            withUntrustedBounds(
+            withUntrustedBounds(param,
               if isUpper then oldBounds.derivedTypeBounds(lo, hi & bound)
               else oldBounds.derivedTypeBounds(lo | bound, hi))
           finally
@@ -544,7 +544,7 @@ trait ConstraintHandling {
     constraint.entry(param) match
       case entry: TypeBounds =>
         val useLowerBound = fromBelow || param.occursIn(entry.hi)
-        val rawInst = withUntrustedBounds(
+        val rawInst = withUntrustedBounds(param,
           if useLowerBound then fullLowerBound(param) else fullUpperBound(param))
         val levelInst = fixLevels(rawInst, fromBelow, maxLevel, param)
         if levelInst ne rawInst then
@@ -796,6 +796,9 @@ trait ConstraintHandling {
    */
   final def assumedTrue(param: TypeParamRef)(using Context): Boolean =
     ctx.mode.is(Mode.TypevarsMissContext) && (caseLambda `ne` param.binder)
+
+  final def assumedFalse(param: TypeParamRef)(using Context): Boolean =
+    myTrustBounds.contains(param)
 
   /** Add constraint `param <: bound` if `fromBelow` is false, `param >: bound` otherwise.
    *  `bound` is assumed to be in normalized form, as specified in `firstTry` and

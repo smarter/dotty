@@ -417,7 +417,8 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           }
           true
         }
-        def compareTypeParamRef =
+        def compareTypeParamRef: Boolean =
+          if assumedFalse(tp1) then return false
           assumedTrue(tp1)
           || tp2.dealias.match
               case tp2a: TypeParamRef => constraint.isLess(tp1, tp2a)
@@ -585,6 +586,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     }
 
     def compareTypeParamRef(tp2: TypeParamRef): Boolean =
+      if assumedFalse(tp2) then return false
       assumedTrue(tp2)
       || {
         val alwaysTrue =
@@ -2334,6 +2336,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
         val arg2 :: args2Rest = args2: @unchecked
         val common = singletonInterval(arg1, arg2)
         val v = tparam.paramVarianceSign
+        // println(i"$arg1, $arg2, $v, $homogenizeArgs, $frozenConstraint")
         val glbArg =
           if (common.exists) common
           else if (v > 0) glb(arg1.hiBound, arg2.hiBound)
@@ -2341,7 +2344,10 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           else if (isBounds(arg1) || isBounds(arg2))
             TypeBounds(lub(arg1.loBound, arg2.loBound),
                        glb(arg1.hiBound, arg2.hiBound))
-          else if (homogenizeArgs && !frozenConstraint && isSameType(arg1, arg2)) arg1
+          else if (homogenizeArgs && !frozenConstraint && {
+            println(TypeComparer.explained(_.isSameType(arg1, arg2)))
+            isSameType(arg1, arg2)
+          }) arg1
           else NoType
         glbArg :: glbArgs(args1Rest, args2Rest, tparamsRest)
       case nil =>
