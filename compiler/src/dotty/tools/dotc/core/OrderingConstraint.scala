@@ -525,20 +525,11 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 
 // ---------- Updates ------------------------------------------------------------
 
-  /** If `inst` is a TypeBounds, make sure it does not contain toplevel
-   *  references to `param` (see `Constraint#occursAtToplevel` for a definition
-   *  of "toplevel").
-   *  Any such references are replaced by `Nothing` in the lower bound and `Any`
-   *  in the upper bound.
-   *  References can be direct or indirect through instantiations of other
-   *  parameters in the constraint.
-   */
-  private def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
-
-    def recur(tp: Type, fromBelow: Boolean): Type = tp match
+  def ensureNonCyclic(param: TypeParamRef, bound: Type, isUpper: Boolean)(using Context): Type =
+    def recur(tp: Type): Type = tp match
       case tp: AndOrType =>
-        val r1 = recur(tp.tp1, fromBelow)
-        val r2 = recur(tp.tp2, fromBelow)
+        val r1 = recur(tp.tp1)
+        val r2 = recur(tp.tp2)
         if (r1 eq tp.tp1) && (r2 eq tp.tp2) then tp
         else tp.match
           case tp: OrType =>
@@ -547,35 +538,41 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
             r1 & r2
       case tp: TypeParamRef =>
         if tp eq param then
-          if fromBelow then defn.NothingType else defn.AnyType
+          if isUpper then defn.AnyType else defn.NothingType
         else entry(tp) match
           case NoType => tp
-          case TypeBounds(lo, hi) => if lo eq hi then recur(lo, fromBelow) else tp
-          case inst => recur(inst, fromBelow)
+          case TypeBounds(lo, hi) => if lo eq hi then recur(lo) else tp
+          case inst => recur(inst)
       case tp: TypeVar =>
-        val underlying1 = recur(tp.underlying, fromBelow)
+        val underlying1 = recur(tp.underlying)
         if underlying1 ne tp.underlying then underlying1 else tp
       case CapturingType(parent, refs) =>
-        val parent1 = recur(parent, fromBelow)
+        val parent1 = recur(parent)
         if parent1 ne parent then tp.derivedCapturingType(parent1, refs) else tp
       case tp: AnnotatedType =>
-        val parent1 = recur(tp.parent, fromBelow)
+        val parent1 = recur(tp.parent)
         if parent1 ne tp.parent then tp.derivedAnnotatedType(parent1, tp.annot) else tp
       case _ =>
         val tp1 = tp.dealiasKeepAnnots
         if tp1 ne tp then
-          val tp2 = recur(tp1, fromBelow)
+          val tp2 = recur(tp1)
           if tp2 ne tp1 then tp2 else tp
         else tp
 
+    recur(bound)
+  end ensureNonCyclic
+
+  /** If `inst` is a TypeBounds, make sure it does not contain toplevel references
+   *  to `param`.
+   */
+  private def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
     inst match
       case bounds: TypeBounds =>
         bounds.derivedTypeBounds(
-          recur(bounds.lo, fromBelow = true),
-          recur(bounds.hi, fromBelow = false))
+          ensureNonCyclic(param, bounds.lo, isUpper = false),
+          ensureNonCyclic(param, bounds.hi, isUpper = true))
       case _ =>
         inst
-  end ensureNonCyclic
 
   /** Add the fact `param1 <: param2` to the constraint `current` and propagate
    *  `<:<` relationships between parameters ("edges") but not bounds.
@@ -658,9 +655,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     current1
   }
 
-  /** The public version of `updateEntry`. Guarantees that there are no cycles */
   def updateEntry(param: TypeParamRef, tp: Type)(using Context): This =
-    updateEntry(this, param, ensureNonCyclic(param, tp)).checkWellFormed()
+    updateEntry(this, param, tp).checkWellFormed()
 
   def addLess(param1: TypeParamRef, param2: TypeParamRef, direction: UnificationDirection)(using Context): This =
     order(this, param1, param2, direction).checkWellFormed()

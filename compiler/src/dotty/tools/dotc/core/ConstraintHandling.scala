@@ -257,7 +257,7 @@ trait ConstraintHandling {
   end LevelAvoidMap
 
   /** Approximate `rawBound` if needed to make it a legal bound of `param` by
-   *  avoiding wildcards and types with a level strictly greater than its
+   *  avoiding cycles, wildcards and types with a level strictly greater than its
    *  `nestingLevel`.
    *
    *  Note that level-checking must be performed here and cannot be delayed
@@ -283,7 +283,7 @@ trait ConstraintHandling {
         // This is necessary for i8900-unflip.scala to typecheck.
         val v = if necessaryConstraintsOnly then -this.variance else this.variance
         atVariance(v)(super.legalVar(tp))
-    approx(rawBound)
+    constraint.ensureNonCyclic(param, approx(rawBound), isUpper)
   end legalBound
 
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =

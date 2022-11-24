@@ -88,6 +88,8 @@ abstract class Constraint extends Showable {
    *   - Another type, indicating a solution for the parameter
    *
    * @pre  `this contains param`.
+   * @pre  `tp` does not contain top-level references to `param`
+   *       (see `ensureNonCyclic`)
    */
   def updateEntry(param: TypeParamRef, tp: Type)(using Context): This
 
@@ -171,6 +173,17 @@ abstract class Constraint extends Showable {
    *  combination of `&` or `|` types.
    */
   def occursAtToplevel(param: TypeParamRef, tp: Type)(using Context): Boolean
+
+  /** Sanitize `bound` to remove any toplevel references to `param` (see
+   *  `Constraint#occursAtToplevel` for a definition of "toplevel"). Any such
+   *  references are replaced by `Any` if `isUpper` is true and `Nothing`
+   *  otherwise. References can be direct or indirect through instantiations of
+   *  other parameters in the constraint.
+   *
+   *  This makes it possible to use `bound` as a bound for `param`, see
+   *  `updateEntry`.
+   */
+  def ensureNonCyclic(param: TypeParamRef, bound: Type, isUpper: Boolean)(using Context): Type
 
   /** A string that shows the reverse dependencies maintained by this constraint
    *  (coDeps and contraDeps for OrderingConstraints).
