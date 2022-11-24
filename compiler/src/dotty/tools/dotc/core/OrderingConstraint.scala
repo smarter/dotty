@@ -565,7 +565,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
   /** If `inst` is a TypeBounds, make sure it does not contain toplevel references
    *  to `param`.
    */
-  private def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
+  def ensureNonCyclic(param: TypeParamRef, inst: Type)(using Context): Type =
     inst match
       case bounds: TypeBounds =>
         bounds.derivedTypeBounds(

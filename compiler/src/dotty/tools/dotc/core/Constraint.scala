@@ -185,6 +185,8 @@ abstract class Constraint extends Showable {
    */
   def ensureNonCyclic(param: TypeParamRef, bound: Type, isUpper: Boolean)(using Context): Type
 
+  def ensureNonCyclic(param: TypeParamRef, bound: Type)(using Context): Type
+
   /** A string that shows the reverse dependencies maintained by this constraint
    *  (coDeps and contraDeps for OrderingConstraints).
    */

@@ -430,6 +430,8 @@ trait ConstraintHandling {
       if !isSub(lo, hi) then
         boundRemoved = TypeBounds(lo & hi, hi)
 
+    boundRemoved = constraint.ensureNonCyclic(pKept, boundRemoved)
+
     val newBounds = (boundKept & boundRemoved).bounds
     constraint = constraint.updateEntry(pKept, newBounds).replace(pRemoved, pKept)
 
