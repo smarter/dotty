@@ -3001,6 +3001,9 @@ object TypeComparer {
   def bounds(param: TypeParamRef)(using Context): TypeBounds =
     comparing(_.bounds(param))
 
+  def nonParamBounds(param: TypeParamRef)(using Context): TypeBounds =
+    comparing(_.nonParamBounds(param))
+
   def fullBounds(param: TypeParamRef)(using Context): TypeBounds =
     comparing(_.fullBounds(param))
 
