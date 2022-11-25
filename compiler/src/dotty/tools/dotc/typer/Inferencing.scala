@@ -163,7 +163,7 @@ object Inferencing {
     (using Context) extends TypeAccumulator[Boolean] {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
-      val inst = tvar.instantiate(fromBelow)
+      val inst = tvar.instantiate(fromBelow, nonParam = true)
       typr.println(i"forced instantiation of ${tvar.origin} = $inst")
       inst
     }
@@ -367,6 +367,31 @@ object Inferencing {
     occurring(tree, boundVars(tree, Nil), Nil)
   }
 
+  //TODO: duplication with OrderingConstraint#stripParams
+  private def stripParams(tp: Type, isUpper: Boolean)(using Context): Type = tp match
+    case param: TypeParamRef if ctx.typerState.constraint.contains(param) =>
+      NoType
+    case tp: TypeBounds =>
+      val lo1 = stripParams(tp.lo, !isUpper).orElse(defn.NothingType)
+      val hi1 = stripParams(tp.hi, isUpper).orElse(tp.topType)
+      tp.derivedTypeBounds(lo1, hi1)
+    case tp: AndType if isUpper =>
+      val tp1 = stripParams(tp.tp1, isUpper)
+      val tp2 = stripParams(tp.tp2, isUpper)
+      if (tp1.exists)
+        if (tp2.exists) tp.derivedAndType(tp1, tp2)
+        else tp1
+      else tp2
+    case tp: OrType if !isUpper =>
+      val tp1 = stripParams(tp.tp1, isUpper)
+      val tp2 = stripParams(tp.tp2, isUpper)
+      if (tp1.exists)
+        if (tp2.exists) tp.derivedOrType(tp1, tp2)
+        else tp1
+      else tp2
+    case _ =>
+      tp
+
   /** The instantiation direction for given poly param computed
    *  from the constraint:
    *  @return   1 (maximize) if constraint is uniformly from above,
@@ -374,8 +399,8 @@ object Inferencing {
    *            0 if unconstrained, or constraint is from below and above.
    */
   private def instDirection(param: TypeParamRef)(using Context): Int = {
-    val constrained = TypeComparer.fullBounds(param)
-    val original = param.binder.paramInfos(param.paramNum)
+    val constrained = TypeComparer.nonParamBounds(param)
+    val original = stripParams(param.binder.paramInfos(param.paramNum), isUpper = true).asInstanceOf[TypeBounds]
     val cmp = TypeComparer
     val approxBelow =
       if (!cmp.isSubTypeWhenFrozen(constrained.lo, original.lo)) 1 else 0

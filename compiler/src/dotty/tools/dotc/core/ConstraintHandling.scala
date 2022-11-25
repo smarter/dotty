@@ -542,12 +542,16 @@ trait ConstraintHandling {
    *  @return the instantiating type
    *  @pre `param` is in the constraint's domain.
    */
-  final def approximation(param: TypeParamRef, fromBelow: Boolean, maxLevel: Int)(using Context): Type =
+  final def approximation(param: TypeParamRef, fromBelow: Boolean, maxLevel: Int, nonParam: Boolean = false)(using Context): Type =
     constraint.entry(param) match
       case entry: TypeBounds =>
         val useLowerBound = fromBelow || param.occursIn(entry.hi)
         val rawInst = withUntrustedBounds(
-          if useLowerBound then fullLowerBound(param) else fullUpperBound(param))
+          if nonParam then
+            val bounds = nonParamBounds(param)
+            if useLowerBound then bounds.lo else bounds.hi
+          else
+            if useLowerBound then fullLowerBound(param) else fullUpperBound(param))
         val levelInst = fixLevels(rawInst, fromBelow, maxLevel, param)
         if levelInst ne rawInst then
           typr.println(i"level avoid for $maxLevel: $rawInst --> $levelInst")
@@ -701,8 +705,8 @@ trait ConstraintHandling {
    *  The instance type is not allowed to contain references to types nested deeper
    *  than `maxLevel`.
    */
-  def instanceType(param: TypeParamRef, fromBelow: Boolean, widenUnions: Boolean, maxLevel: Int)(using Context): Type = {
-    val approx = approximation(param, fromBelow, maxLevel).simplified
+  def instanceType(param: TypeParamRef, fromBelow: Boolean, widenUnions: Boolean, maxLevel: Int, nonParam: Boolean = false)(using Context): Type = {
+    val approx = approximation(param, fromBelow, maxLevel, nonParam).simplified
     if fromBelow then
       val widened = widenInferred(approx, param, widenUnions)
       // Widening can add extra constraints, in particular the widened type might
@@ -712,7 +716,7 @@ trait ConstraintHandling {
       // (we do not check for non-toplevel occurences: those should never occur
       // since `addOneBound` disallows recursive lower bounds).
       if constraint.occursAtToplevel(param, widened) then
-        instanceType(param, fromBelow, widenUnions, maxLevel)
+        instanceType(param, fromBelow, widenUnions, maxLevel, nonParam)
       else
         widened
     else
