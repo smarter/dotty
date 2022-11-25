@@ -2990,11 +2990,13 @@ object TypeComparer {
   def subtypeCheckInProgress(using Context): Boolean =
     comparing(_.subtypeCheckInProgress)
 
-  def instanceType(param: TypeParamRef, fromBelow: Boolean, widenUnions: Boolean, maxLevel: Int = Int.MaxValue)(using Context): Type =
-    comparing(_.instanceType(param, fromBelow, widenUnions, maxLevel))
+  def instanceType(param: TypeParamRef, fromBelow: Boolean,
+    widenUnions: Boolean, maxLevel: Int = Int.MaxValue, nonParam: Boolean = false)(using Context): Type =
+    comparing(_.instanceType(param, fromBelow, widenUnions, maxLevel, nonParam))
 
-  def approximation(param: TypeParamRef, fromBelow: Boolean, maxLevel: Int = Int.MaxValue)(using Context): Type =
-    comparing(_.approximation(param, fromBelow, maxLevel))
+  def approximation(param: TypeParamRef, fromBelow: Boolean,
+    maxLevel: Int = Int.MaxValue, nonParam: Boolean = false)(using Context): Type =
+    comparing(_.approximation(param, fromBelow, maxLevel, nonParam))
 
   def bounds(param: TypeParamRef)(using Context): TypeBounds =
     comparing(_.bounds(param))

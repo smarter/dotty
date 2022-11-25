@@ -4752,12 +4752,19 @@ object Types {
      *  instantiation can be a singleton type only if the upper bound
      *  is also a singleton type.
      */
-    def instantiate(fromBelow: Boolean)(using Context): Type =
-      val tp = TypeComparer.instanceType(origin, fromBelow, widenUnions, nestingLevel)
+    def instantiate(fromBelow: Boolean, nonParam: Boolean = false)(using Context): Type =
+      val tp = TypeComparer.instanceType(origin, fromBelow, widenUnions, nestingLevel, nonParam)
       if myInst.exists then // The line above might have triggered instantiation of the current type variable
         myInst
       else
-        instantiateWith(tp)
+        if nonParam then
+          if this =:= tp then
+            instantiateWith(tp)
+          else
+            // fallback if instantiating to the non-param bound failed, should only happen in case of errors?
+            instantiate(fromBelow, nonParam = false)
+        else
+          instantiateWith(tp)
 
     /** Widen unions when instantiating this variable in the current context? */
     def widenUnions(using Context): Boolean = !ctx.typerState.constraint.isHard(this)
