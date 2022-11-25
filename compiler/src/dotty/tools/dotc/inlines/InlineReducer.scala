@@ -311,7 +311,7 @@ class InlineReducer(inliner: Inliner)(using Context):
       def addTypeBindings(typeBinds: TypeBindsMap)(using Context): Unit =
         typeBinds.foreachBinding { case (sym, shouldBeMinimized) =>
           newTypeBinding(sym,
-            ctx.gadt.approximation(sym, fromBelow = shouldBeMinimized, maxLevel = Int.MaxValue))
+            ctx.gadt.approximation(sym, fromBelow = shouldBeMinimized))
         }
 
       def registerAsGadtSyms(typeBinds: TypeBindsMap)(using Context): Unit =
