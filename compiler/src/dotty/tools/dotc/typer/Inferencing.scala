@@ -163,7 +163,7 @@ object Inferencing {
     (using Context) extends TypeAccumulator[Boolean] {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
-      val inst = tvar.instantiate(fromBelow)
+      val inst = tvar.instantiate(fromBelow, nonParam = true)
       typr.println(i"forced instantiation of ${tvar.origin} = $inst")
       inst
     }
