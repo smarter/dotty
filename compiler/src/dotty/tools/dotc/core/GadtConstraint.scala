@@ -173,9 +173,9 @@ sealed trait GadtConstraint (
   def isNarrowing: Boolean = wasConstrained
 
   /** See [[ConstraintHandling.approximation]] */
-  def approximation(sym: Symbol, fromBelow: Boolean, maxLevel: Int = Int.MaxValue)(using Context): Type = {
+  def approximation(sym: Symbol, fromBelow: Boolean)(using Context): Type = {
     val res =
-      approximation(tvarOrError(sym).origin, fromBelow, maxLevel) match
+      approximation(tvarOrError(sym).origin, fromBelow, maxLevel = Int.MaxValue) match
         case tpr: TypeParamRef =>
           // Here we do externalization when the returned type is a TypeParamRef,
           //  b/c ConstraintHandling.approximation may return internal types when
