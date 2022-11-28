@@ -1701,7 +1701,8 @@ trait Applications extends Compatibility {
                   case _ =>
                     if (variance > 0 && tparam.paramVarianceSign <= 0) TypeBounds(defn.NothingType, arg)
                     else arg
-              mapOver(t.derivedAppliedType(tycon, args.zipWithConserve(tycon.typeParams)(mapArg)))
+              val d = t.derivedAppliedType(tycon, args.zipWithConserve(tycon.typeParams)(mapArg))
+              if t eq d then mapOver(t) else d
             case _ => mapOver(t)
           }
         }
