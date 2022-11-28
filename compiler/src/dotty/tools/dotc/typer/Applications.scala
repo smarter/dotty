@@ -1696,8 +1696,11 @@ trait Applications extends Compatibility {
           def apply(t: Type) = t match {
             case t @ AppliedType(tycon, args) =>
               def mapArg(arg: Type, tparam: TypeParamInfo) =
-                if (variance > 0 && tparam.paramVarianceSign < 0) TypeBounds(defn.NothingType, arg)   //defn.FunctionOf(arg :: Nil, defn.UnitType)
-                else arg
+                arg match
+                  case arg: TypeBounds => arg
+                  case _ =>
+                    if (variance > 0 && tparam.paramVarianceSign <= 0) TypeBounds(defn.NothingType, arg)
+                    else arg
               mapOver(t.derivedAppliedType(tycon, args.zipWithConserve(tycon.typeParams)(mapArg)))
             case _ => mapOver(t)
           }
