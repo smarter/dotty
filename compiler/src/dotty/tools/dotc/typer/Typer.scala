@@ -3536,9 +3536,14 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
     def adaptNoArgsImplicitMethod(wtp: MethodType): Tree = {
       assert(wtp.isImplicitMethod)
+
+      wtp.paramInfos.foreach(tp =>
+        isFullyDefined(tp, ForceDegree.all, canMaximize = false)
+      )
+      
       val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
       def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToInstantiate)
+        // instantiateSelected(tp, tvarsToInstantiate)
         replaceSingletons(tp)
       }
       wtp.paramInfos.foreach(instantiate)

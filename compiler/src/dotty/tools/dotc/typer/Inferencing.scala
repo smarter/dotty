@@ -26,9 +26,9 @@ object Inferencing {
    *  but only if the overall result of `isFullyDefined` is `true`.
    *  Variables that are successfully minimized do not count as uninstantiated.
    */
-  def isFullyDefined(tp: Type, force: ForceDegree.Value)(using Context): Boolean = {
+  def isFullyDefined(tp: Type, force: ForceDegree.Value, canMaximize: Boolean = true)(using Context): Boolean = {
     val nestedCtx = ctx.fresh.setNewTyperState()
-    val result = new IsFullyDefinedAccumulator(force)(using nestedCtx).process(tp)
+    val result = new IsFullyDefinedAccumulator(force, canMaximize = canMaximize)(using nestedCtx).process(tp)
     if (result) nestedCtx.typerState.commit()
     result
   }
@@ -159,7 +159,7 @@ object Inferencing {
    *  2nd Phase: If first phase was successful, instantiate all remaining type variables
    *  to their upper bound.
    */
-  private class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false)
+  private class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false, canMaximize: Boolean = true)
     (using Context) extends TypeAccumulator[Boolean] {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
@@ -187,11 +187,11 @@ object Inferencing {
               // else hold off instantiating unbounded unconstrained variable
             else if direction != 0 then
               instantiate(tvar, fromBelow = direction < 0)
-            else if variance >= 0 && (force.ifBottom == IfBottom.ok || tvar.hasLowerBound) then
+            else if canMaximize && variance >= 0 && (force.ifBottom == IfBottom.ok || tvar.hasLowerBound) then
               instantiate(tvar, fromBelow = true)
-            else if variance >= 0 && force.ifBottom == IfBottom.fail then
+            else if canMaximize && variance >= 0 && force.ifBottom == IfBottom.fail then
               return false
-            else
+            else if canMaximize then
               toMaximize = tvar :: toMaximize
             foldOver(x, tvar)
           }
