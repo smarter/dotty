@@ -178,7 +178,9 @@ object Inferencing {
           force.appliesTo(tvar)
           && ctx.typerState.constraint.contains(tvar)
           && {
-            val direction = instDirection(tvar.origin)
+            val (approxAbove, approxBelow) = instDirection(tvar.origin)
+            val direction = approxAbove - approxBelow
+            var doIt = canMaximize || approxAbove != 0  || approxBelow != 0
             if minimizeSelected then
               if direction <= 0 && tvar.hasLowerBound then
                 instantiate(tvar, fromBelow = true)
@@ -187,11 +189,11 @@ object Inferencing {
               // else hold off instantiating unbounded unconstrained variable
             else if direction != 0 then
               instantiate(tvar, fromBelow = direction < 0)
-            else if canMaximize && variance >= 0 && (force.ifBottom == IfBottom.ok || tvar.hasLowerBound) then
+            else if doIt && variance >= 0 && (force.ifBottom == IfBottom.ok || tvar.hasLowerBound) then
               instantiate(tvar, fromBelow = true)
-            else if canMaximize && variance >= 0 && force.ifBottom == IfBottom.fail then
+            else if doIt && variance >= 0 && force.ifBottom == IfBottom.fail then
               return false
-            else if canMaximize then
+            else if doIt then
               toMaximize = tvar :: toMaximize
             foldOver(x, tvar)
           }
@@ -398,7 +400,7 @@ object Inferencing {
    *           -1 (minimize) if constraint is uniformly from below,
    *            0 if unconstrained, or constraint is from below and above.
    */
-  private def instDirection(param: TypeParamRef)(using Context): Int = {
+  private def instDirection(param: TypeParamRef)(using Context): (Int, Int) = {
     val constrained = TypeComparer.nonParamBounds(param)
     val original = stripParams(param.binder.paramInfos(param.paramNum), isUpper = true).asInstanceOf[TypeBounds]
     val cmp = TypeComparer
@@ -406,7 +408,7 @@ object Inferencing {
       if (!cmp.isSubTypeWhenFrozen(constrained.lo, original.lo)) 1 else 0
     val approxAbove =
       if (!cmp.isSubTypeWhenFrozen(original.hi, constrained.hi)) 1 else 0
-    approxAbove - approxBelow
+    (approxAbove, approxBelow)
   }
 
   /** Following type aliases and stripping refinements and annotations, if one arrives at a
