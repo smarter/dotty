@@ -3536,12 +3536,29 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
     def adaptNoArgsImplicitMethod(wtp: MethodType): Tree = {
       assert(wtp.isImplicitMethod)
+      // Select(Apply(x, bla), foo)
       // val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
-      println("tree: " + tree.show)
-      println("wtp: " + tree.show)
-      val tvarsToInstantiate2 = tree.removeAttachment(PreArgsConstraint) match
+      // println("tree: " + tree.show)
+      // println("wtp: " + tree.show)
+
+      def preArgsConstr(t: Tree): Option[Constraint] = t match
+        case Apply(fun, _) =>
+          preArgsConstr(fun).orElse(t.removeAttachment(PreArgsConstraint))
+        case Select(pre, _) =>
+          preArgsConstr(pre)
+        case Typed(u, _) =>
+          preArgsConstr(u)
+        case _ =>
+          None
+
+      // x(a).y(b).bla
+      // Select(x(a).y(b), bla)
+      // Select(Apply(x().y, b), bla)
+      // Select(Apply(Select(x(a), y), b), bla)
+
+      val tvarsToInstantiate2 = preArgsConstr(tree) match
         case Some(pre) =>
-          println("pre: " + pre.show)
+          // println("pre: " + pre.show)
           val cur = ctx.typerState.constraint
           // TODO: instantiate based on which bound was constrained.
           cur.domainParams.filter(p =>
