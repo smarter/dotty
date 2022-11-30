@@ -37,8 +37,13 @@ import annotation.threadUnsafe
 
 import scala.util.control.NonFatal
 
+import util.Property
+
+
 object Applications {
   import tpd._
+
+  val PreArgsConstraint = new Property.Key[Constraint]
 
   def extractorMember(tp: Type, name: Name)(using Context): SingleDenotation =
     tp.member(name).suchThat(sym => sym.info.isParameterless && sym.info.widenExpr.isValueType)
@@ -465,6 +470,8 @@ trait Applications extends Compatibility {
       else
         args
 
+    var preArgsConstraint: Constraint = OrderingConstraint.empty
+
     protected def init(): Unit = methType match {
       case methType: MethodType =>
         val resultApprox = resultTypeApprox(methType)
@@ -480,6 +487,7 @@ trait Applications extends Compatibility {
           // overloading resolution might prune it.
           fail(TypeMismatch(methType.resultType, resultType, None))
 
+        preArgsConstraint = ctx.typerState.constraint
         // match all arguments with corresponding formal parameters
         matchArgs(orderedArgs, methType.paramInfos, 0)
       case _ =>
@@ -877,7 +885,9 @@ trait Applications extends Compatibility {
             typedArgs = args.asInstanceOf[List[Tree]]
           assignType(app0, normalizedFun, typedArgs)
         }
-      wrapDefs(liftedDefs, app1)
+      val t = wrapDefs(liftedDefs, app1).withAttachment(PreArgsConstraint, preArgsConstraint)
+      preArgsConstraint = OrderingConstraint.empty
+      t
     }
   }
 

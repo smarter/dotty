@@ -33,7 +33,7 @@ import inlines.{Inlines, PrepareInlineable}
 import util.Spans._
 import util.common._
 import util.{Property, SimpleIdentityMap, SrcPos}
-import Applications.{tupleComponentTypes, wrapDefs, defaultArgument}
+import Applications.{tupleComponentTypes, wrapDefs, defaultArgument, PreArgsConstraint}
 
 import collection.mutable
 import annotation.tailrec
@@ -3536,9 +3536,21 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
     def adaptNoArgsImplicitMethod(wtp: MethodType): Tree = {
       assert(wtp.isImplicitMethod)
-      val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
+      // val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
+      val tvarsToInstantiate2 = tree.removeAttachment(PreArgsConstraint) match
+        case Some(pre) =>
+          val cur = ctx.typerState.constraint
+          // TODO: instantiate based on which bound was constrained.
+          cur.domainParams.filter(p =>
+            pre.entry(p) != cur.entry(p)).map(cur.typeVarOfParam)
+        case None =>
+          Nil
+
+      // println("old: " + tvarsToInstantiate)
+      // println("new: " + tvarsToInstantiate2)
+
       def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToInstantiate)
+        instantiateSelected(tp, tvarsToInstantiate2)
         replaceSingletons(tp)
       }
       wtp.paramInfos.foreach(instantiate)
