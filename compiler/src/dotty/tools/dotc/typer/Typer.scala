@@ -3549,7 +3549,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
       assert(wtp.isImplicitMethod)
       // println("tree: " + tree.show)
       // println("wtp: " + wtp.show)
-      val tvarsToKeep = tvarsNotInParams(tree, locked).distinct
+      val tvarsToKeep = (locked.toList ++ tvarsNotInParams(tree, locked)).distinct
       // println("t: " + tvarsToKeep)
       // println("#BEF: " + ctx.typerState.constraint.show)
       def instantiate(tp: Type): Unit = {
