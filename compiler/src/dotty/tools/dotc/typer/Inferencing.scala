@@ -62,10 +62,9 @@ object Inferencing {
    *  The method is called to instantiate type variables before an implicit search.
    */
   def instantiateSelected(tp: Type, tvars: List[Type])(using Context): Unit =
-    if (tvars.nonEmpty)
-      IsFullyDefinedAccumulator(
-        ForceDegree.Value(tvars.contains, IfBottom.flip), minimizeSelected = true
-      ).process(tp)
+    IsFullyDefinedAccumulator(
+      ForceDegree.Value(!tvars.contains(_), IfBottom.flip), minimizeSelected = true
+    ).process(tp)
 
   /** Instantiate any type variables in `tp` whose bounds contain a reference to
    *  one of the parameters in `paramss`.
@@ -333,15 +332,14 @@ object Inferencing {
    *    - The prefix `p` of a selection `p.f`.
    *    - The result expression `e` of a block `{s1; .. sn; e}`.
    */
-  def tvarsInParams(tree: Tree, locked: TypeVars)(using Context): List[TypeVar] = {
+  def tvarsNotInParams(tree: Tree, locked: TypeVars)(using Context): List[TypeVar] = {
     @tailrec def boundVars(tree: Tree, acc: List[TypeVar]): List[TypeVar] = tree match {
       case Apply(fn, _) => boundVars(fn, acc)
       case TypeApply(fn, targs) =>
         val tvars = targs.filter(_.isInstanceOf[InferredTypeTree]).tpes.collect {
           case tvar: TypeVar
           if !tvar.isInstantiated &&
-             ctx.typerState.ownedVars.contains(tvar) &&
-             !locked.contains(tvar) => tvar
+             ctx.typerState.ownedVars.contains(tvar) => tvar
         }
         boundVars(fn, acc ::: tvars)
       case Select(pre, _) => boundVars(pre, acc)
@@ -349,7 +347,7 @@ object Inferencing {
       case _ => acc
     }
     @tailrec def occurring(tree: Tree, toTest: List[TypeVar], acc: List[TypeVar]): List[TypeVar] =
-      if (toTest.isEmpty) acc
+      if (toTest.isEmpty) toTest
       else tree match {
         case Apply(fn, _) =>
           fn.tpe.widen match {
@@ -362,10 +360,17 @@ object Inferencing {
         case TypeApply(fn, targs) => occurring(fn, toTest, acc)
         case Select(pre, _) => occurring(pre, toTest, acc)
         case Block(_, expr) => occurring(expr, toTest, acc)
-        case _ => acc
+        case _ => toTest
       }
     occurring(tree, boundVars(tree, Nil), Nil)
   }
+
+  // def foo[T]: Bla[T]
+  // class Bla[Z] { def bla(x: Z)(using ...): Unit }
+  
+  // (foo[?T].bla): ?S
+  // foo[?S].bla(1)
+  // foo[?S].bla
 
   /** The instantiation direction for given poly param computed
    *  from the constraint:

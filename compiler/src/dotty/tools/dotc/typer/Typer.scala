@@ -3547,12 +3547,17 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
     def adaptNoArgsImplicitMethod(wtp: MethodType): Tree = {
       assert(wtp.isImplicitMethod)
-      val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
+      // println("tree: " + tree.show)
+      // println("wtp: " + wtp.show)
+      val tvarsToKeep = tvarsNotInParams(tree, locked).distinct
+      // println("t: " + tvarsToKeep)
+      // println("#BEF: " + ctx.typerState.constraint.show)
       def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToInstantiate)
+        instantiateSelected(tp, tvarsToKeep)
         replaceSingletons(tp)
       }
       wtp.paramInfos.foreach(instantiate)
+      // println("#AFT: " + ctx.typerState.constraint.show)
       val saved = ctx.typerState.snapshot()
 
       def dummyArg(tp: Type) = untpd.Ident(nme.???).withTypeUnchecked(tp)
