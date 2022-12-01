@@ -3553,7 +3553,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
       // println("t: " + tvarsToKeep)
       // println("#BEF: " + ctx.typerState.constraint.show)
       def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToKeep)
+        instantiateExcept(tp, tvarsToKeep)
         replaceSingletons(tp)
       }
       wtp.paramInfos.foreach(instantiate)

@@ -62,6 +62,12 @@ object Inferencing {
    *  The method is called to instantiate type variables before an implicit search.
    */
   def instantiateSelected(tp: Type, tvars: List[Type])(using Context): Unit =
+    if (tvars.nonEmpty)
+      IsFullyDefinedAccumulator(
+        ForceDegree.Value(tvars.contains, IfBottom.flip), minimizeSelected = true
+      ).process(tp)
+
+  def instantiateExcept(tp: Type, tvars: List[Type])(using Context): Unit =
     IsFullyDefinedAccumulator(
       ForceDegree.Value(!tvars.contains(_), IfBottom.flip), minimizeSelected = true
     ).process(tp)
