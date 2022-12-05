@@ -339,8 +339,7 @@ object Inferencing {
       case TypeApply(fn, targs) =>
         val tvars = targs.filter(_.isInstanceOf[InferredTypeTree]).tpes.collect {
           case tvar: TypeVar
-          if (tvar.isInstantiated || ctx.typerState.ownedVars.contains(tvar)) &&
-             !locked.contains(tvar) =>
+          if !locked.contains(tvar) =>
             // assert(!locked.contains(tvar), i"$tree - $tvar - ${ctx.typerState.constraint}") // fails bootstrapped
             // assert(tvar.isInstantiated || ctx.typerState.ownedVars.contains(tvar), i"$tree - $tvar - ${ctx.typerState.constraint}")
             tvar
