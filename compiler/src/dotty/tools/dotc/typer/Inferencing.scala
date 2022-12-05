@@ -69,7 +69,7 @@ object Inferencing {
 
   def instantiateExcept(tp: Type, tvars: List[Type])(using Context): Unit =
     IsFullyDefinedAccumulator(
-      ForceDegree.Value(!tvars.contains(_), IfBottom.flip), minimizeSelected = true
+      ForceDegree.Value(tv => ctx.typerState.ownedVars.contains(tv) && !tvars.contains(tv), IfBottom.flip), minimizeSelected = true
     ).process(tp)
 
   /** Instantiate any type variables in `tp` whose bounds contain a reference to
