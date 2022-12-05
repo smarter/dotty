@@ -3548,8 +3548,21 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     def adaptNoArgsImplicitMethod(wtp: MethodType): Tree = {
       assert(wtp.isImplicitMethod)
       val tvarsToInstantiate = tvarsInParams(tree, locked).distinct
+      // println("tree: " + tree.show)
+      // println("wtp: " + wtp.show)
+      // println("t: " + tvarsToInstantiate)
       def instantiate(tp: Type): Unit = {
-        instantiateSelected(tp, tvarsToInstantiate)
+        val instTraverser = new TypeTraverser:
+          def traverse(tp: Type) = tp match
+            case tp: TypeVar =>
+              if tvarsToInstantiate.contains(tp) then
+                IsFullyDefinedAccumulator(
+                  ForceDegree.Value(_ => true, IfBottom.flip), minimizeSelected = true
+                ).process(tp)
+            case _ =>
+              traverseChildren(tp)
+        // instantiateSelected(tp, tvarsToInstantiate)
+        instTraverser.traverse(tp)
         replaceSingletons(tp)
       }
       wtp.paramInfos.foreach(instantiate)

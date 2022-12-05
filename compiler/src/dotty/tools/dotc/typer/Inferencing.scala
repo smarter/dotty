@@ -159,7 +159,7 @@ object Inferencing {
    *  2nd Phase: If first phase was successful, instantiate all remaining type variables
    *  to their upper bound.
    */
-  private class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false)
+  /*private*/ class IsFullyDefinedAccumulator(force: ForceDegree.Value, minimizeSelected: Boolean = false)
     (using Context) extends TypeAccumulator[Boolean] {
 
     private def instantiate(tvar: TypeVar, fromBelow: Boolean): Type = {
@@ -339,9 +339,11 @@ object Inferencing {
       case TypeApply(fn, targs) =>
         val tvars = targs.filter(_.isInstanceOf[InferredTypeTree]).tpes.collect {
           case tvar: TypeVar
-          if !tvar.isInstantiated &&
-             ctx.typerState.ownedVars.contains(tvar) &&
-             !locked.contains(tvar) => tvar
+          if (tvar.isInstantiated || ctx.typerState.ownedVars.contains(tvar)) &&
+             !locked.contains(tvar) =>
+            // assert(!locked.contains(tvar), i"$tree - $tvar - ${ctx.typerState.constraint}") // fails bootstrapped
+            // assert(tvar.isInstantiated || ctx.typerState.ownedVars.contains(tvar), i"$tree - $tvar - ${ctx.typerState.constraint}")
+            tvar
         }
         boundVars(fn, acc ::: tvars)
       case Select(pre, _) => boundVars(pre, acc)
