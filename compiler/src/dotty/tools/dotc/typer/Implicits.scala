@@ -1199,7 +1199,8 @@ trait Implicits:
         val history = ctx.searchHistory.nest(cand, pt)
         val typingCtx =
           nestedContext().setNewTyperState().setFreshGADTBounds.setSearchHistory(history)
-        val result = typedImplicit(cand, pt, argument, span, ctx.typerState.ownedVars)(using typingCtx)
+        val locked = util.SimpleIdentitySet(ctx.typerState.constraint.uninstVars.toList*)
+        val result = typedImplicit(cand, pt, argument, span, locked)(using typingCtx)
         result match
           case res: SearchSuccess =>
             ctx.searchHistory.defineBynameImplicit(wideProto, res)
