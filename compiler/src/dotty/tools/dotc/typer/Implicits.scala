@@ -1062,13 +1062,14 @@ trait Implicits:
     }
 
   /** Try to typecheck an implicit reference */
-  def typedImplicit(cand: Candidate, pt: Type, argument: Tree, span: Span)(using Context): SearchResult =  trace(i"typed implicit ${cand.ref}, pt = $pt, implicitsEnabled == ${ctx.mode is ImplicitsEnabled}", implicits, show = true) {
+  def typedImplicit(cand: Candidate, pt: Type, argument: Tree, span: Span, locked: TypeVars)(using Context): SearchResult =  trace(i"typed implicit ${cand.ref}, pt = $pt, implicitsEnabled == ${ctx.mode is ImplicitsEnabled}", implicits, show = true) {
     if ctx.run.nn.isCancelled then NoMatchingImplicitsFailure
     else
       record("typedImplicit")
       val ref = cand.ref
       val generated: Tree = tpd.ref(ref).withSpan(span.startPos)
-      val locked = ctx.typerState.ownedVars
+      // val locked = ctx.typerState.ownedVars
+      // println(s"locking for $cand: " + ctx.typerState + " " + locked)
       val adapted =
         if argument.isEmpty then
           if defn.isContextFunctionType(pt) then
@@ -1198,7 +1199,7 @@ trait Implicits:
         val history = ctx.searchHistory.nest(cand, pt)
         val typingCtx =
           nestedContext().setNewTyperState().setFreshGADTBounds.setSearchHistory(history)
-        val result = typedImplicit(cand, pt, argument, span)(using typingCtx)
+        val result = typedImplicit(cand, pt, argument, span, ctx.typerState.ownedVars)(using typingCtx)
         result match
           case res: SearchSuccess =>
             ctx.searchHistory.defineBynameImplicit(wideProto, res)

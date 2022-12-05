@@ -209,7 +209,7 @@ trait ImportSuggestions:
         val candidate = Candidate(ref, kind, 0)
         try
           timer.schedule(task, testOneImplicitTimeOut)
-          typedImplicit(candidate, expectedType, argument, span)(
+          typedImplicit(candidate, expectedType, argument, span, util.SimpleIdentitySet.empty)(
             using testContext()).isSuccess
         finally
           val run = ctx.run.nn
