@@ -31,7 +31,9 @@ class Synthesizer(typer: Typer)(using @constructorOnly c: Context):
   val synthesizedClassTag: SpecialHandler = (formal, span) =>
     def inst(tp: Type): Type = tp.stripTypeVar match
       case tp: AndOrType if tp.tp1 =:= tp.tp2 => inst(tp.tp1)
-      case _ => fullyDefinedType(tp, "ClassTag argument", ctx.source.atSpan(span))
+      case _ =>
+        if isFullyDefined(tp, ForceDegree.all) then tp
+        else UnspecifiedErrorType
 
     val tag = formal.argInfos match
       case arg :: Nil =>
