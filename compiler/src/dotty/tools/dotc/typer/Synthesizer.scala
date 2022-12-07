@@ -27,14 +27,19 @@ class Synthesizer(typer: Typer)(using @constructorOnly c: Context):
   type SpecialHandler = (Type, Span) => Context ?=> TreeWithErrors
   private type SpecialHandlers = List[(ClassSymbol, SpecialHandler)]
 
+  
   val synthesizedClassTag: SpecialHandler = (formal, span) =>
+    def inst(tp: Type): Type = tp.stripTypeVar match
+      case tp: AndOrType if tp.tp1 =:= tp.tp2 => inst(tp.tp1)
+      case _ => fullyDefinedType(tp, "ClassTag argument", ctx.source.atSpan(span))
+
     val tag = formal.argInfos match
-      case arg :: Nil if isFullyDefined(arg, ForceDegree.all) =>
-        arg match
+      case arg :: Nil =>
+        inst(arg) match
           case defn.ArrayOf(elemTp) =>
             val etag = typer.inferImplicitArg(defn.ClassTagClass.typeRef.appliedTo(elemTp), span)
             if etag.tpe.isError then EmptyTree else etag.select(nme.wrap)
-          case tp if hasStableErasure(tp) && !defn.isBottomClassAfterErasure(tp.typeSymbol) =>
+          case tp if hasStableErasure(tp) =>
             val sym = tp.typeSymbol
             val classTagModul = ref(defn.ClassTagModule)
             if defn.SpecialClassTagClasses.contains(sym) then
@@ -48,7 +53,7 @@ class Synthesizer(typer: Typer)(using @constructorOnly c: Context):
                 case _ =>
                   escapeJavaArray(erasure(tp))
               val ctype = clsOfType(tp)
-              if ctype.exists then
+              if ctype.exists && !defn.isBottomClassAfterErasure(ctype.typeSymbol) then
                 classTagModul.select(nme.apply)
                   .appliedToType(tp)
                   .appliedTo(clsOf(ctype))
