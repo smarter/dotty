@@ -13,6 +13,8 @@ import java.util.Optional
 import scala.util.chaining._
 import core.Decorators.toMessage
 
+import scala.annotation.constructorOnly
+
 object Diagnostic:
 
   def shouldExplain(dia: Diagnostic)(using Context): Boolean =
@@ -24,8 +26,8 @@ object Diagnostic:
   class Error(
     msg: Message,
     pos: SourcePosition
-  ) extends Diagnostic(msg, pos, ERROR):
-    def this(str: => String, pos: SourcePosition) = this(str.toMessage, pos)
+  )(using @constructorOnly ictx: Context) extends Diagnostic(msg, pos, ERROR):
+    def this(str: => String, pos: SourcePosition)(using Context) = this(str.toMessage, pos)
 
   /** A sticky error is an error that should not be hidden by backtracking and
    *  trying some alternative path. Typically, errors issued after catching
@@ -34,27 +36,27 @@ object Diagnostic:
   class StickyError(
     msg: Message,
     pos: SourcePosition
-  ) extends Error(msg, pos)
+  )(using @constructorOnly ictx: Context) extends Error(msg, pos)
 
   class Warning(
     msg: Message,
     pos: SourcePosition
-  ) extends Diagnostic(msg, pos, WARNING) {
-    def toError: Error = new Error(msg, pos).tap(e => if isVerbose then e.setVerbose())
-    def toInfo: Info = new Info(msg, pos).tap(e => if isVerbose then e.setVerbose())
+  )(using @constructorOnly ictx: Context) extends Diagnostic(msg, pos, WARNING) {
+    def toError(using Context): Error = new Error(msg, pos).tap(e => if isVerbose then e.setVerbose())
+    def toInfo(using Context): Info = new Info(msg, pos).tap(e => if isVerbose then e.setVerbose())
     def isSummarizedConditional(using Context): Boolean = false
   }
 
   class Info(
     msg: Message,
     pos: SourcePosition
-  ) extends Diagnostic(msg, pos, INFO):
-    def this(str: => String, pos: SourcePosition) = this(str.toMessage, pos)
+  )(using @constructorOnly ictx: Context) extends Diagnostic(msg, pos, INFO):
+    def this(str: => String, pos: SourcePosition)(using Context) = this(str.toMessage, pos)
 
   abstract class ConditionalWarning(
     msg: Message,
     pos: SourcePosition
-  ) extends Warning(msg, pos) {
+  )(using @constructorOnly ictx: Context) extends Warning(msg, pos) {
     def enablingOption(using Context): Setting[Boolean]
     override def isSummarizedConditional(using Context): Boolean = !enablingOption.value
   }
@@ -62,34 +64,40 @@ object Diagnostic:
   class FeatureWarning(
     msg: Message,
     pos: SourcePosition
-  ) extends ConditionalWarning(msg, pos) {
+  )(using @constructorOnly ictx: Context) extends ConditionalWarning(msg, pos) {
     def enablingOption(using Context): Setting[Boolean] = ctx.settings.feature
   }
 
   class UncheckedWarning(
     msg: Message,
     pos: SourcePosition
-  ) extends ConditionalWarning(msg, pos) {
+  )(using @constructorOnly ictx: Context) extends ConditionalWarning(msg, pos) {
     def enablingOption(using Context): Setting[Boolean] = ctx.settings.unchecked
   }
 
   class DeprecationWarning(
     msg: Message,
     pos: SourcePosition
-  ) extends ConditionalWarning(msg, pos) {
+  )(using @constructorOnly ictx: Context) extends ConditionalWarning(msg, pos) {
     def enablingOption(using Context): Setting[Boolean] = ctx.settings.deprecation
   }
 
   class MigrationWarning(
     msg: Message,
     pos: SourcePosition
-  ) extends Warning(msg, pos)
+  )(using @constructorOnly ictx: Context) extends Warning(msg, pos)
 
 class Diagnostic(
   val msg: Message,
   val pos: SourcePosition,
   val level: Int
-) extends Exception with interfaces.Diagnostic:
+)(using @constructorOnly ictx: Context) extends Exception(
+    // These are just the default values
+    /*message =*/ null, /*cause =*/ null, /*enableSuppression =*/ true,
+
+    // Performance optimization: don't compute the stack trace unless requested by the reporter.
+    /*writableStackTrace =*/ ictx.reporter.hasStackTraces
+  ) with interfaces.Diagnostic:
   private var verbose: Boolean = false
   def isVerbose: Boolean = verbose
   def setVerbose(): this.type =

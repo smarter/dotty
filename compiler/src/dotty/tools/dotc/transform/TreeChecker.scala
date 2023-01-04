@@ -135,7 +135,7 @@ class TreeChecker extends Phase with SymTransformer {
     val checkingCtx = ctx
         .fresh
         .addMode(Mode.ImplicitsEnabled)
-        .setReporter(new ThrowingReporter(ctx.reporter))
+        .setReporter(new ThrowingReporter(ctx.reporter, hasStackTraces = true))
 
     val checker = inContext(ctx) {
       new Checker(previousPhases(phasesToRun.toList))

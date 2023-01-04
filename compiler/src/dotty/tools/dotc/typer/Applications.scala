@@ -2390,7 +2390,8 @@ trait Applications extends Compatibility {
     val methodRefTree = ref(methodRef, needLoad = false)
     val truncatedSym = methodRef.symbol.asTerm.copy(info = truncateExtension(methodRef.info))
     val truncatedRefTree = untpd.TypedSplice(ref(truncatedSym)).withSpan(receiver.span)
-    val newCtx = ctx.fresh.setNewScope.setReporter(new reporting.ThrowingReporter(ctx.reporter))
+    val newCtx = ctx.fresh.setNewScope.setReporter(
+      new reporting.ThrowingReporter(ctx.reporter, hasStackTraces = false))
 
     try
       val appliedTree = inContext(newCtx) {

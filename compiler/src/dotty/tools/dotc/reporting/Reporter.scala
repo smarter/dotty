@@ -265,4 +265,9 @@ abstract class Reporter extends interfaces.ReporterResult {
 
   /** If this reporter buffers messages, all buffered messages, otherwise Nil */
   def pendingMessages(using Context): List[Diagnostic] = Nil
+
+  /** If true, Diagnostics created when `ctx.reporter eq this` will have their
+   *  stack traces filled in.
+   */
+  def hasStackTraces: Boolean = false
 }

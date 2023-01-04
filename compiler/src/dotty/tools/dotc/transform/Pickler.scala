@@ -119,7 +119,7 @@ class Pickler extends Phase {
       testUnpickler(
         using ctx2
             .setPeriod(Period(ctx.runId + 1, ctx.base.typerPhase.id))
-            .setReporter(new ThrowingReporter(ctx.reporter))
+            .setReporter(new ThrowingReporter(ctx.reporter, hasStackTraces = true))
             .addMode(Mode.ReadPositions)
             .addMode(Mode.PrintShowExceptions))
     result
