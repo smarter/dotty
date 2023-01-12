@@ -82,9 +82,9 @@ class TyperState() {
   protected def depth: Int = 
     var cur = this
     var d = 0
-    while previous != null do
-      cur = cur.previous
+    while cur != null do
       d += 1
+      cur = cur.previous
     d
 
   def commonAncestor(that: TyperState): TyperState =
@@ -94,12 +94,12 @@ class TyperState() {
     val leftDepth = left.depth
     val rightDepth = right.depth
     var diff = leftDepth - rightDepth
-    while diff < 0 do
-      left = left.previous.uncheckedNN
-      diff += 1
     while diff > 0 do
-      right = right.previous.uncheckedNN
+      left = left.previous.uncheckedNN
       diff -= 1
+    while diff < 0 do
+      right = right.previous.uncheckedNN
+      diff += 1
     while left ne right do
       left = left.previous.uncheckedNN
       right = right.previous.uncheckedNN
@@ -281,8 +281,9 @@ class TyperState() {
       assert(res || ctx.reporter.errorsReported, i"cannot merge $constraint with $other.")
     ))
 
-    for tl <- constraint.domainLambdas do
-      if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
+    // for tl <- constraint.domainLambdas do
+    //   if constraint.isRemovable(tl) then constraint = constraint.remove(tl)
+    gc()
     this
   end mergeConstraintWith
 
