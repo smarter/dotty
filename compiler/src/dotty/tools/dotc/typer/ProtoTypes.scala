@@ -452,6 +452,32 @@ object ProtoTypes {
           // We only need to propagate constraints if we typed the arguments in a different
           // TyperState and if that created additional constraints.
           if (passedTyperState ne protoTyperState) && (oldConstraint ne newConstraint) then
+            // If there are new constraints of tvars that already exit in passedTyperState,
+            // then we need to do a merge.
+            // Otherwise:
+            // - we need to instantiate all tvars which are not in passedTyperState and
+            //   which show up in args. We run into issues if there is any tvar
+            //   like this which is owned by an ancestor of protoTyperState.
+            //   If this happens, we need to merge the ancestor first.
+
+          
+            // 1. Traverse args1.tpes to instantiate all tvars which are not in passedTyperState
+            //    If we find a tvar which is not owned by protoTyperState, remember it in nonOwnedTvars
+
+            val common = protoTyperState.commonAncestor(passedTyperState)
+            def foo(cur: TyperState): Unit = 
+              if cur.previous != common then
+                foo(cur.previous)
+              if cur.isCommittable then
+                //do stuff now that previous has been merged.
+                cur.mergeConstraintWith(previous)(using passedCtx)
+            foo(protoTyperState)
+
+            println("args: " + args1.map(_.show))
+            println("proto: " + protoTyperState)
+            println("passed: " + passedTyperState)
+            println("old: " + oldConstraint.show)
+            println("new: " + newConstraint.show)
             // To respect the pre-condition of `mergeConstraintWith` and keep
             // `protoTyperState` committable we must ensure that it does not
             // contain any type variable which don't already exist in the passed
@@ -475,6 +501,11 @@ object ProtoTypes {
                   tvar.instantiate(fromBelow = false)
                 case _ =>
               }
+            var cur = protoTyperState
+            while cur.previous != common do
+              cur.previous.mergeConstraintWith(cur)
+              // At this point cur.previous
+              cur = cur.previous
             passedTyperState.mergeConstraintWith(protoTyperState)(using passedCtx)
           end if
           args1

@@ -47,7 +47,7 @@ class TyperState() {
   private var myId: Int = _
   def id: Int = myId
 
-  private var previous: TyperState | Null = _
+  private[dotc] var previous: TyperState | Null = _
 
   private var myReporter: Reporter = _
 
@@ -78,6 +78,32 @@ class TyperState() {
 
   def isGlobalCommittable: Boolean =
     isCommittable && (previous == null || previous.uncheckedNN.isGlobalCommittable)
+
+  protected def depth: Int = 
+    var cur = this
+    var d = 0
+    while previous != null do
+      cur = cur.previous
+      d += 1
+    d
+
+  def commonAncestor(that: TyperState): TyperState =
+    if this eq that then return this
+    var left = this
+    var right = that
+    val leftDepth = left.depth
+    val rightDepth = right.depth
+    var diff = leftDepth - rightDepth
+    while diff < 0 do
+      left = left.previous.uncheckedNN
+      diff += 1
+    while diff > 0 do
+      right = right.previous.uncheckedNN
+      diff -= 1
+    while left ne right do
+      left = left.previous.uncheckedNN
+      right = right.previous.uncheckedNN
+    return left
 
   private var isCommitted: Boolean = _
 
