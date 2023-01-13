@@ -493,8 +493,12 @@ object ProtoTypes {
                 case _ =>
               }
 
+              println("proto: " + protoTyperState)
+              println("passed: " + passedTyperState)
               val common = protoTyperState.commonAncestor(passedTyperState)
+              println("common: " + common)
               def foo(cur: TyperState): Unit =
+                println("cur: " + cur)
                 if cur.previous == common then
                   passedTyperState.mergeConstraintWith(cur)(using passedCtx)
                 else
