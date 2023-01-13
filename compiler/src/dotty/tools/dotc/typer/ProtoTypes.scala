@@ -452,6 +452,11 @@ object ProtoTypes {
           // We only need to propagate constraints if we typed the arguments in a different
           // TyperState and if that created additional constraints.
           if (passedTyperState ne protoTyperState) && (oldConstraint ne newConstraint) then
+            val common = protoTyperState.commonAncestor(passedTyperState)
+            // 1. move all vars in proto but not in passed to be owned by common
+            // 2. mergeConstraint between proto and passed.
+
+
             // If there are new constraints of tvars that already exit in passedTyperState,
             // then we need to do a merge.
             // Otherwise:
