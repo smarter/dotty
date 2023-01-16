@@ -82,8 +82,8 @@ class TyperState() {
   def isGlobalCommittable: Boolean =
     isCommittable && (previous == null || previous.uncheckedNN.isGlobalCommittable)
 
-  protected def depth: Int = 
-    var cur = this
+  protected def depth: Int =
+    var cur: TyperState | Null = this
     var d = 0
     while cur != null do
       d += 1

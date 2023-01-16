@@ -499,7 +499,7 @@ object ProtoTypes {
                   for tvar <- tvars do
                     // println("BEF tvar: " + tvar + " " + tvar.owningState.nn.get + " " + tvar.owningState.nn.get.ownedVars)
                     val origState = tvar.owningState
-                    tvar.owningState.nn.get.ownedVars -= tvar
+                    tvar.owningState.nn.get.nn.ownedVars -= tvar
                     // println("origState: " + tvar.owningState.nn.get.ownedVars)
                     tvar.owningState = new java.lang.ref.WeakReference(common)
                     common.ownedVars += tvar
