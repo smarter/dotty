@@ -481,13 +481,16 @@ object ProtoTypes {
             // in ancestors of `protoTyperState`, if this situation ever
             // comes up, an assertion in TyperState will trigger and this code
             // will need to be generalized.
-            if protoTyperState.isCommittable then
+            val common = protoTyperState.commonAncestor(passedTyperState)
+            if protoTyperState.isCommittable && (common ne protoTyperState) then
               val passedConstraint = passedTyperState.constraint
+              // TODO: re-owning won't work if there actually are conflicting typevars.
               val newLambdas = newConstraint.domainLambdas.filter(tl =>
                 !passedConstraint.contains(tl) || passedConstraint.hasConflictingTypeVarsFor(tl, newConstraint))
               // val newTvars = newLambdas.flatMap(_.paramRefs).map(newConstraint.typeVarOfParam)
+              // println("new: " + newLambdas.map(_.show))
 
-              val common = protoTyperState.commonAncestor(passedTyperState)
+              // println("common: " + common.constraint.show)
               // println("common: " + common)
               val commonCtx = ctx.withTyperState(common)
               inContext(commonCtx)(comparing(typeComparer =>
