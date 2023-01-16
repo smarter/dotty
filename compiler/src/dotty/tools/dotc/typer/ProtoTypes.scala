@@ -452,7 +452,6 @@ object ProtoTypes {
           // We only need to propagate constraints if we typed the arguments in a different
           // TyperState and if that created additional constraints.
           if (passedTyperState ne protoTyperState) && (oldConstraint ne newConstraint) then
-            val common = protoTyperState.commonAncestor(passedTyperState)
             // 1. move all vars in proto but not in passed to be owned by common
             // 2. mergeConstraint between proto and passed.
 
@@ -486,33 +485,51 @@ object ProtoTypes {
               val passedConstraint = passedTyperState.constraint
               val newLambdas = newConstraint.domainLambdas.filter(tl =>
                 !passedConstraint.contains(tl) || passedConstraint.hasConflictingTypeVarsFor(tl, newConstraint))
-              val newTvars = newLambdas.flatMap(_.paramRefs).map(newConstraint.typeVarOfParam)
+              // val newTvars = newLambdas.flatMap(_.paramRefs).map(newConstraint.typeVarOfParam)
 
-              args1.foreach(arg => Inferencing.instantiateSelected(arg.tpe, newTvars))
-
-              // `instantiateSelected` can leave some type variables uninstantiated,
-              // so we maximize them in a second pass.
-              newTvars.foreach {
-                case tvar: TypeVar if !tvar.isInstantiated =>
-                  tvar.instantiate(fromBelow = false)
-                case _ =>
-              }
-
-              println("proto: " + protoTyperState)
-              println("passed: " + passedTyperState)
               val common = protoTyperState.commonAncestor(passedTyperState)
-              println("common: " + common)
-              def foo(cur: TyperState): Unit =
-                println("cur: " + cur)
-                if cur.previous == common then
-                  passedTyperState.mergeConstraintWith(cur)(using passedCtx)
-                else
-                  if cur.isCommittable then
-                    cur.previous.mergeConstraintWith(cur)
-                  foo(cur.previous)
-              end foo
-              foo(protoTyperState)
+              // println("common: " + common)
+              val commonCtx = ctx.withTyperState(common)
+              inContext(commonCtx)(comparing(typeComparer =>
+                for tl <- newLambdas do
+                  val tvars = tl.paramRefs.map(newConstraint.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
+                  for tvar <- tvars do
+                    // println("BEF tvar: " + tvar + " " + tvar.owningState.nn.get + " " + tvar.owningState.nn.get.ownedVars)
+                    val origState = tvar.owningState
+                    tvar.owningState.nn.get.ownedVars -= tvar
+                    // println("origState: " + tvar.owningState.nn.get.ownedVars)
+                    tvar.owningState = new java.lang.ref.WeakReference(common)
+                    common.ownedVars += tvar
+                    // println("AFT tvar: " + tvar + " " + tvar.owningState.nn.get + " " + tvar.owningState.nn.get.ownedVars)
+                    typeComparer.addToConstraint(tl, tvars)
+              ))
             end if
+            passedTyperState.mergeConstraintWith(protoTyperState)(using passedCtx)
+            
+              // args1.foreach(arg => Inferencing.instantiateSelected(arg.tpe, newTvars))
+
+              // // `instantiateSelected` can leave some type variables uninstantiated,
+              // // so we maximize them in a second pass.
+              // newTvars.foreach {
+              //   case tvar: TypeVar if !tvar.isInstantiated =>
+              //     tvar.instantiate(fromBelow = false)
+              //   case _ =>
+              // }
+
+              // println("proto: " + protoTyperState)
+              // println("passed: " + passedTyperState)
+              // val common = protoTyperState.commonAncestor(passedTyperState)
+              // println("common: " + common)
+              // def foo(cur: TyperState): Unit =
+              //   println("cur: " + cur)
+              //   if cur.previous == common then
+              //     passedTyperState.mergeConstraintWith(cur)(using passedCtx)
+              //   else
+              //     if cur.isCommittable then
+              //       cur.previous.mergeConstraintWith(cur)
+              //     foo(cur.previous)
+              // end foo
+              // foo(protoTyperState)
           args1
         }
 

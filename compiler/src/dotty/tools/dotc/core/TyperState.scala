@@ -27,6 +27,9 @@ object TyperState {
 
   opaque type Snapshot = (Constraint, TypeVars, LevelMap)
 
+  def isOwnedAnywhere(ts: TyperState, tvar: TypeVar): Boolean =
+    ts.ownedVars.contains(tvar) || ts.previous != null && isOwnedAnywhere(ts.previous.uncheckedNN, tvar)
+
   extension (ts: TyperState)
     def snapshot()(using Context): Snapshot =
       (ts.constraint, ts.ownedVars, ts.upLevels)
@@ -34,10 +37,10 @@ object TyperState {
     def resetTo(state: Snapshot)(using Context): Unit =
       val (constraint, ownedVars, upLevels) = state
       for tv <- ownedVars do
-        if !ts.ownedVars.contains(tv) then // tv has been instantiated
+        if !isOwnedAnywhere(ts, tv) then // tv has been instantiated
           tv.resetInst(ts)
+          ts.ownedVars += tv
       ts.constraint = constraint
-      ts.ownedVars = ownedVars
       ts.upLevels = upLevels
 }
 
@@ -256,7 +259,7 @@ class TyperState() {
           val tvars = tl.paramRefs.map(other.typeVarOfParam(_)).collect { case tv: TypeVar => tv }
           if this.isCommittable then
             tvars.foreach(tvar =>
-              if !tvar.inst.exists && !isOwnedAnywhere(this, tvar) then includeVar(tvar))
+              if !tvar.inst.exists && !TyperState.isOwnedAnywhere(this, tvar) then includeVar(tvar))
           typeComparer.addToConstraint(tl, tvars)
         }) &&
         // Integrate the additional constraints on type variables from `other`
@@ -298,9 +301,6 @@ class TyperState() {
       i"$this attempted to take ownership of $tvar which is already owned by committable $oldState")
     tvar.owningState = new WeakReference(this)
     ownedVars += tvar
-
-  private def isOwnedAnywhere(ts: TyperState, tvar: TypeVar): Boolean =
-    ts.ownedVars.contains(tvar) || ts.previous != null && isOwnedAnywhere(ts.previous.uncheckedNN, tvar)
 
   /** Make type variable instances permanent by assigning to `inst` field if
    *  type variable instantiation cannot be retracted anymore. Then, remove
