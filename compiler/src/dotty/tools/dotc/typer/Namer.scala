@@ -1687,7 +1687,7 @@ class Namer { typer: Typer =>
             // So fixing levels at instantiation avoids the soundness problem but apparently leads
             // to type inference problems since it comes too late.
             if !Config.checkLevelsOnConstraints then
-              val hygienicType = TypeOps.avoid(rhsType, termParamss.flatten)
+              val hygienicType = TypeOps.avoid(rhsType, termParamss.flatten).deskolemized
               if (!hygienicType.isValueType || !(hygienicType <:< tpt.tpe))
                 report.error(
                   em"""return type ${tpt.tpe} of lambda cannot be made hygienic
