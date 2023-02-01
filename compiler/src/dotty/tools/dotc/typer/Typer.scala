@@ -3962,7 +3962,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
             return adaptConstant(tree, ConstantType(converted))
         case _ =>
 
-      val captured = captureWildcards(wtp)
+      val captured = captureWildcardsCompat(wtp, pt, this)
       if (captured `ne` wtp)
         return readapt(tree.cast(captured))
 

@@ -543,6 +543,11 @@ object Inferencing {
     case _ => tp
   }
 
+  def captureWildcardsCompat(tp: Type, pt: Type, compat: Compatibility)(using Context): Type =
+    val captured = captureWildcards(tp)
+    if (captured ne tp) && compat.isCompatible(captured, pt) then captured
+    else tp
+
   def hasCaptureConversionArg(tp: Type)(using Context): Boolean = tp match
     case tp: AppliedType => tp.args.exists(_.typeSymbol == defn.TypeBox_CAP)
     case _ => false
