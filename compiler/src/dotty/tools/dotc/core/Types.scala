@@ -118,7 +118,7 @@ object Types {
         if t.mightBeProvisional then
           t.mightBeProvisional = t match
             case t: TypeRef =>
-              !t.currentSymbol.isStatic && {
+              {
                 (t: Type).mightBeProvisional = false // break cycles
                 t.symbol.isProvisional
                 || test(t.prefix, theAcc)
