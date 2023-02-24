@@ -19,6 +19,9 @@ import ast.Trees.genericEmptyTree
 import annotation.{tailrec, constructorOnly}
 import ast.tpd._
 import Synthesizer._
+import sbt.ExtractDependencies.*
+import sbt.ClassDependency
+import xsbti.api.DependencyContext._
 
 /** Synthesize terms for special classes */
 class Synthesizer(typer: Typer)(using @constructorOnly c: Context):
@@ -458,7 +461,11 @@ class Synthesizer(typer: Typer)(using @constructorOnly c: Context):
             val reason = s"it reduces to a tuple with arity $arity, expected arity <= $maxArity"
             withErrors(i"${defn.PairClass} is not a generic product because $reason")
         case MirrorSource.ClassSymbol(pre, cls) =>
-          if cls.isGenericProduct then makeProductMirror(pre, cls, None)
+          if cls.isGenericProduct then
+            val fromClass = nonLocalEnclosingClass
+            recordDependency(ClassDependency(fromClass, cls, DependencyByMemberRef))
+            recordUsedName(fromClass, cls.primaryConstructor)
+            makeProductMirror(pre, cls, None)
           else withErrors(i"$cls is not a generic product because ${cls.whyNotGenericProduct}")
       case Left(msg) =>
         withErrors(i"type `$mirroredType` is not a generic product because $msg")
@@ -582,6 +589,8 @@ class Synthesizer(typer: Typer)(using @constructorOnly c: Context):
    *  where `T` is a generic product type or a case object or an enum case.
    */
   val synthesizedProductMirror: SpecialHandler = (formal, span) =>
+    // println("formal:"  + formal.show)
+    // Thread.dumpStack
     makeMirror(productMirror, formal, span)
 
   /** An implied instance for a type of the form `Mirror.Sum { type MirroredType = T }`

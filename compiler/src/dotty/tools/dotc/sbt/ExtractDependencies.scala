@@ -116,6 +116,10 @@ object ExtractDependencies {
   def internalError(msg: => String, pos: SrcPos = NoSourcePosition)(using Context): Unit =
     report.error(em"Internal error in the incremental compiler while compiling ${ctx.compilationUnit.source}: $msg", pos)
 
+  def recordUsedName(fromClass: Symbol, namedSym: Symbol)(using Context): Unit =
+    if ctx.sbtCallback == null then return
+    ctx.sbtCallback.usedName(classNameAsString(fromClass), namedSym.zincMangledName.toString, EnumSet.of(UseScope.Default))
+
   /*
    * Handles dependency on given symbol by trying to figure out if represents a term
    * that is coming from either source code (not necessarily compiled in this compilation
@@ -165,6 +169,21 @@ object ExtractDependencies {
         ctx.sbtCallback.classDependency(toClassName, fromClassName, dep.context)
       }
     }
+  }
+
+  def nonLocalEnclosingClass(using Context): Symbol = {
+    var clazz = ctx.owner.enclosingClass
+    var owner = clazz
+
+    while (!owner.is(PackageClass)) {
+      if (owner.isTerm) {
+        clazz = owner.enclosingClass
+        owner = clazz
+      } else {
+        owner = owner.owner
+      }
+    }
+    clazz
   }
 }
 
@@ -254,24 +273,9 @@ private class ExtractDependenciesCollector extends tpd.TreeTraverser { thisTreeT
    * class from a given `ctx.owner`
    */
   private def resolveDependencySource(using Context): Symbol = {
-    def nonLocalEnclosingClass = {
-      var clazz = ctx.owner.enclosingClass
-      var owner = clazz
-
-      while (!owner.is(PackageClass)) {
-        if (owner.isTerm) {
-          clazz = owner.enclosingClass
-          owner = clazz
-        } else {
-          owner = owner.owner
-        }
-      }
-      clazz
-    }
-
     if (lastOwner != ctx.owner) {
       lastOwner = ctx.owner
-      val source = nonLocalEnclosingClass
+      val source = ExtractDependencies.nonLocalEnclosingClass
       lastDepSource = if (source.is(PackageClass)) responsibleForImports else source
     }
 
