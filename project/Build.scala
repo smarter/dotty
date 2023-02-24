@@ -660,12 +660,13 @@ object Build {
         } else if (args.contains("-with-compiler")) {
           val args1 = args.filter(_ != "-with-compiler")
           val asm = findArtifactPath(externalDeps, "scala-asm")
+          val compilerInterface = findArtifactPath(externalDeps, "compiler-interface")
           val dottyCompiler = jars("scala3-compiler")
           val dottyStaging = jars("scala3-staging")
           val dottyTastyInspector = jars("scala3-tasty-inspector")
           val dottyInterfaces = jars("scala3-interfaces")
           val tastyCore = jars("tasty-core")
-          run(insertClasspathInArgs(args1, List(dottyCompiler, dottyInterfaces, asm, dottyStaging, dottyTastyInspector, tastyCore).mkString(File.pathSeparator)))
+          run(insertClasspathInArgs(args1, List(dottyCompiler, dottyInterfaces, compilerInterface, asm, dottyStaging, dottyTastyInspector, tastyCore).mkString(File.pathSeparator)))
         } else run(args)
       },
 
