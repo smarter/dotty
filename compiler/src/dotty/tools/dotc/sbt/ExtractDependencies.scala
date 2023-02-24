@@ -103,6 +103,18 @@ class ExtractDependencies extends Phase {
       collector.dependencies.foreach(recordDependency)
     }
   }
+}
+
+object ExtractDependencies {
+  val name: String = "sbt-deps"
+  val description: String = "sends information on classes' dependencies to sbt"
+
+  def classNameAsString(sym: Symbol)(using Context): String =
+    sym.fullName.stripModuleClassSuffix.toString
+
+  /** Report an internal error in incremental compilation. */
+  def internalError(msg: => String, pos: SrcPos = NoSourcePosition)(using Context): Unit =
+    report.error(em"Internal error in the incremental compiler while compiling ${ctx.compilationUnit.source}: $msg", pos)
 
   /*
    * Handles dependency on given symbol by trying to figure out if represents a term
@@ -110,6 +122,8 @@ class ExtractDependencies extends Phase {
    * run) or from class file and calls respective callback method.
    */
   def recordDependency(dep: ClassDependency)(using Context): Unit = {
+    if ctx.sbtCallback == null then return
+
     val fromClassName = classNameAsString(dep.from)
     val sourceFile = ctx.compilationUnit.source.file.file
 
@@ -154,19 +168,7 @@ class ExtractDependencies extends Phase {
   }
 }
 
-object ExtractDependencies {
-  val name: String = "sbt-deps"
-  val description: String = "sends information on classes' dependencies to sbt"
-
-  def classNameAsString(sym: Symbol)(using Context): String =
-    sym.fullName.stripModuleClassSuffix.toString
-
-  /** Report an internal error in incremental compilation. */
-  def internalError(msg: => String, pos: SrcPos = NoSourcePosition)(using Context): Unit =
-    report.error(em"Internal error in the incremental compiler while compiling ${ctx.compilationUnit.source}: $msg", pos)
-}
-
-private case class ClassDependency(from: Symbol, to: Symbol, context: DependencyContext)
+case class ClassDependency(from: Symbol, to: Symbol, context: DependencyContext)
 
 /** An object that maintain the set of used names from within a class */
 private final class UsedNamesInClass {
