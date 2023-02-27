@@ -1574,8 +1574,6 @@ object Types {
           else NoType
         case SkolemType(tp) =>
           loop(tp)
-        case pre: WildcardType =>
-          WildcardType.sameKindAs(pre.effectiveBounds.hi.select(name))
         case pre: TypeRef =>
           pre.info match {
             case TypeAlias(alias) => loop(alias)
@@ -2653,6 +2651,7 @@ object Types {
     def derivedSelect(prefix: Type)(using Context): Type =
       if (prefix eq this.prefix) this
       else if (prefix.isExactlyNothing) prefix
+      else if (prefix.isInstanceOf[WildcardType]) WildcardType.sameKindAs(this)
       else {
         if (isType) {
           val res =
@@ -2679,11 +2678,7 @@ object Types {
               case _ =>
             }
         }
-        prefix match
-          case _: WildcardType =>
-            WildcardType.sameKindAs(this)
-          case _ =>
-            withPrefix(prefix)
+        withPrefix(prefix)
       }
 
     /** A reference like this one, but with the given symbol, if it exists */
