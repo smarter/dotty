@@ -1574,13 +1574,8 @@ object Types {
           else NoType
         case SkolemType(tp) =>
           loop(tp)
-        // case WildcardType(TypeBounds(lo, hi)) =>
-        //   val tb = TypeBounds(loop(lo), loop(hi))
-        //   println("%this: " + this)
-        //   println("%tb: " + tb)
-        //   WildcardType(tb)
-        case _: WildcardType =>
-          NoType
+        case pre: WildcardType =>
+          WildcardType.sameKindAs(pre.effectiveBounds.hi.select(name))
         case pre: TypeRef =>
           pre.info match {
             case TypeAlias(alias) => loop(alias)
@@ -2685,17 +2680,8 @@ object Types {
             }
         }
         prefix match
-          // case WildcardType(TypeBounds(lo, hi)) =>
-          //   val tb = TypeBounds(derivedSelect(lo), derivedSelect(hi))
-          //   println("#this: " + this)
-          //   println("#tb: " + tb)
-          //   WildcardType(tb)
-          // case WildcardType =>
-          //   WildcardType
-          case prefix: WildcardType =>
-            val top = this.topType
-            if top.isExactlyAny then WildcardType
-            else WildcardType(TypeBounds.upper(top))
+          case _: WildcardType =>
+            WildcardType.sameKindAs(this)
           case _ =>
             withPrefix(prefix)
       }
@@ -5270,6 +5256,10 @@ object Types {
       else
         result
     def emptyPolyKind(using Context): TypeBounds = apply(defn.NothingType, defn.AnyKindType)
+    /** An interval covering all types of the same kind as `tp`. */
+    def emptySameKindAs(tp: Type)(using Context): TypeBounds =
+      val top = tp.topType
+      if top.isExactlyAny then empty else apply(defn.NothingType, top)
     def upper(hi: Type)(using Context): TypeBounds = apply(defn.NothingType, hi)
     def lower(lo: Type)(using Context): TypeBounds = apply(lo, defn.AnyType)
   }
@@ -5445,6 +5435,9 @@ object Types {
         else
           result
       else unique(CachedWildcardType(bounds))
+    /** A wildcard matching any type of the same kind as `tp`. */
+    def sameKindAs(tp: Type)(using Context): WildcardType =
+      apply(TypeBounds.emptySameKindAs(tp))
   }
 
   /** An extractor for single abstract method types.
