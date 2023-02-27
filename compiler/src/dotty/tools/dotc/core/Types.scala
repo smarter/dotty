@@ -1574,8 +1574,13 @@ object Types {
           else NoType
         case SkolemType(tp) =>
           loop(tp)
-        case pre: WildcardType =>
-          WildcardType
+        // case WildcardType(TypeBounds(lo, hi)) =>
+        //   val tb = TypeBounds(loop(lo), loop(hi))
+        //   println("%this: " + this)
+        //   println("%tb: " + tb)
+        //   WildcardType(tb)
+        case _: WildcardType =>
+          NoType
         case pre: TypeRef =>
           pre.info match {
             case TypeAlias(alias) => loop(alias)
@@ -2679,8 +2684,20 @@ object Types {
               case _ =>
             }
         }
-        if (prefix.isInstanceOf[WildcardType]) WildcardType
-        else withPrefix(prefix)
+        prefix match
+          // case WildcardType(TypeBounds(lo, hi)) =>
+          //   val tb = TypeBounds(derivedSelect(lo), derivedSelect(hi))
+          //   println("#this: " + this)
+          //   println("#tb: " + tb)
+          //   WildcardType(tb)
+          // case WildcardType =>
+          //   WildcardType
+          case prefix: WildcardType =>
+            val top = this.topType
+            if top.isExactlyAny then WildcardType
+            else WildcardType(TypeBounds.upper(top))
+          case _ =>
+            withPrefix(prefix)
       }
 
     /** A reference like this one, but with the given symbol, if it exists */
