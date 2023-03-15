@@ -1714,7 +1714,7 @@ object Types {
         t
       case t if defn.isErasedFunctionType(t) =>
         t
-      case t @ SAMType(_) =>
+      case t @ SAMType(_, _) =>
         t
       case _ =>
         NoType
@@ -5449,6 +5449,44 @@ object Types {
    *  type of the single abstract method.
    */
   object SAMType {
+    type VarianceMap = MutableSymbolMap[Int | Null]
+
+    /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
+    def dropArgsWildcards(tp: Type, methSym: Symbol)(using Context): Type = tp match
+      // TODO: what about WildcardType has type arguments?
+      // I guess we could avoid that if we moved the isFullyDefined check
+      // before the SAMType extractor.
+      case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
+        val vmap = MutableSymbolMap[Int | Null]()
+
+        object accu extends TypeAccumulator[VarianceMap] {
+          def setVariance(v: Int) = variance = v
+          def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
+            case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) =>
+              val sym = tp.symbol
+              val v = vmap.lookup(sym)
+              if (v == null) { vmap(sym) = variance; vmap }
+              else if (v == variance || v == 0) vmap
+              else { vmap(sym) = 0; vmap }
+            case _ =>
+              foldOver(vmap, t)
+          }
+        }
+
+        accu(vmap, methSym.info)
+        val tparams = tycon.typeParamSymbols
+        val args1 = args.zipWithConserve(tparams) {
+          case (arg @ TypeBounds(lo, hi), tparam) =>
+            val v = vmap.lookup(tparam)
+            if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
+            else if v.uncheckedNN < 0 then lo
+            else arg
+          case (arg, _ ) => arg
+        }
+        tp.derivedAppliedType(tycon, args1)
+      case _ =>
+        tp
+
     def zeroParamClass(tp: Type)(using Context): Type = tp match {
       case tp: ClassInfo =>
         def zeroParams(tp: Type): Boolean = tp.stripPoly match {
@@ -5482,50 +5520,19 @@ object Types {
       case _ =>
         false
     }
-    def unapply(tp: Type)(using Context): Option[MethodType] =
+    // We don't really need the two-params versions after Typer since
+    // we should have sane closure#tpt, but unclear how to communicate
+    // that. Safer to always go through the same code path.
+    def unapply(tp: Type)(using Context): Option[(MethodType, Type)] =
       if (isInstantiatable(tp)) {
         val absMems = tp.possibleSamMethods
         if (absMems.size == 1)
-          absMems.head.info match {
+          val methDenot = absMems.head
+          val dropped = dropArgsWildcards(tp, methDenot.symbol)
+          methDenot.asSeenFrom(dropped).info match {
             case mt: MethodType if !mt.isParamDependent &&
                 !defn.isContextFunctionType(mt.resultType) =>
-              val cls = tp.classSymbol
-
-              // Given a SAM type such as:
-              //
-              //     import java.util.function.Function
-              //     Function[? >: String, ? <: Int]
-              //
-              // the single abstract method will have type:
-              //
-              //     (x: Function[? >: String, ? <: Int]#T): Function[? >: String, ? <: Int]#R
-              //
-              // which is not implementable outside of the scope of Function.
-              //
-              // To avoid this kind of issue, we approximate references to
-              // parameters of the SAM type by their bounds, this way in the
-              // above example we get:
-              //
-              //    (x: String): Int
-              val approxParams = new ApproximatingTypeMap {
-                def apply(tp: Type): Type = tp match {
-                  case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) && tp.symbol.owner == cls =>
-                    tp.info match {
-                      case info: AliasingBounds =>
-                        mapOver(info.alias)
-                      case TypeBounds(lo, hi) =>
-                        range(atVariance(-variance)(apply(lo)), apply(hi))
-                      case _ =>
-                        range(defn.NothingType, defn.AnyType) // should happen only in error cases
-                    }
-                  case _ =>
-                    mapOver(tp)
-                }
-              }
-              val approx =
-                if ctx.owner.isContainedIn(cls) then mt
-                else approxParams(mt).asInstanceOf[MethodType]
-              Some(approx)
+              Some(mt, dropped)
             case _ =>
               None
           }
@@ -5536,7 +5543,7 @@ object Types {
           //     def isDefinedAt(x: T) = true
           // and overwrite that method whenever the function body is a sequence of
           // case clauses.
-          absMems.find(_.symbol.name == nme.apply).map(_.info.asInstanceOf[MethodType])
+          absMems.find(_.symbol.name == nme.apply).map(_.info.asInstanceOf[MethodType]).map((_, tp))
         else None
       }
       else None
