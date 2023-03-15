@@ -1328,7 +1328,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         case RefinedType(parent, nme.apply, mt @ MethodTpe(_, formals, restpe))
         if (defn.isNonRefinedFunction(parent) || defn.isErasedFunctionType(parent)) && formals.length == defaultArity =>
           (formals, untpd.InLambdaTypeTree(isResult = true, (_, syms) => restpe.substParams(mt, syms.map(_.termRef))))
-        case pt1 @ SAMType(mt @ MethodTpe(_, formals, _)) =>
+        case pt1 @ SAMType(mt @ MethodTpe(_, formals, _), _) =>
           val restpe = mt.resultType match
             case mt: MethodType => mt.toFunctionType(isJava = pt1.classSymbol.is(JavaDefined))
             case tp => tp
@@ -1684,17 +1684,21 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         meth1.tpe.widen match {
           case mt: MethodType =>
             pt.findFunctionType match {
-              case pt @ SAMType(sam)
+              case SAMType(sam, pt)
               if !defn.isFunctionType(pt) && mt <:< sam =>
                 // SAMs of the form C[?] where C is a class cannot be conversion targets.
                 // The resulting class `class $anon extends C[?] {...}` would be illegal,
                 // since type arguments to `C`'s super constructor cannot be constructed.
                 def isWildcardClassSAM =
-                  !pt.classSymbol.is(Trait) && pt.argInfos.exists(_.isInstanceOf[TypeBounds])
+                  pt.argInfos.exists(_.isInstanceOf[TypeBounds])
                 val targetTpe =
                   if isFullyDefined(pt, ForceDegree.all) && !isWildcardClassSAM then
                     pt
                   else if pt.isRef(defn.PartialFunctionClass) then
+                    // TODO: can't be moved to SAMType since it relies on mt that we don't have then, but needs explanation.
+                    // SAMType for PartialFun could still try to avoid wildcards/typebounds, but then
+                    // we wouldn't get in this case hmm.
+                    // ===> move the isFullyDefined check and recovery before the SAMType extractor logic
                     // Replace the underspecified expected type by one based on the closure method type
                     defn.PartialFunctionOf(mt.firstParamTypes.head, mt.resultType)
                   else
@@ -1708,6 +1712,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
                   errorTree(tree,
                     em"""cannot turn method type $mt into closure
                         |because it has capture conversion skolem types""")
+                // if SAMType can fail with underspecified things, might want to add the underspecified error here
                 else
                   EmptyTree
             }
@@ -3992,7 +3997,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         else
           if (!defn.isFunctionType(pt))
             pt match {
-              case SAMType(_) if !pt.classSymbol.hasAnnotation(defn.FunctionalInterfaceAnnot) =>
+              case SAMType(_, _) if !pt.classSymbol.hasAnnotation(defn.FunctionalInterfaceAnnot) =>
                 report.warning(em"${tree.symbol} is eta-expanded even though $pt does not have the @FunctionalInterface annotation.", tree.srcPos)
               case _ =>
             }
@@ -4159,8 +4164,8 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
       }
     }
 
-    def toSAM(tree: Tree): Tree = tree match {
-      case tree: Block => tpd.cpy.Block(tree)(tree.stats, toSAM(tree.expr))
+    def toSAM(tree: Tree, pt: Type): Tree = tree match {
+      case tree: Block => tpd.cpy.Block(tree)(tree.stats, toSAM(tree.expr, pt))
       case tree: Closure => cpy.Closure(tree)(tpt = TypeTree(pt)).withType(pt)
     }
 
@@ -4200,13 +4205,13 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         case closure(Nil, id @ Ident(nme.ANON_FUN), _)
         if defn.isFunctionType(wtp) && !defn.isFunctionType(pt) =>
           pt match {
-            case SAMType(sam)
-            if wtp <:< sam.toFunctionType(isJava = pt.classSymbol.is(JavaDefined)) =>
+            case SAMType(sam, pt1)
+            if wtp <:< sam.toFunctionType(isJava = pt1.classSymbol.is(JavaDefined)) =>
               // was ... && isFullyDefined(pt, ForceDegree.flipBottom)
               // but this prevents case blocks from implementing polymorphic partial functions,
               // since we do not know the result parameter a priori. Have to wait until the
               // body is typechecked.
-              return toSAM(tree)
+              return toSAM(tree, pt1)
             case _ =>
           }
         case _ =>

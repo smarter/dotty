@@ -21,7 +21,7 @@ import CheckRealizable._
 import Variances.{Variance, setStructuralVariances, Invariant}
 import typer.Nullables
 import util.Stats._
-import util.SimpleIdentitySet
+import util.{SimpleIdentityMap, SimpleIdentitySet}
 import ast.tpd._
 import ast.TreeTypeMap
 import printing.Texts._
@@ -959,6 +959,10 @@ object Types {
           (name, buf) => buf ++= nonPrivateMember(name).altsWith(_.is(Deferred)))
     }
 
+    // TODO: replace by def samMethod that also handles the logic in SAMType#unapply
+    // and ExpandSAM ?
+    // ... or just inline into SAMType.
+
     /**
      * Returns the set of methods that are abstract and do not overlap with any of
      * [[java.lang.Object]] methods.
@@ -1746,7 +1750,7 @@ object Types {
         t
       case t if defn.isErasedFunctionType(t) =>
         t
-      case t @ SAMType(_) =>
+      case t @ SAMType(_, _) =>
         t
       case _ =>
         NoType
@@ -5509,101 +5513,124 @@ object Types {
    *     and which is not marked inline.
    *   - can be instantiated without arguments or with just () as argument.
    *
-   *  The pattern `SAMType(sam)` matches a SAM type, where `sam` is the
-   *  type of the single abstract method.
+   *  The pattern `SAMType(samMethType, samParentType)` matches a SAM type, where `samMethType` is the
+   *  type of the single abstract method and `samParentType` is a subtype of the matched
+   *  SAM type which has been stripped of wildcards to turn it into a valid parent
+   *  type.
    */
   object SAMType {
-    def zeroParamClass(tp: Type)(using Context): Type = tp match {
+    /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
+    /** If possible, return a subtype of `tp` which is a type application of `samClass`
+     *  where none of the type arguments are wildcards (thus making it a valid parent type),
+     *  otherwise return NoType.
+     *
+     *  A wildcard in the original type will be replaced by its upper or lower bound in a way
+     *  that maximizes the number of possible implementations of `samMeth`. For example,
+     *  java.util.function defines an interface equivalent to:
+     *
+     *      trait Function[T, R]:
+     *        def apply(t: T): R
+     *
+     *  and it usually appears with wildcards to compensate for the lack of
+     *  definition-site variance in Java:
+     *
+     *      (x => x.toInt): Function[? >: String, ? <: Int]
+     *
+     *  When typechecking this lambda, we need to approximate the wildcards to find
+     *  a valid parent type for our lambda to extend. We can see that in `apply`,
+     *  `T` only appears contravariantly and `R` only appears covariantly, so by
+     *  minimizing the first parameter and maximizing the second, we maximize the
+     *  number of valid implementations of `apply` which lets us implement the lambda
+     *  with a closure equivalent to:
+     *
+     *      new Function[String, Int] { def apply(x: String): Int = x.toInt }
+     */
+    def samParentType(origTp: Type, samClass: Symbol, samMeth: Symbol)(using Context): Type =
+      val tp = origTp.baseType(samClass)
+      if !(tp <:< origTp) then NoType
+      else tp match
+        case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
+          // TODO: refactor with existing accu? trait VarianceAccumulator extends TypeAccumulator[VarianceMap]
+          val accu = new TypeAccumulator[VarianceMap[Symbol]]:
+            def apply(vmap: VarianceMap[Symbol], t: Type): VarianceMap[Symbol] = t match
+              case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) =>
+                vmap.recordLocalVariance(tp.symbol, variance)
+              case _ =>
+                foldOver(vmap, t)
+          val vmap = accu(VarianceMap.empty, samMeth.info)
+          val tparams = tycon.typeParamSymbols
+          val args1 = args.zipWithConserve(tparams) {
+            case (arg @ TypeBounds(lo, hi), tparam) =>
+              val v = vmap.computedVariance(tparam)
+              if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
+              else if v.uncheckedNN < 0 then lo
+              else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
+            case (arg, _) => arg
+          }
+          tp.derivedAppliedType(tycon, args1)
+        case _ =>
+          tp
+
+    def samClass(tp: Type)(using Context): Symbol = tp match {
       case tp: ClassInfo =>
         def zeroParams(tp: Type): Boolean = tp.stripPoly match {
           case mt: MethodType => mt.paramInfos.isEmpty && !mt.resultType.isInstanceOf[MethodType]
           case et: ExprType => true
           case _ => false
         }
-        // `ContextFunctionN` does not have constructors
-        val ctor = tp.cls.primaryConstructor
-        if (!ctor.exists || zeroParams(ctor.info)) tp
-        else NoType
+        val cls = tp.cls
+        val validCtor =
+          val ctor = cls.primaryConstructor
+          // `ContextFunctionN` does not have constructors
+          !ctor.exists || zeroParams(ctor.info)
+        val isInstantiable = !cls.isOneOf(FinalOrSealed) && (tp.appliedRef <:< tp.selfType)
+        if validCtor && isInstantiable then tp.cls
+        else NoSymbol
       case tp: AppliedType =>
-        zeroParamClass(tp.superType)
+        samClass(tp.superType)
       case tp: TypeRef =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: RefinedType =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: TypeBounds =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: TypeVar =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: AnnotatedType =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case _ =>
-        NoType
+        NoSymbol
     }
-    def isInstantiatable(tp: Type)(using Context): Boolean = zeroParamClass(tp) match {
-      case cinfo: ClassInfo if !cinfo.cls.isOneOf(FinalOrSealed) =>
-        val selfType = cinfo.selfType.asSeenFrom(tp, cinfo.cls)
-        tp <:< selfType
-      case _ =>
-        false
-    }
-    def unapply(tp: Type)(using Context): Option[MethodType] =
-      if (isInstantiatable(tp)) {
-        val absMems = tp.possibleSamMethods
-        if (absMems.size == 1)
-          absMems.head.info match {
+
+    // We don't really need the two-params versions after Typer since
+    // we should have sane closure#tpt, but unclear how to communicate
+    // that. Safer to always go through the same code path.
+    def unapply(tp: Type)(using Context): Option[(MethodType, Type)] =
+      val cls = samClass(tp)
+      if cls.exists then
+        val absMems =
+          if tp.isRef(defn.PartialFunctionClass) then
+            // To maintain compatibility with 2.x, we treat PartialFunction specially,
+            // pretending it is a SAM type. In the future it would be better to merge
+            // Function and PartialFunction, have Function1 contain a isDefinedAt method
+            //     def isDefinedAt(x: T) = true
+            // and overwrite that method whenever the function body is a sequence of
+            // case clauses.
+            List(defn.PartialFunction_apply)
+          else
+            tp.possibleSamMethods.map(_.symbol)
+        if absMems.size == 1 then
+          val samMeth = absMems.head
+          val parentType = samParentType(tp, cls, samMeth)
+          samMeth.asSeenFrom(parentType).info match
             case mt: MethodType if !mt.isParamDependent &&
                 mt.resultType.isValueTypeOrWildcard &&
-                !defn.isContextFunctionType(mt.resultType) =>
-              val cls = tp.classSymbol
-
-              // Given a SAM type such as:
-              //
-              //     import java.util.function.Function
-              //     Function[? >: String, ? <: Int]
-              //
-              // the single abstract method will have type:
-              //
-              //     (x: Function[? >: String, ? <: Int]#T): Function[? >: String, ? <: Int]#R
-              //
-              // which is not implementable outside of the scope of Function.
-              //
-              // To avoid this kind of issue, we approximate references to
-              // parameters of the SAM type by their bounds, this way in the
-              // above example we get:
-              //
-              //    (x: String): Int
-              val approxParams = new ApproximatingTypeMap {
-                def apply(tp: Type): Type = tp match {
-                  case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) && tp.symbol.owner == cls =>
-                    tp.info match {
-                      case info: AliasingBounds =>
-                        mapOver(info.alias)
-                      case TypeBounds(lo, hi) =>
-                        range(atVariance(-variance)(apply(lo)), apply(hi))
-                      case _ =>
-                        range(defn.NothingType, defn.AnyType) // should happen only in error cases
-                    }
-                  case _ =>
-                    mapOver(tp)
-                }
-              }
-              val approx =
-                if ctx.owner.isContainedIn(cls) then mt
-                else approxParams(mt).asInstanceOf[MethodType]
-              Some(approx)
+                !defn.isContextFunctionType(mt.resultType) => // TODO: Replace by an error message, like we did for PF before?
+                                                              // This makes sense unlike for isParamDependent since the type itself is SAM, just this particular type arg is disallowed.
+              Some(mt, parentType)
             case _ =>
               None
-          }
-        else if (tp isRef defn.PartialFunctionClass)
-          // To maintain compatibility with 2.x, we treat PartialFunction specially,
-          // pretending it is a SAM type. In the future it would be better to merge
-          // Function and PartialFunction, have Function1 contain a isDefinedAt method
-          //     def isDefinedAt(x: T) = true
-          // and overwrite that method whenever the function body is a sequence of
-          // case clauses.
-          absMems.find(_.symbol.name == nme.apply).map(_.info.asInstanceOf[MethodType])
         else None
-      }
       else None
   }
 
@@ -6435,6 +6462,35 @@ object Types {
         }
       }
   }
+
+  object VarianceMap:
+    /** An immutable map representing the variance of keys of type `K` */
+    opaque type VarianceMap[K <: AnyRef] <: AnyRef = SimpleIdentityMap[K, Integer]
+    def empty[K <: AnyRef]: VarianceMap[K] = SimpleIdentityMap.empty[K]
+    extension [K <: AnyRef](vmap: VarianceMap[K])
+      /** The backing map used to implement this VarianceMap. */
+      inline def underlying: SimpleIdentityMap[K, Integer] = vmap
+
+      /** Return a new map taking into account that K appears in a
+       *  {co,contra,in}-variant position if `localVariance` is {positive,negative,zero}.
+       */
+      def recordLocalVariance(k: K, localVariance: Int): VarianceMap[K] =
+        // inline val underling: SimpleIdentityMap[K, Integer] = vmap
+        val previousVariance = vmap(k)
+        if (previousVariance == null) vmap.updated(k, localVariance)
+        else if (previousVariance == localVariance || previousVariance == 0) vmap
+        else vmap.updated(k, 0)
+
+      /** Return the variance of `k`:
+       *  - A positive value means that `k` appears only covariantly.
+       *  - A negative value means that `k` appears only contravariantly.
+       *  - A zero value means that `k` appears both covariantly and
+       *    contravariantly, or appears invariantly.
+       *  - A null value means that `k` does not appear at all.
+       */
+      def computedVariance(k: K): Integer | Null =
+        vmap(k)
+  export VarianceMap.VarianceMap
 
   //   ----- Name Filters --------------------------------------------------
 
