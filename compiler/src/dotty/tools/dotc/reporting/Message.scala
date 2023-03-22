@@ -13,6 +13,8 @@ import scala.language.unsafeNulls
 
 import scala.annotation.threadUnsafe
 
+import rewrites.Rewrites.Patch
+
 /** ## Tips for error message generation
  *
  *  - You can use the `em` interpolator for error messages. It's defined in core.Decorators.
@@ -383,6 +385,8 @@ abstract class Message(val errorId: ErrorMessageID)(using Context) { self =>
    *  to only a single message of that class to be issued.
    */
   def showAlways = false
+
+  def quickFix(using Context): java.util.List[Patch] = java.util.Collections.emptyList
 
   override def toString = msg
 }

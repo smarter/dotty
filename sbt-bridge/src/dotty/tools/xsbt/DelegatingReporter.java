@@ -12,8 +12,11 @@ import dotty.tools.dotc.reporting.Diagnostic;
 import dotty.tools.dotc.reporting.Message;
 import dotty.tools.dotc.util.SourceFile;
 import dotty.tools.dotc.util.SourcePosition;
+import dotty.tools.dotc.rewrites.Rewrites.Patch;
 import xsbti.Position;
 import xsbti.Severity;
+
+import static java.util.stream.Collectors.toList;
 
 final public class DelegatingReporter extends AbstractReporter {
   private xsbti.Reporter delegate;
@@ -34,7 +37,8 @@ final public class DelegatingReporter extends AbstractReporter {
 
   public void doReport(Diagnostic dia, Context ctx) {
     Severity severity = severityOf(dia.level());
-    Position position = positionOf(dia.pos().nonInlined());
+    SourcePosition srcPosition = dia.pos().nonInlined();
+    Position position = positionOf(srcPosition);
 
     StringBuilder rendered = new StringBuilder();
     rendered.append(messageAndPos(dia, ctx));
@@ -47,8 +51,10 @@ final public class DelegatingReporter extends AbstractReporter {
       rendered.append(explanation(message, ctx));
       messageBuilder.append(System.lineSeparator()).append(explanation(message, ctx));
     }
+    java.util.List<xsbti.TextEdit> quickFix =
+      message.quickFix(ctx).stream().map(patch -> textEditOf(patch, srcPosition.source())).collect(toList());
 
-    delegate.log(new Problem(position, messageBuilder.toString(), severity, rendered.toString(), diagnosticCode));
+    delegate.log(new Problem(position, messageBuilder.toString(), severity, rendered.toString(), diagnosticCode, quickFix));
   }
 
   private static Severity severityOf(int level) {
@@ -69,6 +75,13 @@ final public class DelegatingReporter extends AbstractReporter {
     } else {
       return PositionBridge.noPosition;
     }
+  }
+
+  // TODO: Replace Patch#span by Patch#SourcePosition to support patches in other files?
+  private static xsbti.TextEdit textEditOf(Patch patch, SourceFile source) {
+    SourcePosition srcPos = SourcePosition.apply(source, patch.span(), dotty.tools.dotc.util.NoSourcePosition$.MODULE$);
+    Position pos = positionOf(srcPos);
+    return new TextEditBridge(pos, patch.replacement());
   }
 
   @SuppressWarnings("unchecked")

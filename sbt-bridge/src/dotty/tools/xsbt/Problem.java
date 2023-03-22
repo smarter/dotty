@@ -1,8 +1,10 @@
 package dotty.tools.xsbt;
 
+import java.util.List;
 import java.util.Optional;
 import xsbti.Position;
 import xsbti.Severity;
+import xsbti.TextEdit;
 
 final public class Problem implements xsbti.Problem {
   private final Position _position;
@@ -10,14 +12,16 @@ final public class Problem implements xsbti.Problem {
   private final Severity _severity;
   private final Optional<String> _rendered;
   private final String _diagnosticCode;
+  private final List<TextEdit> _quickFix;
 
-  public Problem(Position position, String message, Severity severity, String rendered, String diagnosticCode) {
+  public Problem(Position position, String message, Severity severity, String rendered, String diagnosticCode, List<TextEdit> quickFix) {
     super();
     this._position = position;
     this._message = message;
     this._severity = severity;
     this._rendered = Optional.of(rendered);
     this._diagnosticCode = diagnosticCode;
+    this._quickFix = quickFix;
   }
 
   public String category() {
@@ -38,6 +42,10 @@ final public class Problem implements xsbti.Problem {
 
   public Optional<String> rendered() {
     return _rendered;
+  }
+
+  public List<TextEdit> quickFix() {
+    return _quickFix;
   }
 
   public Optional<xsbti.DiagnosticCode> diagnosticCode() {
