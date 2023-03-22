@@ -386,7 +386,7 @@ abstract class Message(val errorId: ErrorMessageID)(using Context) { self =>
    */
   def showAlways = false
 
-  def quickFix(using Context): java.util.List[xsbti.TextEdit] = java.util.Collections.emptyList
+  def quickFix(using Context): java.util.List[Patch] = java.util.Collections.emptyList
 
   override def toString = msg
 }
