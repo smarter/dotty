@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 object Rewrites {
   private class PatchedFiles extends mutable.HashMap[SourceFile, Patches]
 
-  private case class Patch(span: Span, replacement: String) {
+  case class Patch(span: Span, replacement: String) {
     def delta = replacement.length - (span.end - span.start)
   }
 

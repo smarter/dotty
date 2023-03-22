@@ -2799,11 +2799,11 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
       case closure(_, _, _) =>
       case _ =>
         val recovered = typed(qual)(using ctx.fresh.setExploreTyperState())
-        report.errorOrMigrationWarning(OnlyFunctionsCanBeFollowedByUnderscore(recovered.tpe.widen), tree.srcPos, from = `3.0`)
+        report.errorOrMigrationWarning(OnlyFunctionsCanBeFollowedByUnderscore(recovered.tpe.widen, tree), tree.srcPos, from = `3.0`)
         if (migrateTo3) {
           // Under -rewrite, patch `x _` to `(() => x)`
-          patch(Span(tree.span.start), "(() => ")
-          patch(Span(qual.span.end, tree.span.end), ")")
+          // patch(Span(tree.span.start), "(() => ")
+          // patch(Span(qual.span.end, tree.span.end), ")")
           return typed(untpd.Function(Nil, qual), pt)
         }
     }
