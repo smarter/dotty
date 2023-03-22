@@ -1807,7 +1807,7 @@ class OnlyFunctionsCanBeFollowedByUnderscore(tp: Type, tree: untpd.PostfixOp)(us
   override def quickFix(using Context) =
     val untpd.PostfixOp(qual, Ident(nme.WILDCARD)) = tree: @unchecked
     import scala.jdk.CollectionConverters.*
-    // import xsbti.*
+    import scala.language.unsafeNulls
     def asTextEdit(patch: Patch): xsbti.TextEdit =
       import java.util.Optional
       new xsbti.TextEdit {
