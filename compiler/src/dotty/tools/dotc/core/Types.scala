@@ -5445,17 +5445,24 @@ object Types {
    *     and which is not marked inline.
    *   - can be instantiated without arguments or with just () as argument.
    *
-   *  The pattern `SAMType(sam)` matches a SAM type, where `sam` is the
-   *  type of the single abstract method.
+   *  The pattern `SAMType(samMeth, samParent)` matches a SAM type, where `samMeth` is the
+   *  type of the single abstract method and `samParent` is a subtype of the matched
+   *  SAM type which has been stripped of wildcards to turn it into a valid parent
+   *  type.
    */
   object SAMType {
     type VarianceMap = MutableSymbolMap[Int | Null]
 
+    // tp could be a weird applied type lambda [[X] =>> Foo[?]][Int] (or see tests/pos/argDenot-alpakka.min.scala)
+    // via asSeenFrom we can get Foo[?] if we rely on tp.baseType(zeroParamClass(tp).cls)
+    // and then matching on AppliedType(tycon, args) is fine.
     /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
     def dropArgsWildcards(tp: Type, methSym: Symbol)(using Context): Type = tp match
       // TODO: what about WildcardType has type arguments?
       // I guess we could avoid that if we moved the isFullyDefined check
       // before the SAMType extractor.
+      // ... fully defining won't have an impact on WildcardType,
+      // if they can actually happen they could be replaced using AvoidWildcardsMap.
       case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
         val vmap = MutableSymbolMap[Int | Null]()
 
@@ -5480,7 +5487,7 @@ object Types {
             val v = vmap.lookup(tparam)
             if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
             else if v.uncheckedNN < 0 then lo
-            else arg
+            else arg // return NoType to hard fail?
           case (arg, _ ) => arg
         }
         tp.derivedAppliedType(tycon, args1)

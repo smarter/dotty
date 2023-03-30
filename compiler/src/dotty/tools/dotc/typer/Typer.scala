@@ -1623,6 +1623,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
                   errorTree(tree,
                     em"""cannot turn method type $mt into closure
                         |because it has capture conversion skolem types""")
+                // if SAMType can fail with underspecified things, might want to add the underspecified error here
                 else
                   EmptyTree
             }
