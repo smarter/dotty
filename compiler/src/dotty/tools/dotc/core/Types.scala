@@ -927,6 +927,10 @@ object Types {
           (name, buf) => buf ++= nonPrivateMember(name).altsWith(_.is(Deferred)))
     }
 
+    // TODO: replace by def samMethod that also handles the logic in SAMType#unapply
+    // and ExpandSAM ?
+    // ... or just inline into SAMType.
+
     /**
      * Returns the set of methods that are abstract and do not overlap with any of
      * [[java.lang.Object]] methods.
@@ -5445,28 +5449,26 @@ object Types {
    *     and which is not marked inline.
    *   - can be instantiated without arguments or with just () as argument.
    *
-   *  The pattern `SAMType(samMeth, samParent)` matches a SAM type, where `samMeth` is the
-   *  type of the single abstract method and `samParent` is a subtype of the matched
+   *  The pattern `SAMType(samMethType, samParentType)` matches a SAM type, where `samMethType` is the
+   *  type of the single abstract method and `samParentType` is a subtype of the matched
    *  SAM type which has been stripped of wildcards to turn it into a valid parent
    *  type.
    */
   object SAMType {
     type VarianceMap = MutableSymbolMap[Int | Null]
 
-    // tp could be a weird applied type lambda [[X] =>> Foo[?]][Int] (or see tests/pos/argDenot-alpakka.min.scala)
-    // via asSeenFrom we can get Foo[?] if we rely on tp.baseType(zeroParamClass(tp).cls)
-    // and then matching on AppliedType(tycon, args) is fine.
-    // ... or .simplified for MatchAlias, .dealias fro TypeAlias? So we don't loose refinements etc.
+    // TODO: Should we take the classSym and do the baseType here to do all normalizations at once?
     /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
     def dropArgsWildcards(tp: Type, methSym: Symbol)(using Context): Type = tp match
       // TODO: what about WildcardType has type arguments?
       // I guess we could avoid that if we moved the isFullyDefined check
       // before the SAMType extractor.
-      // ... fully defining won't have an impact on WildcardType,
+      // ... fully defining won't have an impact on WildcardType,  // ===> FALSE: fully defining disallow WildcardType.
       // if they can actually happen they could be replaced using AvoidWildcardsMap.
       case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
         val vmap = MutableSymbolMap[Int | Null]()
 
+        // TODO: refactor with existing accu? trait VarianceAccumulator extends TypeAccumulator[VarianceMap]
         object accu extends TypeAccumulator[VarianceMap] {
           def setVariance(v: Int) = variance = v
           def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
@@ -5488,72 +5490,73 @@ object Types {
             val v = vmap.lookup(tparam)
             if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
             else if v.uncheckedNN < 0 then lo
-            else arg // return NoType to hard fail?
+            else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
           case (arg, _ ) => arg
         }
         tp.derivedAppliedType(tycon, args1)
       case _ =>
         tp
 
-    def zeroParamClass(tp: Type)(using Context): Symbol = tp match {
+    def samClass(tp: Type)(using Context): Symbol = tp match {
       case tp: ClassInfo =>
         def zeroParams(tp: Type): Boolean = tp.stripPoly match {
           case mt: MethodType => mt.paramInfos.isEmpty && !mt.resultType.isInstanceOf[MethodType]
           case et: ExprType => true
           case _ => false
         }
-        // `ContextFunctionN` does not have constructors
-        val ctor = tp.cls.primaryConstructor
-        if (!ctor.exists || zeroParams(ctor.info)) tp.cls
+        val cls = tp.cls
+        val validCtor =
+          val ctor = cls.primaryConstructor
+          // `ContextFunctionN` does not have constructors
+          !ctor.exists || zeroParams(ctor.info)
+        val isInstantiable = !cls.isOneOf(FinalOrSealed) && (tp.selfType <:< tp.appliedRef)
+        if validCtor && isInstantiable then tp.cls
         else NoSymbol
       case tp: AppliedType =>
-        zeroParamClass(tp.superType)
+        samClass(tp.superType)
       case tp: TypeRef =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: RefinedType =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: TypeBounds =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: TypeVar =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case tp: AnnotatedType =>
-        zeroParamClass(tp.underlying)
+        samClass(tp.underlying)
       case _ =>
         NoSymbol
     }
-    def isInstantiatable(tp: Type)(using Context): Boolean = zeroParamClass(tp) match {
-      case cls: ClassSymbol if !cls.isOneOf(FinalOrSealed) =>
-        val selfType = cls.classInfo.selfType.asSeenFrom(tp, cls)
-        tp <:< selfType
-      case _ =>
-        false
-    }
+
     // We don't really need the two-params versions after Typer since
     // we should have sane closure#tpt, but unclear how to communicate
     // that. Safer to always go through the same code path.
     def unapply(tp: Type)(using Context): Option[(MethodType, Type)] =
-      if (isInstantiatable(tp)) {
-        val absMems = tp.possibleSamMethods
-        if (absMems.size == 1)
-          val methDenot = absMems.head
-          val dropped = dropArgsWildcards(tp, methDenot.symbol)
-          methDenot.asSeenFrom(dropped).info match {
+      val cls = samClass(tp)
+      if cls.exists then
+        val tpNorm = tp.baseType(cls)
+        if (tpNorm ne tp) && !(tpNorm <:< tp) then return None
+        val absMems =
+          if tpNorm.isRef(defn.PartialFunctionClass) then
+            // To maintain compatibility with 2.x, we treat PartialFunction specially,
+            // pretending it is a SAM type. In the future it would be better to merge
+            // Function and PartialFunction, have Function1 contain a isDefinedAt method
+            //     def isDefinedAt(x: T) = true
+            // and overwrite that method whenever the function body is a sequence of
+            // case clauses.
+            List(defn.PartialFunction_apply)
+          else
+            tpNorm.possibleSamMethods.map(_.symbol)
+        if absMems.size == 1 then
+          val samMethSymbol = absMems.head
+          val samParentType = dropArgsWildcards(tpNorm, samMethSymbol)
+          samMethSymbol.asSeenFrom(samParentType).info match
             case mt: MethodType if !mt.isParamDependent &&
                 !defn.isContextFunctionType(mt.resultType) =>
-              Some(mt, dropped)
+              Some(mt, samParentType)
             case _ =>
               None
-          }
-        else if (tp isRef defn.PartialFunctionClass)
-          // To maintain compatibility with 2.x, we treat PartialFunction specially,
-          // pretending it is a SAM type. In the future it would be better to merge
-          // Function and PartialFunction, have Function1 contain a isDefinedAt method
-          //     def isDefinedAt(x: T) = true
-          // and overwrite that method whenever the function body is a sequence of
-          // case clauses.
-          absMems.find(_.symbol.name == nme.apply).map(_.info.asInstanceOf[MethodType]).map((_, tp))
         else None
-      }
       else None
   }
 
