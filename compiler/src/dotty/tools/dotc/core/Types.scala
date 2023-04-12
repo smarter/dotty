@@ -5456,6 +5456,7 @@ object Types {
     // tp could be a weird applied type lambda [[X] =>> Foo[?]][Int] (or see tests/pos/argDenot-alpakka.min.scala)
     // via asSeenFrom we can get Foo[?] if we rely on tp.baseType(zeroParamClass(tp).cls)
     // and then matching on AppliedType(tycon, args) is fine.
+    // ... or .simplified for MatchAlias, .dealias fro TypeAlias? So we don't loose refinements etc.
     /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
     def dropArgsWildcards(tp: Type, methSym: Symbol)(using Context): Type = tp match
       // TODO: what about WildcardType has type arguments?
@@ -5494,7 +5495,7 @@ object Types {
       case _ =>
         tp
 
-    def zeroParamClass(tp: Type)(using Context): Type = tp match {
+    def zeroParamClass(tp: Type)(using Context): Symbol = tp match {
       case tp: ClassInfo =>
         def zeroParams(tp: Type): Boolean = tp.stripPoly match {
           case mt: MethodType => mt.paramInfos.isEmpty && !mt.resultType.isInstanceOf[MethodType]
@@ -5503,8 +5504,8 @@ object Types {
         }
         // `ContextFunctionN` does not have constructors
         val ctor = tp.cls.primaryConstructor
-        if (!ctor.exists || zeroParams(ctor.info)) tp
-        else NoType
+        if (!ctor.exists || zeroParams(ctor.info)) tp.cls
+        else NoSymbol
       case tp: AppliedType =>
         zeroParamClass(tp.superType)
       case tp: TypeRef =>
@@ -5518,11 +5519,11 @@ object Types {
       case tp: AnnotatedType =>
         zeroParamClass(tp.underlying)
       case _ =>
-        NoType
+        NoSymbol
     }
     def isInstantiatable(tp: Type)(using Context): Boolean = zeroParamClass(tp) match {
-      case cinfo: ClassInfo if !cinfo.cls.isOneOf(FinalOrSealed) =>
-        val selfType = cinfo.selfType.asSeenFrom(tp, cinfo.cls)
+      case cls: ClassSymbol if !cls.isOneOf(FinalOrSealed) =>
+        val selfType = cls.classInfo.selfType.asSeenFrom(tp, cls)
         tp <:< selfType
       case _ =>
         false
