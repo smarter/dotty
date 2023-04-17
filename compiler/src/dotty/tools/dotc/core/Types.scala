@@ -5519,7 +5519,7 @@ object Types {
           val ctor = cls.primaryConstructor
           // `ContextFunctionN` does not have constructors
           !ctor.exists || zeroParams(ctor.info)
-        val isInstantiable = !cls.isOneOf(FinalOrSealed) && (tp.selfType <:< tp.appliedRef)
+        val isInstantiable = !cls.isOneOf(FinalOrSealed) && (tp.appliedRef <:< tp.selfType)
         if validCtor && isInstantiable then tp.cls
         else NoSymbol
       case tp: AppliedType =>
