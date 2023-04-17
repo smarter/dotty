@@ -5457,45 +5457,65 @@ object Types {
   object SAMType {
     type VarianceMap = MutableSymbolMap[Int | Null]
 
-    // TODO: Should we take the classSym and do the baseType here to do all normalizations at once?
     /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
-    def dropArgsWildcards(tp: Type, methSym: Symbol)(using Context): Type = tp match
-      // TODO: what about WildcardType has type arguments?
-      // I guess we could avoid that if we moved the isFullyDefined check
-      // before the SAMType extractor.
-      // ... fully defining won't have an impact on WildcardType,  // ===> FALSE: fully defining disallow WildcardType.
-      // if they can actually happen they could be replaced using AvoidWildcardsMap.
-      case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
-        val vmap = MutableSymbolMap[Int | Null]()
-
-        // TODO: refactor with existing accu? trait VarianceAccumulator extends TypeAccumulator[VarianceMap]
-        object accu extends TypeAccumulator[VarianceMap] {
-          def setVariance(v: Int) = variance = v
-          def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
-            case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) =>
-              val sym = tp.symbol
-              val v = vmap.lookup(sym)
-              if (v == null) { vmap(sym) = variance; vmap }
-              else if (v == variance || v == 0) vmap
-              else { vmap(sym) = 0; vmap }
-            case _ =>
-              foldOver(vmap, t)
+    /** If possible, return a subtype of `tp` which is a type application of `samClass`
+     *  where none of the type arguments are wildcards (thus making it a valid parent type),
+     *  otherwise return NoType.
+     *
+     *  A wildcard in the original type will be replaced by its upper or lower bound in a way
+     *  that maximizes the number of possible implementations of `samMeth`. For example,
+     *  java.util.function defines an interface equivalent to:
+     *
+     *      trait Function[T, R]:
+     *        def apply(t: T): R
+     *
+     *  and it usually appears with wildcards to compensate for the lack of
+     *  definition-site variance in Java:
+     *
+     *      (x => x.toInt): Function[? >: String, ? <: Int]
+     *
+     *  When typechecking this lambda, we need to approximate the wildcards to find
+     *  a valid parent type for our lambda to extend. We can see that in `apply`,
+     *  `T` only appears contravariantly and `R` only appears covariantly, so by
+     *  minimizing the first parameter and maximizing the second, we maximize the
+     *  number of valid implementations of `apply` which lets us implement the lambda
+     *  with a closure equivalent to:
+     *
+     *      new Function[String, Int] { def apply(x: String): Int = x.toInt }
+     */
+    def samParentType(origTp: Type, samClass: Symbol, samMeth: Symbol)(using Context): Type =
+      val tp = origTp.baseType(samClass)
+      if !(tp <:< origTp) then NoType
+      else tp match
+        case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
+          val vmap = MutableSymbolMap[Int | Null]()
+          // TODO: refactor with existing accu? trait VarianceAccumulator extends TypeAccumulator[VarianceMap]
+          object accu extends TypeAccumulator[VarianceMap] {
+            def setVariance(v: Int) = variance = v
+            def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
+              case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) =>
+                val sym = tp.symbol
+                val v = vmap.lookup(sym)
+                if (v == null) { vmap(sym) = variance; vmap }
+                else if (v == variance || v == 0) vmap
+                else { vmap(sym) = 0; vmap }
+              case _ =>
+                foldOver(vmap, t)
+            }
           }
-        }
-
-        accu(vmap, methSym.info)
-        val tparams = tycon.typeParamSymbols
-        val args1 = args.zipWithConserve(tparams) {
-          case (arg @ TypeBounds(lo, hi), tparam) =>
-            val v = vmap.lookup(tparam)
-            if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
-            else if v.uncheckedNN < 0 then lo
-            else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
-          case (arg, _ ) => arg
-        }
-        tp.derivedAppliedType(tycon, args1)
-      case _ =>
-        tp
+          accu(vmap, samMeth.info)
+          val tparams = tycon.typeParamSymbols
+          val args1 = args.zipWithConserve(tparams) {
+            case (arg @ TypeBounds(lo, hi), tparam) =>
+              val v = vmap.lookup(tparam)
+              if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
+              else if v.uncheckedNN < 0 then lo
+              else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
+            case (arg, _ ) => arg
+          }
+          tp.derivedAppliedType(tycon, args1)
+        case _ =>
+          tp
 
     def samClass(tp: Type)(using Context): Symbol = tp match {
       case tp: ClassInfo =>
@@ -5534,10 +5554,8 @@ object Types {
     def unapply(tp: Type)(using Context): Option[(MethodType, Type)] =
       val cls = samClass(tp)
       if cls.exists then
-        val tpNorm = tp.baseType(cls)
-        if (tpNorm ne tp) && !(tpNorm <:< tp) then return None
         val absMems =
-          if tpNorm.isRef(defn.PartialFunctionClass) then
+          if tp.isRef(defn.PartialFunctionClass) then
             // To maintain compatibility with 2.x, we treat PartialFunction specially,
             // pretending it is a SAM type. In the future it would be better to merge
             // Function and PartialFunction, have Function1 contain a isDefinedAt method
@@ -5546,14 +5564,14 @@ object Types {
             // case clauses.
             List(defn.PartialFunction_apply)
           else
-            tpNorm.possibleSamMethods.map(_.symbol)
+            tp.possibleSamMethods.map(_.symbol)
         if absMems.size == 1 then
-          val samMethSymbol = absMems.head
-          val samParentType = dropArgsWildcards(tpNorm, samMethSymbol)
-          samMethSymbol.asSeenFrom(samParentType).info match
+          val samMeth = absMems.head
+          val parentType = samParentType(tp, cls, samMeth)
+          samMeth.asSeenFrom(parentType).info match
             case mt: MethodType if !mt.isParamDependent &&
                 !defn.isContextFunctionType(mt.resultType) =>
-              Some(mt, samParentType)
+              Some(mt, parentType)
             case _ =>
               None
         else None
