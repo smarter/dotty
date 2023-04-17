@@ -21,7 +21,7 @@ import CheckRealizable._
 import Variances.{Variance, setStructuralVariances, Invariant}
 import typer.Nullables
 import util.Stats._
-import util.SimpleIdentitySet
+import util.{SimpleIdentityMap, SimpleIdentitySet}
 import ast.tpd._
 import ast.TreeTypeMap
 import printing.Texts._
@@ -5455,7 +5455,7 @@ object Types {
    *  type.
    */
   object SAMType {
-    type VarianceMap = MutableSymbolMap[Int | Null]
+    type VarianceMap = SimpleIdentityMap[Symbol, Integer]
 
     /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
     /** If possible, return a subtype of `tp` which is a type application of `samClass`
@@ -5488,26 +5488,26 @@ object Types {
       if !(tp <:< origTp) then NoType
       else tp match
         case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
-          val vmap = MutableSymbolMap[Int | Null]()
+          val vmap0 = SimpleIdentityMap.empty[Symbol]
           // TODO: refactor with existing accu? trait VarianceAccumulator extends TypeAccumulator[VarianceMap]
           object accu extends TypeAccumulator[VarianceMap] {
             def setVariance(v: Int) = variance = v
             def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
               case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) =>
                 val sym = tp.symbol
-                val v = vmap.lookup(sym)
-                if (v == null) { vmap(sym) = variance; vmap }
+                val v = vmap(sym)
+                if (v == null) vmap.updated(sym, variance)
                 else if (v == variance || v == 0) vmap
-                else { vmap(sym) = 0; vmap }
+                else vmap.updated(sym, 0)
               case _ =>
                 foldOver(vmap, t)
             }
           }
-          accu(vmap, samMeth.info)
+          val vmap = accu(vmap0, samMeth.info)
           val tparams = tycon.typeParamSymbols
           val args1 = args.zipWithConserve(tparams) {
             case (arg @ TypeBounds(lo, hi), tparam) =>
-              val v = vmap.lookup(tparam)
+              val v = vmap(tparam)
               if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
               else if v.uncheckedNN < 0 then lo
               else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
