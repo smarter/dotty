@@ -5455,8 +5455,6 @@ object Types {
    *  type.
    */
   object SAMType {
-    type VarianceMap = SimpleIdentityMap[Symbol, Integer]
-
     /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
     /** If possible, return a subtype of `tp` which is a type application of `samClass`
      *  where none of the type arguments are wildcards (thus making it a valid parent type),
@@ -5488,26 +5486,18 @@ object Types {
       if !(tp <:< origTp) then NoType
       else tp match
         case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
-          val vmap0 = SimpleIdentityMap.empty[Symbol]
           // TODO: refactor with existing accu? trait VarianceAccumulator extends TypeAccumulator[VarianceMap]
-          object accu extends TypeAccumulator[VarianceMap] {
-            def setVariance(v: Int) = variance = v
-            def apply(vmap: VarianceMap, t: Type): VarianceMap = t match {
+          val accu = new TypeAccumulator[VarianceMap[Symbol]]:
+            def apply(vmap: VarianceMap[Symbol], t: Type): VarianceMap[Symbol] = t match
               case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) =>
-                val sym = tp.symbol
-                val v = vmap(sym)
-                if (v == null) vmap.updated(sym, variance)
-                else if (v == variance || v == 0) vmap
-                else vmap.updated(sym, 0)
+                vmap.recordLocalVariance(tp.symbol, variance)
               case _ =>
                 foldOver(vmap, t)
-            }
-          }
-          val vmap = accu(vmap0, samMeth.info)
+          val vmap = accu(VarianceMap.empty, samMeth.info)
           val tparams = tycon.typeParamSymbols
           val args1 = args.zipWithConserve(tparams) {
             case (arg @ TypeBounds(lo, hi), tparam) =>
-              val v = vmap(tparam)
+              val v = vmap.computedVariance(tparam)
               if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
               else if v.uncheckedNN < 0 then lo
               else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
@@ -6406,6 +6396,35 @@ object Types {
         }
       }
   }
+
+  object VarianceMap:
+    /** An immutable map representing the variance of keys of type `K` */
+    opaque type VarianceMap[K <: AnyRef] <: AnyRef = SimpleIdentityMap[K, Integer]
+    def empty[K <: AnyRef]: VarianceMap[K] = SimpleIdentityMap.empty[K]
+    extension [K <: AnyRef](vmap: VarianceMap[K])
+      /** The backing map used to implement this VarianceMap. */
+      inline def underlying: SimpleIdentityMap[K, Integer] = vmap
+
+      /** Return a new map taking into account that K appears in a
+       *  {co,contra,in}-variant position if `localVariance` is {positive,negative,zero}.
+       */
+      def recordLocalVariance(k: K, localVariance: Int): VarianceMap[K] =
+        // inline val underling: SimpleIdentityMap[K, Integer] = vmap
+        val previousVariance = vmap(k)
+        if (previousVariance == null) vmap.updated(k, localVariance)
+        else if (previousVariance == localVariance || previousVariance == 0) vmap
+        else vmap.updated(k, 0)
+
+      /** Return the variance of `k`:
+       *  - A positive value means that `k` appears only covariantly.
+       *  - A negative value means that `k` appears only contravariantly.
+       *  - A zero value means that `k` appears both covariantly and
+       *    contravariantly, or appears invariantly.
+       *  - A null value means that `k` does not appear at all.
+       */
+      def computedVariance(k: K): Integer | Null =
+        vmap(k)
+  export VarianceMap.VarianceMap
 
   //   ----- Name Filters --------------------------------------------------
 
