@@ -5501,7 +5501,7 @@ object Types {
               if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
               else if v.uncheckedNN < 0 then lo
               else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
-            case (arg, _ ) => arg
+            case (arg, _) => arg
           }
           tp.derivedAppliedType(tycon, args1)
         case _ =>
