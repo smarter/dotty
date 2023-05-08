@@ -1425,6 +1425,18 @@ object desugar {
         .withMods(synthetic | Artifact),
       Closure(Nil, Ident(nme.ANON_FUN), if (isContextual) ContextualEmptyTree else EmptyTree))
 
+  def makePolyClosure(tparams: List[TypeDef], params: List[ValDef], body: Tree, tpt: Tree | Null = null, isContextual: Boolean, span: Span)(using Context): Block =
+    val ddef =
+      DefDef(nme.ANON_FUN, tparams :: params :: Nil, if (tpt == null) TypeTree() else tpt, body)
+        .withSpan(span)
+        .withMods(synthetic | Artifact)
+    tparams.foreach:
+      case TypeDef(_, rhs: DerivedTypeTree) => rhs.watching(ddef)
+      case _ =>
+    Block(
+      ddef,
+      Closure(Nil, Ident(nme.ANON_FUN), if (isContextual) ContextualEmptyTree else EmptyTree))
+
   /** If `nparams` == 1, expand partial function
    *
    *       { cases }

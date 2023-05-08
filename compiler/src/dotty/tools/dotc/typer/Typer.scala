@@ -4253,6 +4253,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
             pt match
               case RefinedType(_, _, npt: PolyType) if poly.resultType.isInstanceOf[MethodType] => // Should be something that matches specifically PolyFunction instead
 
+                // TODO: move to typedFunctionValue where we can rely on makePolyClosure to do the watching
                 // !!!: Doesn't work because DerivedTypeTree needs to watch some tree definition.
                 val paramTpts = poly.paramInfos.map: info =>
                   new untpd.DerivedTypeTree:
