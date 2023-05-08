@@ -1383,6 +1383,10 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     else if target.exists && isFullyDefined(target, ForceDegree.flipBottom) then target
     else NoType
 
+  def typedPolyFunction(tree: untpd.PolyFunction, pt: Type)(using Context): Tree =
+    if (ctx.mode is Mode.Type) ??? // done in desugar currently
+    else ???//typedPolyFunctionValue(tree, pt)
+
   def typedFunction(tree: untpd.Function, pt: Type)(using Context): Tree =
     if (ctx.mode is Mode.Type) typedFunctionType(tree, pt)
     else typedFunctionValue(tree, pt)
@@ -3054,6 +3058,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           case tree: untpd.Block => typedBlock(desugar.block(tree), pt)(using ctx.fresh.setNewScope)
           case tree: untpd.If => typedIf(tree, pt)
           case tree: untpd.Function => typedFunction(tree, pt)
+          // case tree: untpd.PolyFunction => typedPolyFunction(tree, pt)
           case tree: untpd.Closure => typedClosure(tree, pt)
           case tree: untpd.Import => typedImport(tree)
           case tree: untpd.Export => typedExport(tree)
@@ -4245,11 +4250,39 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           if isApplyProxy(tree) then newExpr
           else if pt.isInstanceOf[PolyProto] then tree
           else
-            var typeArgs = tree match
-              case Select(qual, nme.CONSTRUCTOR) => qual.tpe.widenDealias.argTypesLo.map(TypeTree(_))
-              case _ => Nil
-            if typeArgs.isEmpty then typeArgs = constrained(poly, tree)._2
-            convertNewGenericArray(readapt(tree.appliedToTypeTrees(typeArgs)))
+            pt match
+              case RefinedType(_, _, npt: PolyType) if poly.resultType.isInstanceOf[MethodType] => // Should be something that matches specifically PolyFunction instead
+                // val freshPoly = poly.derivedLambdaType(paramNames = poly.paramNames.map(UniqueName.fresh))
+                // val paramRefs = freshPoly.paramRefs
+                // val typeApplied = tree.appliedToTypes(paramRefs)
+                // val paramDefs = 
+                // untpd.PolyFunction(paramRefs, etaExpand(typeApplied, typeApplied.info, xarity = -1)
+
+                // Adapted from SymDenotations#paramSymss, TODO: generalize?
+                val params = poly.paramNames.lazyZip(poly.paramInfos).map((pname, ptype) =>
+                  newSymbol(ctx.owner, pname, SyntheticParam, ptype))
+                // val prefs = params.map(TypeRef(NoPrefix, _))
+                val prefs = params.map(_.namedType) // should be equivalent
+                for param <- params do
+                  param.info = param.info.substParams(poly, prefs)
+                //
+
+                val typeApplied = tree.appliedToTypes(prefs)
+                val paramDefs = params.map(p => untpd.TypedSplice(TypeDef(p)))
+                val resultType = typeApplied.tpe.asInstanceOf[MethodType] // cannot fail since all based on poly which is known to return MethodType.
+
+                typed(untpd.PolyFunction(paramDefs, etaExpand(typeApplied, resultType, xarity = -1)),
+                  pt, locked)
+                // Looking in the tree is not good enough for:
+                //   [T] => (x: A) => [S] => (y: B) => C = [T] => (x: A) => foo[T](x)
+                // so the following can't be used:
+                // val polyParams = tree.symbol.paramSymss.head.map(_.copy(owner = NoSymbol))
+              case _ =>
+                var typeArgs = tree match
+                  case Select(qual, nme.CONSTRUCTOR) => qual.tpe.widenDealias.argTypesLo.map(TypeTree(_))
+                  case _ => Nil
+                if typeArgs.isEmpty then typeArgs = constrained(poly, tree)._2
+                convertNewGenericArray(readapt(tree.appliedToTypeTrees(typeArgs)))
         case wtp =>
           val isStructuralCall = wtp.isValueType && isStructuralTermSelectOrApply(tree)
           if (isStructuralCall)

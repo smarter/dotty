@@ -96,6 +96,7 @@ abstract class Lifter {
             lifter.liftArg(defs, arg, if (name.firstPart contains '$') EmptyTermName else name)
         }
       case _ =>
+        /// When do we get in this case?
         args.mapConserve(liftArg(defs, _))
     }
 
@@ -116,6 +117,7 @@ abstract class Lifter {
     case Apply(fn, args) =>
       val fn1 = liftApp(defs, fn)
       val args1 = liftArgs(defs, fn.tpe, args)
+      // isErased is dead code?
       if isErased then untpd.cpy.Apply(tree)(fn1, args1).withType(tree.tpe) // application may be partial
       else cpy.Apply(tree)(fn1, args1)
     case TypeApply(fn, targs) =>
