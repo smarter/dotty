@@ -1744,18 +1744,22 @@ object desugar {
           // Into    new scala.PolyFunction { def apply[T_1, ..., T_M](x_1: P_1, ..., x_N: P_N): R2 = body }
           // where R2 is R, with all references to S_1..S_M replaced with T1..T_M.
 
+          // TODO: Generalize DependentTypeTree to be used here.
+          // need to pass both tparams and vparams
           def typeTree(tp: Type) = tp match
-            case RefinedType(parent, nme.apply, PolyType(_, mt)) if parent.typeSymbol eq defn.PolyFunctionClass =>
-              var bail = false
-              def mapper(tp: Type, topLevel: Boolean = false): Tree = tp match
-                case tp: TypeRef              => ref(tp)
-                case tp: TypeParamRef         => Ident(applyTParams(tp.paramNum).name)
-                case AppliedType(tycon, args) => AppliedTypeTree(mapper(tycon), args.map(mapper(_)))
-                case _                        => if topLevel then TypeTree() else { bail = true; genericEmptyTree }
-              val mapped = mapper(mt.resultType, topLevel = true)
-              if bail then TypeTree() else mapped
-            case _ => TypeTree()
+            case RefinedType(parent, nme.apply, pt @ PolyType(_, mt: MethodType)) if parent.typeSymbol eq defn.PolyFunctionClass =>
 
+              DependentPolyTypeTree((tsyms, vsyms) =>
+                mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(pt, tsyms.map(_.typeRef)))
+              // var bail = false
+              // def mapper(tp: Type, topLevel: Boolean = false): Tree = tp match
+              //   case tp: TypeRef              => ref(tp)
+              //   case tp: TypeParamRef         => Ident(applyTParams(tp.paramNum).name)
+              //   case AppliedType(tycon, args) => AppliedTypeTree(mapper(tycon), args.map(mapper(_)))
+              //   case _                        => if topLevel then TypeTree() else { bail = true; genericEmptyTree }
+              // val mapped = mapper(mt.resultType, topLevel = true)
+              // if bail then TypeTree() else mapped
+            case _ => TypeTree()
           val applyVParams = vargs.asInstanceOf[List[ValDef]]
             .map(varg => varg.withAddedFlags(mods.flags | Param))
             New(Template(emptyConstructor, List(polyFunctionTpt), Nil, EmptyValDef,

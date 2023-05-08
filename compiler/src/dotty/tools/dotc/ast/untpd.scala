@@ -152,6 +152,7 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
 
   /** Short-lived usage in typer, does not need copy/transform/fold infrastructure */
   case class DependentTypeTree(tp: List[Symbol] => Type)(implicit @constructorOnly src: SourceFile) extends Tree
+  case class DependentPolyTypeTree(tp: (List[Symbol], List[Symbol]) => Type)(implicit @constructorOnly src: SourceFile) extends Tree
 
   @sharable object EmptyTypeIdent extends Ident(tpnme.EMPTY)(NoSource) with WithoutTypeOrPos[Untyped] {
     override def isEmpty: Boolean = true

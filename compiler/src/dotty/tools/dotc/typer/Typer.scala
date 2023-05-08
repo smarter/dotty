@@ -4263,6 +4263,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
                 val typeApplied = tree.appliedToTypes(prefs)
                 val paramDefs = params.map(p => untpd.TypedSplice(TypeDef(p)))
+                // val paramDefs = prefs.map(p => untpd.TypedDef(untpd.TypeTree(TypeAlias(p)))) // type Foo$1 = <noprefix>.Foo$1
                 val resultType = typeApplied.tpe.asInstanceOf[MethodType] // cannot fail since all based on poly which is known to return MethodType.
 
                 // Broken because Desugar assumes targs are TypeDefs, not TypedSplice

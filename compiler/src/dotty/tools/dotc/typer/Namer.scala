@@ -1688,6 +1688,10 @@ class Namer { typer: Typer =>
         WildcardType
       case TypeTree() =>
         checkMembersOK(inferredType, mdef.srcPos)
+      case DependentPolyTypeTree(tpFun) =>
+        val tpe = tpFun(paramss.head, termParamss.head)
+        if (isFullyDefined(tpe, ForceDegree.none)) tpe
+        else typedAheadExpr(mdef.rhs, tpe).tpe
       case DependentTypeTree(tpFun) =>
         val tpe = tpFun(termParamss.head)
         if (isFullyDefined(tpe, ForceDegree.none)) tpe
