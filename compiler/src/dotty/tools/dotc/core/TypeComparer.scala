@@ -3149,7 +3149,7 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
                   }
                 }
               case redux =>
-                MatchResult.Reduced(redux.simplified)
+                MatchResult.Reduced(redux)
           case _ =>
             MatchResult.Reduced(body)
 
