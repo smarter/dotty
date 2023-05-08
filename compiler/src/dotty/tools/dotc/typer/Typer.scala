@@ -4252,24 +4252,23 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           else
             pt match
               case RefinedType(_, _, npt: PolyType) if poly.resultType.isInstanceOf[MethodType] => // Should be something that matches specifically PolyFunction instead
-                // Adapted from SymDenotations#paramSymss, TODO: generalize?
-                val params = poly.paramNames.lazyZip(poly.paramInfos).map((pname, ptype) =>
-                  newSymbol(ctx.owner, pname, SyntheticParam, ptype))
-                // val prefs = params.map(TypeRef(NoPrefix, _))
-                val prefs = params.map(_.namedType) // should be equivalent
-                for param <- params do
-                  param.info = param.info.substParams(poly, prefs)
-                //
 
-                val typeApplied = tree.appliedToTypes(prefs)
-                // TODO: TypedSplice not valid for param of DefDef (DefDef#paramss is List[ParamClause])
-                val paramDefs = params.map(p => untpd.TypedSplice(TypeDef(p)))
-                // val paramDefs = prefs.map(p => untpd.TypedDef(untpd.TypeTree(TypeAlias(p)))) // type Foo$1 = <noprefix>.Foo$1
-                val resultType = typeApplied.tpe.asInstanceOf[MethodType] // cannot fail since all based on poly which is known to return MethodType.
+                val paramTpts = poly.paramInfos.map: info =>
+                  new untpd.DerivedTypeTree:
+                    def derivedTree(sym: Symbol)(using Context) =
+                      tpd.TypeTree(info.subst(poly, sym.owner.info.asInstanceOf[PolyType]))
+                val params = poly.paramNames.lazyZip(paramTpts).map: (name, tpt) =>
+                  untpd.TypeDef(name, tpt) // withspan?
+
+                // ARG: doesn't work becaue etaExpand actually expects a typed tree.
+                val typeApplied = untpd.TypeApply(tree, poly.paramNames.map(name => untpd.Ident(name) /*withSpan?*/))
+
+                // XXX: can't substitute with untyped stuff, OK if etaExpand doesn't actually make use of the type of arguments (so xarity = -1)
+                val resultType = poly.resultType.asInstanceOf[MethodType]
 
                 // Broken because Desugar assumes targs are TypeDefs, not TypedSplice
                 // To fix it we want to properly type polyfunctions instead of desugaring them.
-                val pf = untpd.PolyFunction(paramDefs, etaExpand(typeApplied, resultType, xarity = -1))
+                val pf = untpd.PolyFunction(params, etaExpand(typeApplied, resultType, xarity = -1))
                 println("pf: " + pf.show)
                 val z = typed(pf, pt, locked)
                 println("z: " + z)
