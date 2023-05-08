@@ -264,11 +264,11 @@ object EtaExpansion extends LiftImpure {
    *  be OK. After elimByName they are all converted to regular function types anyway.
    *  But see comment on the `ExprType` case in function `prune` in class `ConstraintHandling`.
    */
-  def etaExpand(tree: Tree, mt: MethodType, xarity: Int)(using Context): untpd.Tree = {
+  def etaExpand(tree: Tree, mt: MethodType, xarity: Int, wrapLifted: untpd.Tree => untpd.Tree = identity)(using Context): untpd.Tree = {
     import untpd._
     assert(!ctx.isAfterTyper || (ctx.phase eq ctx.base.inliningPhase), ctx.phase)
     val defs = new mutable.ListBuffer[tpd.Tree]
-    val lifted: Tree = TypedSplice(liftApp(defs, tree))
+    val lifted: Tree = wrapLifted(TypedSplice(liftApp(defs, tree)))
     val isLastApplication = mt.resultType match {
       case rt: MethodType => rt.isImplicitMethod
       case _ => true
