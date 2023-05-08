@@ -4251,13 +4251,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           else if pt.isInstanceOf[PolyProto] then tree
           else
             pt match
-              case RefinedType(_, _, npt: PolyType) if poly.resultType.isInstanceOf[MethodType] => // Should be something that matches specifically PolyFunction instead
-                // val freshPoly = poly.derivedLambdaType(paramNames = poly.paramNames.map(UniqueName.fresh))
-                // val paramRefs = freshPoly.paramRefs
-                // val typeApplied = tree.appliedToTypes(paramRefs)
-                // val paramDefs = 
-                // untpd.PolyFunction(paramRefs, etaExpand(typeApplied, typeApplied.info, xarity = -1)
-
+              case RefinedType(_, _, npt: PolyType) if poly.resultType.isInstanceOf[MethodType] && false => // Should be something that matches specifically PolyFunction instead
                 // Adapted from SymDenotations#paramSymss, TODO: generalize?
                 val params = poly.paramNames.lazyZip(poly.paramInfos).map((pname, ptype) =>
                   newSymbol(ctx.owner, pname, SyntheticParam, ptype))
@@ -4271,12 +4265,10 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
                 val paramDefs = params.map(p => untpd.TypedSplice(TypeDef(p)))
                 val resultType = typeApplied.tpe.asInstanceOf[MethodType] // cannot fail since all based on poly which is known to return MethodType.
 
+                // Broken because Desugar assumes targs are TypeDefs, not TypedSplice
+                // To fix it we want to properly type polyfunctions instead of desugaring them.
                 typed(untpd.PolyFunction(paramDefs, etaExpand(typeApplied, resultType, xarity = -1)),
                   pt, locked)
-                // Looking in the tree is not good enough for:
-                //   [T] => (x: A) => [S] => (y: B) => C = [T] => (x: A) => foo[T](x)
-                // so the following can't be used:
-                // val polyParams = tree.symbol.paramSymss.head.map(_.copy(owner = NoSymbol))
               case _ =>
                 var typeArgs = tree match
                   case Select(qual, nme.CONSTRUCTOR) => qual.tpe.widenDealias.argTypesLo.map(TypeTree(_))
