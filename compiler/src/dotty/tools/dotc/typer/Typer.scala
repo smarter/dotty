@@ -4251,7 +4251,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           else if pt.isInstanceOf[PolyProto] then tree
           else
             pt match
-              case RefinedType(_, _, npt: PolyType) if poly.resultType.isInstanceOf[MethodType] && false => // Should be something that matches specifically PolyFunction instead
+              case RefinedType(_, _, npt: PolyType) if poly.resultType.isInstanceOf[MethodType] => // Should be something that matches specifically PolyFunction instead
                 // Adapted from SymDenotations#paramSymss, TODO: generalize?
                 val params = poly.paramNames.lazyZip(poly.paramInfos).map((pname, ptype) =>
                   newSymbol(ctx.owner, pname, SyntheticParam, ptype))
@@ -4262,14 +4262,18 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
                 //
 
                 val typeApplied = tree.appliedToTypes(prefs)
+                // TODO: TypedSplice not valid for param of DefDef (DefDef#paramss is List[ParamClause])
                 val paramDefs = params.map(p => untpd.TypedSplice(TypeDef(p)))
                 // val paramDefs = prefs.map(p => untpd.TypedDef(untpd.TypeTree(TypeAlias(p)))) // type Foo$1 = <noprefix>.Foo$1
                 val resultType = typeApplied.tpe.asInstanceOf[MethodType] // cannot fail since all based on poly which is known to return MethodType.
 
                 // Broken because Desugar assumes targs are TypeDefs, not TypedSplice
                 // To fix it we want to properly type polyfunctions instead of desugaring them.
-                typed(untpd.PolyFunction(paramDefs, etaExpand(typeApplied, resultType, xarity = -1)),
-                  pt, locked)
+                val pf = untpd.PolyFunction(paramDefs, etaExpand(typeApplied, resultType, xarity = -1))
+                println("pf: " + pf.show)
+                val z = typed(pf, pt, locked)
+                println("z: " + z)
+                z
               case _ =>
                 var typeArgs = tree match
                   case Select(qual, nme.CONSTRUCTOR) => qual.tpe.widenDealias.argTypesLo.map(TypeTree(_))

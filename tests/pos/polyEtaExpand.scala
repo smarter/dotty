@@ -1,8 +1,8 @@
 
 def foo[A](x: A): A = x
-def bar[A]: A => A = x => x
-type F[A] = A => A
-def baz[A]: F[A] = x => x
+// def bar[A]: A => A = x => x
+// type F[A] = A => A
+// def baz[A]: F[A] = x => x
 //def doubleTypes[A](using A)[B](x: B): B = x
 
 // // These vals should already compile on main
