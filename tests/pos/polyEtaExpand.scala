@@ -21,6 +21,8 @@ def foo[A](x: A): A = x
 
 // These vals should not compile on main and compile with this feature (the first failure might swallow the others)
 object After {
+  val foo1: [T] => T => T = x => x
+
   // val foo2: [T] => T => T = foo // should be indistinguishible from evenBefore.foo2
 
   // val bar2: [T] => T => T = bar // should be indistinguishible from evenBefore.bar2

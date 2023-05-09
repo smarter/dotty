@@ -1401,11 +1401,12 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     val mods = fun match
       case body: untpd.FunctionWithMods => body.mods
       case _ => untpd.EmptyModifiers
+    // I don't think we support contextual polymorphic funs actually.
     val isContextual = mods.flags.is(Given)
     // typedFunctionValue handles isErased here too
 
-    val resultTpt = pt match
-      case RefinedType(parent, nme.apply, pt @ PolyType(_, mt: MethodType)) if parent.typeSymbol eq defn.PolyFunctionClass =>
+    val resultTpt = pt.dealias match
+      case RefinedType(parent, nme.apply, pt @ PolyType(_, mt: MethodType)) if parent.classSymbol eq defn.PolyFunctionClass =>
         untpd.DependentPolyTypeTree((tsyms, vsyms) =>
           mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(pt, tsyms.map(_.typeRef)))
       case _ => untpd.TypeTree()
@@ -1492,6 +1493,25 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
   def typedFunctionValue(tree: untpd.Function, pt: Type)(using Context): Tree = {
     val untpd.Function(params: List[untpd.ValDef] @unchecked, _) = tree: @unchecked
+
+    pt match
+      case RefinedType(parent, nme.apply, pt: PolyType)
+      if (parent.typeSymbol eq defn.PolyFunctionClass) &&
+         params.forall(_.tpt.isEmpty)
+      =>
+        val tparams = pt.paramNames.lazyZip(pt.paramInfos).map: (name, info) =>
+          // TODO: generalize PolyDependentTypeTree instead to be usable in non-return positions?
+          untpd.TypeDef(name, new untpd.DerivedTypeTree:
+            // Inspired by DerivedFromParamTree#derivedTree
+            def derivedTree(sym: Symbol)(using Context) =
+              val defctx = ctx.outersIterator.dropWhile(_.scope eq ctx.scope).next()
+              val tparams = defctx.scope.toList.filter(_.isType)
+              val tparamRefs = tparams.map(_.typeRef)
+              tpd.TypeTree(info.substParams(pt, tparamRefs)))
+
+        // TODO: need type ascriptions for the term params too, do this in typedPolyFunctionValue? ([T] => x => x): [T] => T => T Would also be possible with DependentTypeTree.
+        typed(untpd.PolyFunction(tparams, tree), pt)
+      case _ =>
 
     val (isContextual, isDefinedErased) = tree match {
       case tree: untpd.FunctionWithMods => (tree.mods.is(Given), tree.erasedParams)
