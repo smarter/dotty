@@ -1842,6 +1842,8 @@ object Types {
         if alwaysDependent || mt.isResultDependent then
           RefinedType(funType, nme.apply, mt)
         else funType
+      case mt: PolyType =>
+        RefinedType(defn.PolyFunctionType, nme.apply, mt)
     }
 
     /** The signature of this type. This is by default NotAMethod,

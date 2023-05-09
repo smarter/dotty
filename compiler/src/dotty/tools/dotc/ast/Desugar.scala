@@ -1751,6 +1751,8 @@ object desugar {
           ))
         }
         else {
+          return EmptyTree
+
           // Desugar [T_1, ..., T_M] -> (x_1: P_1, ..., x_N: P_N) => body
           // with pt [S_1, ..., S_M] -> (O_1, ..., O_N) => R
           // Into    new scala.PolyFunction { def apply[T_1, ..., T_M](x_1: P_1, ..., x_N: P_N): R2 = body }

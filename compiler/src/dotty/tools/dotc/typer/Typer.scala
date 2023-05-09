@@ -1385,7 +1385,38 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
   def typedPolyFunction(tree: untpd.PolyFunction, pt: Type)(using Context): Tree =
     if (ctx.mode is Mode.Type) ??? // done in desugar currently
-    else ???//typedPolyFunctionValue(tree, pt)
+    else typedPolyFunctionValue(tree, pt)
+
+
+  def typedPolyFunctionValue(tree: untpd.PolyFunction, pt: Type)(using Context): Tree =
+    val untpd.PolyFunction(tparams: List[untpd.TypeDef] @unchecked, body0) = tree: @unchecked
+    def stripped(tree: untpd.Tree): untpd.Tree = tree match
+      case untpd.Parens(body1) =>
+        stripped(body1)
+      case untpd.Block(Nil, body1) =>
+        stripped(body1)
+      case _ => tree
+    val fun @ untpd.Function(vparams: List[untpd.ValDef] @unchecked, body1) = stripped(body0): @unchecked
+
+    val mods = fun match
+      case body: untpd.FunctionWithMods => body.mods
+      case _ => untpd.EmptyModifiers
+    val isContextual = mods.flags.is(Given)
+    // typedFunctionValue handles isErased here too
+
+    val resultTpt = pt match
+      case RefinedType(parent, nme.apply, pt @ PolyType(_, mt: MethodType)) if parent.typeSymbol eq defn.PolyFunctionClass =>
+        untpd.DependentPolyTypeTree((tsyms, vsyms) =>
+          mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(pt, tsyms.map(_.typeRef)))
+      case _ => untpd.TypeTree()
+
+    // not useful because we're making a regular def
+    // val applyVParams = vargs
+      //.map(varg => varg.withAddedFlags(mods.flags | Param))
+
+    val desugared = desugar.makePolyClosure(tparams, vparams, body1, resultTpt, isContextual, tree.span)
+    typed(desugared, pt)
+      // .showing(i"desugared fun $tree --> $desugared with pt = $pt", typr)
 
   def typedFunction(tree: untpd.Function, pt: Type)(using Context): Tree =
     if (ctx.mode is Mode.Type) typedFunctionType(tree, pt)
@@ -1678,6 +1709,8 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
                 else
                   EmptyTree
             }
+          case mt: PolyType =>
+            EmptyTree
           case tp =>
             if !tp.isErroneous then
               throw new java.lang.Error(i"internal error: closing over non-method $tp, pos = ${tree.span}")
@@ -3058,7 +3091,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           case tree: untpd.Block => typedBlock(desugar.block(tree), pt)(using ctx.fresh.setNewScope)
           case tree: untpd.If => typedIf(tree, pt)
           case tree: untpd.Function => typedFunction(tree, pt)
-          // case tree: untpd.PolyFunction => typedPolyFunction(tree, pt)
+          case tree: untpd.PolyFunction if !ctx.mode.is(Mode.Type) => typedPolyFunction(tree, pt)
           case tree: untpd.Closure => typedClosure(tree, pt)
           case tree: untpd.Import => typedImport(tree)
           case tree: untpd.Export => typedExport(tree)
