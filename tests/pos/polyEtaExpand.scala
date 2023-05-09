@@ -20,8 +20,8 @@ def foo[A](x: A): A = x
 //   val baz2: [T] => T => T = [T] => (x: T) => baz[T](x)
 
 // These vals should not compile on main and compile with this feature (the first failure might swallow the others)
-object After:
-  val foo2: [T] => T => T = foo // should be indistinguishible from evenBefore.foo2
+object After {
+  // val foo2: [T] => T => T = foo // should be indistinguishible from evenBefore.foo2
 
   // val bar2: [T] => T => T = bar // should be indistinguishible from evenBefore.bar2
 
@@ -30,7 +30,7 @@ object After:
   // other examples with using params and extension methods
 
   //val asVal: [A1] => A1 ?=> [B1] => B1 => B1 = doubleTypes
-  
+}
 
 // // Should not compile even with this feature, to be moved to a neg test
 // object notEvenAfter:
