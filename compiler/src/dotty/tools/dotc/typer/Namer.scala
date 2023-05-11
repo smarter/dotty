@@ -1684,12 +1684,14 @@ class Namer { typer: Typer =>
     lazy val termParamss = paramss.collect { case TermSymbols(vparams) => vparams }
 
     val tptProto = mdef.tpt match {
-      case _: untpd.DerivedTypeTree =>
+      case _: (untpd.DerivedTypeTree | untpd.LambdaParamTypeTree) =>
         WildcardType
       case TypeTree() =>
         checkMembersOK(inferredType, mdef.srcPos)
-      case DependentPolyTypeTree(tpFun) =>
-        val tpe = tpFun(paramss.head, termParamss.head)
+      case LambdaResultTypeTree(tpFun) =>
+        // makes more sense in Typer, if we keep this here we can use paramss
+        val (tsyms, vsyms) = ctx.scope.toList.partition(_.isType)
+        val tpe = tpFun(tsyms, vsyms)
         if (isFullyDefined(tpe, ForceDegree.none)) tpe
         else typedAheadExpr(mdef.rhs, tpe).tpe
       case DependentTypeTree(tpFun) =>

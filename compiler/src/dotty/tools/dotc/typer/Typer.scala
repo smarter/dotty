@@ -1407,7 +1407,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
     val resultTpt = pt.dealias match
       case RefinedType(parent, nme.apply, pt @ PolyType(_, mt: MethodType)) if parent.classSymbol eq defn.PolyFunctionClass =>
-        untpd.DependentPolyTypeTree((tsyms, vsyms) =>
+        untpd.LambdaResultTypeTree((tsyms, vsyms) =>
           mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(pt, tsyms.map(_.typeRef)))
       case _ => untpd.TypeTree()
 
@@ -1495,22 +1495,26 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     val untpd.Function(params: List[untpd.ValDef] @unchecked, _) = tree: @unchecked
 
     pt match
-      case RefinedType(parent, nme.apply, pt: PolyType)
+      case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType))
       if (parent.typeSymbol eq defn.PolyFunctionClass) &&
          params.forall(_.tpt.isEmpty)
       =>
-        val tparams = pt.paramNames.lazyZip(pt.paramInfos).map: (name, info) =>
+        val tparams = poly.paramNames.lazyZip(poly.paramInfos).map: (name, info) =>
           // TODO: generalize PolyDependentTypeTree instead to be usable in non-return positions?
-          untpd.TypeDef(name, new untpd.DerivedTypeTree:
-            // Inspired by DerivedFromParamTree#derivedTree
-            def derivedTree(sym: Symbol)(using Context) =
-              val defctx = ctx.outersIterator.dropWhile(_.scope eq ctx.scope).next()
-              val tparams = defctx.scope.toList.filter(_.isType)
-              val tparamRefs = tparams.map(_.typeRef)
-              tpd.TypeTree(info.substParams(pt, tparamRefs)))
+          untpd.TypeDef(name, new untpd.LambdaParamTypeTree((tsyms, vsyms) =>
+            info.substParams(poly, tsyms.map(_.typeRef)))).withFlags(SyntheticParam).withSpan(tree.span.startPos)
+        val params1 = params.lazyZip(mt.paramInfos).map: (vparam, info) =>
+          cpy.ValDef(vparam)(tpt = new untpd.LambdaParamTypeTree((tsyms, vsyms) =>
+            // println("tsyms: " + tsyms)
+            // println("vsyms: " + vsyms)
+            // println("poly: " + poly.show)
+            info.substParams(mt, vsyms.map(_.termRef)).substParams(poly, tsyms.map(_.typeRef)))
+          )
+        val fun1 = cpy.Function(tree)(params1, tree.body)
+        // println("fun1: " + fun1)
 
         // TODO: need type ascriptions for the term params too, do this in typedPolyFunctionValue? ([T] => x => x): [T] => T => T Would also be possible with DependentTypeTree.
-        typed(untpd.PolyFunction(tparams, tree), pt)
+        return typed(untpd.PolyFunction(tparams, fun1), pt)
       case _ =>
 
     val (isContextual, isDefinedErased) = tree match {
@@ -3139,7 +3143,13 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           case tree: untpd.TypedSplice => typedTypedSplice(tree)
           case tree: untpd.UnApply => typedUnApply(tree, pt)
           case tree: untpd.Tuple => typedTuple(tree, pt)
-          case tree: (untpd.DependentTypeTree | untpd.DependentPolyTypeTree) => completeTypeTree(untpd.InferredTypeTree(), pt, tree)
+          case tree: (untpd.DependentTypeTree | untpd.LambdaResultTypeTree) => completeTypeTree(untpd.InferredTypeTree(), pt, tree)
+          case tree @ untpd.LambdaParamTypeTree(tpFun) =>
+            // could be done in namer too, but then typedefsig should also handle it.
+            // maybe other way is better: move LambdaResultTypeTree to Typer.
+            val (tsyms, vsyms) = ctx.outer.outer.scope.toList.partition(_.isType)
+            val tpe = tpFun(tsyms, vsyms)
+            completeTypeTree(untpd.InferredTypeTree(), tpe, tree)
           case tree: untpd.InfixOp => typedInfixOp(tree, pt)
           case tree: untpd.ParsedTry => typedTry(tree, pt)
           case tree @ untpd.PostfixOp(qual, Ident(nme.WILDCARD)) => typedAsFunction(tree, pt)

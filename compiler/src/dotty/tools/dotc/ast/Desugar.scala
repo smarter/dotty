@@ -1763,7 +1763,7 @@ object desugar {
           def typeTree(tp: Type) = tp match
             case RefinedType(parent, nme.apply, pt @ PolyType(_, mt: MethodType)) if parent.typeSymbol eq defn.PolyFunctionClass =>
 
-              DependentPolyTypeTree((tsyms, vsyms) =>
+              LambdaResultTypeTree((tsyms, vsyms) =>
                 mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(pt, tsyms.map(_.typeRef)))
               // var bail = false
               // def mapper(tp: Type, topLevel: Boolean = false): Tree = tp match
