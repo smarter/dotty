@@ -1334,11 +1334,11 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           (pt1.argInfos.init, typeTree(interpolateWildcards(pt1.argInfos.last.hiBound)))
         case RefinedType(parent, nme.apply, mt @ MethodTpe(_, formals, restpe))
         if (defn.isNonRefinedFunction(parent) || defn.isErasedFunctionType(parent)) && formals.length == defaultArity =>
-          (formals, untpd.DependentTypeTree(syms => restpe.substParams(mt, syms.map(_.termRef))))
+          (formals, untpd.DependentTypeTree((_, syms) => restpe.substParams(mt, syms.map(_.termRef))))
         case SAMType(mt @ MethodTpe(_, formals, restpe)) =>
           (formals,
            if (mt.isResultDependent)
-             untpd.DependentTypeTree(syms => restpe.substParams(mt, syms.map(_.termRef)))
+             untpd.DependentTypeTree((_, syms) => restpe.substParams(mt, syms.map(_.termRef)))
            else
              typeTree(restpe))
         case _ =>
