@@ -144,6 +144,26 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
   private def arrow(isGiven: Boolean, isPure: Boolean): String =
     (if isGiven then "?" else "") + (if isPure then "->" else "=>")
 
+  def toTextMethodAsFunction(info: Type, isPure: Boolean): Text = info match
+    case info: MethodType =>
+      changePrec(GlobalPrec) {
+        "("
+        ~ paramsText(info)
+        ~ ") "
+        ~ arrow(info.isImplicitMethod, isPure)
+        ~ " "
+        ~ toTextMethodAsFunction(info.resultType, isPure)
+      }
+    case info: PolyType =>
+      changePrec(GlobalPrec) {
+        "["
+        ~ paramsText(info)
+        ~ "] => "
+        ~ toTextMethodAsFunction(info.resultType, isPure)
+      }
+    case _ =>
+      toText(info)
+
   override def toText(tp: Type): Text = controlled {
     def toTextTuple(args: List[Type]): Text =
       "(" ~ argsText(args) ~ ")"
@@ -162,26 +182,6 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
             ~ ")"
         argStr ~ " " ~ arrow(isGiven, isPure) ~ " " ~ argText(args.last)
       }
-
-    def toTextMethodAsFunction(info: Type, isPure: Boolean): Text = info match
-      case info: MethodType =>
-        changePrec(GlobalPrec) {
-          "("
-          ~ paramsText(info)
-          ~ ") "
-          ~ arrow(info.isImplicitMethod, isPure)
-          ~ " "
-          ~ toTextMethodAsFunction(info.resultType, isPure)
-        }
-      case info: PolyType =>
-        changePrec(GlobalPrec) {
-          "["
-          ~ paramsText(info)
-          ~ "] => "
-          ~ toTextMethodAsFunction(info.resultType, isPure)
-        }
-      case _ =>
-        toText(info)
 
     def isInfixType(tp: Type): Boolean = tp match
       case AppliedType(tycon, args) =>
