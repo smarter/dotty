@@ -1413,14 +1413,17 @@ object desugar {
   }
 
   /** Make closure corresponding to function.
-   *      params => body
+   *      [tparams] => params => body
    *  ==>
-   *      def $anonfun(params) = body
+   *      def $anonfun[tparams](params) = body
    *      Closure($anonfun)
    */
-  def makeClosure(params: List[ValDef], body: Tree, tpt: Tree | Null = null, isContextual: Boolean, span: Span)(using Context): Block =
+  def makeClosure(tparams: List[TypeDef], vparams: List[ValDef], body: Tree, tpt: Tree | Null = null, isContextual: Boolean, span: Span)(using Context): Block =
+    val paramss: List[ParamClause] =
+      if tparams.isEmpty then vparams :: Nil
+      else tparams :: vparams :: Nil
     Block(
-      DefDef(nme.ANON_FUN, params :: Nil, if (tpt == null) TypeTree() else tpt, body)
+      DefDef(nme.ANON_FUN, paramss, if (tpt == null) TypeTree() else tpt, body)
         .withSpan(span)
         .withMods(synthetic | Artifact),
       Closure(Nil, Ident(nme.ANON_FUN), if (isContextual) ContextualEmptyTree else EmptyTree))
@@ -1738,24 +1741,7 @@ object desugar {
             DefDef(nme.apply, applyTParams :: applyVParams :: Nil, res, EmptyTree).withFlags(Synthetic)
           ))
         }
-        else {
-          // Desugar [T_1, ..., T_M] -> (x_1: P_1, ..., x_N: P_N) => body
-          // with pt [S_1, ..., S_M] -> (O_1, ..., O_N) => R
-          // Into    new scala.PolyFunction { def apply[T_1, ..., T_M](x_1: P_1, ..., x_N: P_N): R2 = body }
-          // where R2 is R, with all references to S_1..S_M replaced with T1..T_M.
-
-          def typeTree(tp: Type) = tp match
-            case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType)) if parent.classSymbol eq defn.PolyFunctionClass =>
-              untpd.DependentTypeTree((tsyms, vsyms) =>
-                mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(poly, tsyms.map(_.typeRef)))
-            case _ => TypeTree()
-
-          val applyVParams = vargs.asInstanceOf[List[ValDef]]
-            .map(varg => varg.withAddedFlags(mods.flags | Param))
-            New(Template(emptyConstructor, List(polyFunctionTpt), Nil, EmptyValDef,
-              List(DefDef(nme.apply, applyTParams :: applyVParams :: Nil, typeTree(pt), res))
-              ))
-        }
+        else EmptyTree
       case _ =>
         // may happen for erroneous input. An error will already have been reported.
         assert(ctx.reporter.errorsReported)

@@ -1628,11 +1628,48 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
                 )
               cpy.ValDef(param)(tpt = paramTpt)
           if isErased then param0.withAddedFlags(Flags.Erased) else param0
-      desugared = desugar.makeClosure(inferredParams, fnBody, resultTpt, isContextual, tree.span)
+      desugared = desugar.makeClosure(Nil, inferredParams, fnBody, resultTpt, isContextual, tree.span)
 
     typed(desugared, pt)
       .showing(i"desugared fun $tree --> $desugared with pt = $pt", typr)
   }
+
+
+  def typedPolyFunction(tree: untpd.PolyFunction, pt: Type)(using Context): Tree =
+    if (ctx.mode is Mode.Type) ??? // done in desugar currently
+    else typedPolyFunctionValue(tree, pt)
+
+  def typedPolyFunctionValue(tree: untpd.PolyFunction, pt: Type)(using Context): Tree =
+    val untpd.PolyFunction(tparams: List[untpd.TypeDef] @unchecked, body0) = tree: @unchecked
+    def stripped(tree: untpd.Tree): untpd.Tree = tree match
+      case untpd.Parens(body1) =>
+        stripped(body1)
+      case untpd.Block(Nil, body1) =>
+        stripped(body1)
+      case _ => tree
+    val fun @ untpd.Function(vparams: List[untpd.ValDef] @unchecked, body1) = stripped(body0): @unchecked
+
+    val mods = fun match
+      case body: untpd.FunctionWithMods => body.mods
+      case _ => untpd.EmptyModifiers
+    // I don't think we support contextual polymorphic funs actually.
+    val isContextual = mods.flags.is(Given)
+    // typedFunctionValue handles isErased here too
+
+    val resultTpt = pt.dealias match
+      case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType)) if parent.classSymbol eq defn.PolyFunctionClass =>
+        untpd.DependentTypeTree((tsyms, vsyms) =>
+          mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(poly, tsyms.map(_.typeRef)))
+      case _ => untpd.TypeTree()
+
+    // not useful because we're making a regular def
+    // val applyVParams = vargs
+      //.map(varg => varg.withAddedFlags(mods.flags | Param))
+
+    val desugared = desugar.makeClosure(tparams, vparams, body1, resultTpt, isContextual, tree.span)
+    typed(desugared, pt)
+      // .showing(i"desugared fun $tree --> $desugared with pt = $pt", typr)
+  end typedPolyFunctionValue
 
   def typedClosure(tree: untpd.Closure, pt: Type)(using Context): Tree = {
     val env1 = tree.env mapconserve (typed(_))
@@ -1674,6 +1711,8 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
                 else
                   EmptyTree
             }
+          case _: PolyType =>
+            EmptyTree
           case tp =>
             if !tp.isErroneous then
               throw new java.lang.Error(i"internal error: closing over non-method $tp, pos = ${tree.span}")
@@ -3054,6 +3093,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           case tree: untpd.Block => typedBlock(desugar.block(tree), pt)(using ctx.fresh.setNewScope)
           case tree: untpd.If => typedIf(tree, pt)
           case tree: untpd.Function => typedFunction(tree, pt)
+          case tree: untpd.PolyFunction if !ctx.mode.is(Mode.Type) => typedPolyFunction(tree, pt)
           case tree: untpd.Closure => typedClosure(tree, pt)
           case tree: untpd.Import => typedImport(tree)
           case tree: untpd.Export => typedExport(tree)
