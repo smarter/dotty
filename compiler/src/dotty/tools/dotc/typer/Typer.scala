@@ -1334,11 +1334,11 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           (pt1.argInfos.init, typeTree(interpolateWildcards(pt1.argInfos.last.hiBound)))
         case RefinedType(parent, nme.apply, mt @ MethodTpe(_, formals, restpe))
         if (defn.isNonRefinedFunction(parent) || defn.isErasedFunctionType(parent)) && formals.length == defaultArity =>
-          (formals, untpd.DependentTypeTree((_, syms) => restpe.substParams(mt, syms.map(_.termRef))))
+          (formals, untpd.InLambdaTypeTree(isResult = true, (_, syms) => restpe.substParams(mt, syms.map(_.termRef))))
         case SAMType(mt @ MethodTpe(_, formals, restpe)) =>
           (formals,
            if (mt.isResultDependent)
-             untpd.DependentTypeTree((_, syms) => restpe.substParams(mt, syms.map(_.termRef)))
+             untpd.InLambdaTypeTree(isResult = true, (_, syms) => restpe.substParams(mt, syms.map(_.termRef)))
            else
              typeTree(restpe))
         case _ =>
@@ -1651,7 +1651,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
     val resultTpt = pt.dealias match
       case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType)) if parent.classSymbol eq defn.PolyFunctionClass =>
-        untpd.DependentTypeTree((tsyms, vsyms) =>
+        untpd.InLambdaTypeTree(isResult = true, (tsyms, vsyms) =>
           mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(poly, tsyms.map(_.typeRef)))
       case _ => untpd.TypeTree()
 
@@ -2105,6 +2105,18 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         }
       case _ =>
         completeTypeTree(InferredTypeTree(), pt, tree)
+
+  def typedInLambdaTypeTree(tree: untpd.InLambdaTypeTree, pt: Type)(using Context): Tree =
+    val tp =
+      if tree.isResult then pt // See InLambdaTypeTree logic in Namer#valOrDefDefSig.
+      else
+        val lambdaCtx = ctx.outersIterator.dropWhile(_.owner.name ne nme.ANON_FUN).next()
+        // A lambda has at most one type parameter list followed by exactly one term parameter list.
+        // Parameters are entered in order in the scope of the lambda.
+        val (tsyms: List[TypeSymbol @unchecked], vsyms: List[TermSymbol @unchecked]) =
+          lambdaCtx.scope.toList.partition(_.isType): @unchecked
+        tree.tpFun(tsyms, vsyms)
+    completeTypeTree(InferredTypeTree(), tp, tree)
 
   def typedSingletonTypeTree(tree: untpd.SingletonTypeTree)(using Context): SingletonTypeTree = {
     val ref1 = typedExpr(tree.ref, SingletonTypeProto)
@@ -3110,7 +3122,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           case tree: untpd.TypedSplice => typedTypedSplice(tree)
           case tree: untpd.UnApply => typedUnApply(tree, pt)
           case tree: untpd.Tuple => typedTuple(tree, pt)
-          case tree: untpd.DependentTypeTree => completeTypeTree(untpd.InferredTypeTree(), pt, tree)
+          case tree: untpd.InLambdaTypeTree => typedInLambdaTypeTree(tree, pt)
           case tree: untpd.InfixOp => typedInfixOp(tree, pt)
           case tree: untpd.ParsedTry => typedTry(tree, pt)
           case tree @ untpd.PostfixOp(qual, Ident(nme.WILDCARD)) => typedAsFunction(tree, pt)
