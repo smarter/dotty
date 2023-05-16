@@ -1687,7 +1687,7 @@ class Namer { typer: Typer =>
         WildcardType
       case TypeTree() =>
         checkMembersOK(inferredType, mdef.srcPos)
-      case DependentTypeTree(tpFun) =>
+      case InLambdaTypeTree(/*isResult =*/ true, tpFun) =>
         // A lambda has at most one type parameter list followed by exactly one term parameter list.
         val tpe = (paramss: @unchecked) match
           case TypeSymbols(tparams) :: TermSymbols(vparams) :: Nil => tpFun(tparams, vparams)
