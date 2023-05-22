@@ -4327,6 +4327,15 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           if isApplyProxy(tree) then newExpr
           else if pt.isInstanceOf[PolyProto] then tree
           else
+            pt match //.strippedDealias.normalized ? or underlyingApplied ?
+              case RefinedType(parent, nme.apply, _: PolyType) if parent.classSymbol eq defn.PolyFunctionClass =>
+                poly.resultType match
+                  case mt: MethodType =>
+                    // Does simplify do anything?
+                    val e = etaExpand(tree, mt, mt.paramInfos.length)
+                    return simplify(typed(e, pt), pt, locked)
+                  case _ =>
+              case _ =>
             var typeArgs = tree match
               case Select(qual, nme.CONSTRUCTOR) => qual.tpe.widenDealias.argTypesLo.map(TypeTree(_))
               case _ => Nil
