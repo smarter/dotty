@@ -1,6 +1,13 @@
 -- [E035] Syntax Error: tests/neg/i13769.scala:2:21 --------------------------------------------------------------------
-2 |val te = tup.map((x: _ <: Int) => List(x)) // error
+2 |val te = tup.map((x: _ <: Int) => List(x)) // error // error
   |                     ^^^^^^^^
   |                     Unbound wildcard type
+  |
+  | longer explanation available when compiling with `-explain`
+-- [E007] Type Mismatch Error: tests/neg/i13769.scala:2:39 -------------------------------------------------------------
+2 |val te = tup.map((x: _ <: Int) => List(x)) // error // error
+  |                                       ^
+  |                                       Found:    (x : Any)
+  |                                       Required: t
   |
   | longer explanation available when compiling with `-explain`

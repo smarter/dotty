@@ -113,4 +113,11 @@ object Test extends App {
     [T, S <: List[T]] => (x, y) => x :: y
   val i3: [T, S <: List[T]] => (T, S) => List[T] =
     [T, S <: List[T]] => (x, y: S) => x :: y
+
+  // Inferred type block
+  val i4: [T] => T => T = x => x
+  val i5: [T] => (T, Int) => (Int, T) =
+    (x, y: Int) => (y, x)
+  val i6: [T, S <: List[T]] => (T, S) => List[T] =
+    (x, y) => x :: y
 }

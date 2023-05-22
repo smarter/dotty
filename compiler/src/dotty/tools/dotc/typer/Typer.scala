@@ -1463,6 +1463,24 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
   def typedFunctionValue(tree: untpd.Function, pt: Type)(using Context): Tree = {
     val untpd.Function(params: List[untpd.ValDef] @unchecked, _) = tree: @unchecked
 
+    // If the expected type is a polymorphic function type:
+    //    [S_1, ..., S_m] => (T_1, ..., T_n) => R
+    // and this is a lambda of the form:
+    //                       (x_1, ..., x_n) => e
+    // then continue with:
+    //    [S_1, ..., S_m] => (x_1, ..., x_n) => e
+    pt match
+      case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType))
+      if (parent.typeSymbol eq defn.PolyFunctionClass) &&
+         params.lengthCompare(mt.paramNames) == 0
+      =>
+        val tparams = poly.paramNames.lazyZip(poly.paramInfos).map: (name, info) =>
+          untpd.TypeDef(name, new untpd.InLambdaTypeTree(isResult = false, (tsyms, _) =>
+            info.substParams(poly, tsyms.map(_.typeRef)))
+          ).withFlags(SyntheticParam)
+        return typed(untpd.PolyFunction(tparams, tree), pt)
+      case _ =>
+
     val (isContextual, isDefinedErased) = tree match {
       case tree: untpd.FunctionWithMods => (tree.mods.is(Given), tree.erasedParams)
       case _ => (false, tree.args.map(_ => false))
