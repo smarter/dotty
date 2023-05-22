@@ -1469,6 +1469,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     //                       (x_1, ..., x_n) => e
     // then continue with:
     //    [S_1, ..., S_m] => (x_1, ..., x_n) => e
+    // TODO: need to make up fresh names to avoid conflict if e refers to S_1?
     pt match
       case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType))
       if (parent.typeSymbol eq defn.PolyFunctionClass) &&
