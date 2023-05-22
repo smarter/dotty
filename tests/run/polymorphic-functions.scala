@@ -120,4 +120,9 @@ object Test extends App {
     (x, y: Int) => (y, x)
   val i6: [T, S <: List[T]] => (T, S) => List[T] =
     (x, y) => x :: y
+
+  // Eta-expansion
+  def foo[A](x: A): A = x
+  val e1: [T] => T => T = foo
+  val e2: [T] => T => String = _.toString
 }
