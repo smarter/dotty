@@ -1649,13 +1649,34 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     val untpd.PolyFunction(tparams: List[untpd.TypeDef] @unchecked, fun) = tree: @unchecked
     val untpd.Function(vparams: List[untpd.ValDef] @unchecked, body) = fun: @unchecked
 
+    // If the expected type is a polymorphic function with the same number of
+    // type and value parameters, then infer the types of value parameters from the expected type.
+    val inferredVParams = pt match
+      case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType))
+      if (parent.typeSymbol eq defn.PolyFunctionClass)
+      && tparams.lengthCompare(poly.paramNames) == 0
+      && vparams.lengthCompare(mt.paramNames) == 0
+      =>
+        vparams.zipWithConserve(mt.paramInfos): (vparam, formal) =>
+          // Unlike in typedFunctionValue, `formal` cannot be a Wildcard or a TypeBounds since
+          // it must be a valid method parameter type.
+          if vparam.tpt.isEmpty && isFullyDefined(formal, ForceDegree.failBottom) then
+            cpy.ValDef(vparam)(tpt = new untpd.InLambdaTypeTree(isResult = false, (tsyms, vsyms) =>
+              // We don't need to substitute `mt` by `vsyms` because we currently disallow
+              // dependencies between value parameters of a closure.
+              formal.substParams(poly, tsyms.map(_.typeRef)))
+            )
+          else vparam
+      case _ =>
+        vparams
+
     val resultTpt = pt.dealias match
       case RefinedType(parent, nme.apply, poly @ PolyType(_, mt: MethodType)) if parent.classSymbol eq defn.PolyFunctionClass =>
         untpd.InLambdaTypeTree(isResult = true, (tsyms, vsyms) =>
           mt.resultType.substParams(mt, vsyms.map(_.termRef)).substParams(poly, tsyms.map(_.typeRef)))
       case _ => untpd.TypeTree()
 
-    val desugared = desugar.makeClosure(tparams, vparams, body, resultTpt, tree.span)
+    val desugared = desugar.makeClosure(tparams, inferredVParams, body, resultTpt, tree.span)
     typed(desugared, pt)
   end typedPolyFunctionValue
 
