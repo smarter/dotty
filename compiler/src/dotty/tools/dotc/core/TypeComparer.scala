@@ -643,6 +643,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             // (---> orphan params during pickling)
             def isSubInfo(info1: Type, info2: Type): Boolean = (info1, info2) match
               case (info1: PolyType, info2: PolyType) =>
+                // comparingTypeLambdas(tp1, tp2)
                 info1.paramNames.hasSameLengthAs(info2.paramNames)
                 && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1))
               case (info1: MethodType, info2: MethodType) =>
@@ -1989,8 +1990,13 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           case info2: PolyType =>
             info1 match
               case info1: PolyType =>
-                info1.paramNames.hasSameLengthAs(info2.paramNames)
-                && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1), symInfo.resultType)
+                comparingTypeLambdas(info1, info2) {
+                // println("info1: " + info1.show)
+                // println("info2: " + info2.show)
+                // println("info2.s: " + info2.resultType.subst(info2, info1).show)
+                  info1.paramNames.hasSameLengthAs(info2.paramNames)
+                  && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1), symInfo.resultType)
+                }
                 // Polymorphic refinements are only allowed for the apply method of a PolyFunction,
                 // so no signature check is necessary.
               case _ => false
