@@ -1965,6 +1965,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       def sigsOK(symInfo: Type, info2: Type) =
         tp2.underlyingClassRef(refinementOK = true).member(name).exists
         || tp2.derivesFrom(defn.WithoutPreciseParameterTypesClass)
+        || tp2.derivesFrom(defn.PolyFunctionClass) //...
         || symInfo.isInstanceOf[MethodType]
             && symInfo.signature.consistentParams(info2.signature)
 
@@ -1984,8 +1985,17 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
                 matchingMethodParams(info1, info2, precise = false)
                 && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1), symInfo1.resultType)
                 && sigsOK(symInfo1, info2)
-              case _ => inFrozenGadtIf(tp1IsSingleton) { isSubType(info1, info2) }
-          case _ => inFrozenGadtIf(tp1IsSingleton) { isSubType(info1, info2) }
+              case _ => false
+          case info2: PolyType =>
+            info1 match
+              case info1: PolyType =>
+                info1.paramNames.hasSameLengthAs(info2.paramNames)
+                && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1), symInfo.resultType)
+                // Polymorphic refinements are only allowed for the apply method of a PolyFunction,
+                // so no signature check is necessary.
+              case _ => false
+          case _ =>
+            inFrozenGadtIf(tp1IsSingleton) { isSubType(info1, info2) }
 
       def qualifies(m: SingleDenotation): Boolean =
         val info1 = m.info.widenExpr
