@@ -5513,8 +5513,8 @@ object Types {
    *     and which is not marked inline.
    *   - can be instantiated without arguments or with just () as argument.
    *
-   *  The pattern `SAMType(samMethType, samParentType)` matches a SAM type, where `samMethType` is the
-   *  type of the single abstract method and `samParentType` is a subtype of the matched
+   *  The pattern `SAMType(samMethod, samParent)` matches a SAM type, where `samMethod` is the
+   *  type of the single abstract method and `samParent` is a subtype of the matched
    *  SAM type which has been stripped of wildcards to turn it into a valid parent
    *  type.
    */
@@ -5545,7 +5545,7 @@ object Types {
      *
      *      new Function[String, Int] { def apply(x: String): Int = x.toInt }
      */
-    def samParentType(origTp: Type, samClass: Symbol, samMeth: Symbol)(using Context): Type =
+    def samParent(origTp: Type, samClass: Symbol, samMeth: Symbol)(using Context): Type =
       val tp = origTp.baseType(samClass)
       if !(tp <:< origTp) then NoType
       else tp match
@@ -5620,14 +5620,14 @@ object Types {
           else
             tp.possibleSamMethods.map(_.symbol)
         if absMems.size == 1 then
-          val samMeth = absMems.head
-          val parentType = samParentType(tp, cls, samMeth)
-          samMeth.asSeenFrom(parentType).info match
+          val samMethSym = absMems.head
+          val parent = samParent(tp, cls, samMethSym)
+          samMethSym.asSeenFrom(parent).info match
             case mt: MethodType if !mt.isParamDependent &&
                 mt.resultType.isValueTypeOrWildcard &&
                 !defn.isContextFunctionType(mt.resultType) => // TODO: Replace by an error message, like we did for PF before?
                                                               // This makes sense unlike for isParamDependent since the type itself is SAM, just this particular type arg is disallowed.
-              Some(mt, parentType)
+              Some(mt, parent)
             case _ =>
               None
         else None
