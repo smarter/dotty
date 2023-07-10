@@ -5550,7 +5550,6 @@ object Types {
       if !(tp <:< origTp) then NoType
       else tp match
         case tp @ AppliedType(tycon, args) if tp.hasWildcardArg =>
-          // TODO: refactor with existing accu? trait VarianceAccumulator extends TypeAccumulator[VarianceMap]
           val accu = new TypeAccumulator[VarianceMap[Symbol]]:
             def apply(vmap: VarianceMap[Symbol], t: Type): VarianceMap[Symbol] = t match
               case tp: TypeRef if tp.symbol.isAllOf(ClassTypeParam) =>
