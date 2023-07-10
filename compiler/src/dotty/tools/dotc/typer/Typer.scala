@@ -1328,7 +1328,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         case RefinedType(parent, nme.apply, mt @ MethodTpe(_, formals, restpe))
         if (defn.isNonRefinedFunction(parent) || defn.isErasedFunctionType(parent)) && formals.length == defaultArity =>
           (formals, untpd.InLambdaTypeTree(isResult = true, (_, syms) => restpe.substParams(mt, syms.map(_.termRef))))
-        case pt1 @ SAMType(mt @ MethodTpe(_, formals, _), _) =>
+        case SAMType(mt @ MethodTpe(_, formals, _), pt1) =>
           val restpe = mt.resultType match
             case mt: MethodType => mt.toFunctionType(isJava = pt1.classSymbol.is(JavaDefined))
             case tp => tp
@@ -3997,8 +3997,8 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         else
           if (!defn.isFunctionType(pt))
             pt match {
-              case SAMType(_, _) if !pt.classSymbol.hasAnnotation(defn.FunctionalInterfaceAnnot) =>
-                report.warning(em"${tree.symbol} is eta-expanded even though $pt does not have the @FunctionalInterface annotation.", tree.srcPos)
+              case SAMType(_, pt1) if !pt1.classSymbol.hasAnnotation(defn.FunctionalInterfaceAnnot) =>
+                report.warning(em"${tree.symbol} is eta-expanded even though $pt1 does not have the @FunctionalInterface annotation.", tree.srcPos)
               case _ =>
             }
           simplify(typed(etaExpand(tree, wtp, arity), pt), pt, locked)
