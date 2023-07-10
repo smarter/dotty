@@ -5519,7 +5519,6 @@ object Types {
    *  type.
    */
   object SAMType {
-    /** Drop wildcards from type arguments of `tp` based on the variance of the corresponding type parameter in `samMeth`. */
     /** If possible, return a subtype of `tp` which is a type application of `samClass`
      *  where none of the type arguments are wildcards (thus making it a valid parent type),
      *  otherwise return NoType.
@@ -5544,6 +5543,9 @@ object Types {
      *  with a closure equivalent to:
      *
      *      new Function[String, Int] { def apply(x: String): Int = x.toInt }
+     *
+     *  If a type parameter appears invariantly or does not appear at all in `samMeth`, then
+     *  we arbitrarily pick the upper-bound.
      */
     def samParent(origTp: Type, samClass: Symbol, samMeth: Symbol)(using Context): Type =
       val tp = origTp.baseType(samClass)
@@ -5561,9 +5563,8 @@ object Types {
           val args1 = args.zipWithConserve(tparams) {
             case (arg @ TypeBounds(lo, hi), tparam) =>
               val v = vmap.computedVariance(tparam)
-              if v == null || v.uncheckedNN > 0 then hi // if v == null we can pick any bound.
-              else if v.uncheckedNN < 0 then lo
-              else arg // return NoType to hard fail? ==> better to pick an arbitrary bound? trait Foo [T] { def apply(x: T): T } ==> val x: Foo[?] = x => x
+              if v.uncheckedNN < 0 then lo
+              else hi
             case (arg, _) => arg
           }
           tp.derivedAppliedType(tycon, args1)
