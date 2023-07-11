@@ -1728,7 +1728,7 @@ object Types {
       case _ => resultType
     }
 
-    /** Determine the expected function or SAM type from the prototype.
+    /** Determine the expected function type from the prototype.
      *  If no function type is found, NoType is returned. If multiple
      *  function types are found in an intersection, their intersection
      *  is returned. This works since `&` invokes `TypeComparer.distributeAnd`, which
@@ -1750,8 +1750,8 @@ object Types {
         t
       case t if defn.isErasedFunctionType(t) =>
         t
-      case SAMType(_, samParent) =>
-        samParent
+      case t @ SAMType(_, _) =>
+        t
       case _ =>
         NoType
 
