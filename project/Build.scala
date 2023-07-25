@@ -301,7 +301,8 @@ object Build {
     Compile / packageBin / packageOptions +=
       Package.ManifestAttributes(
         "Automatic-Module-Name" -> s"${dottyOrganization.replaceAll("-",".")}.${moduleName.value.replaceAll("-",".")}"
-      )
+      ),
+    disableDocSetting
   )
 
   // Settings used for projects compiled only with Java
