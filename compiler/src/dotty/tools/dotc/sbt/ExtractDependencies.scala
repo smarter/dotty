@@ -326,24 +326,29 @@ class DependencyRecorder {
 
   /** Record a reference to the name of `sym` from the current non-local
    *  enclosing class.
-   *
-   *  Zinc will use this information to invalidate this class if something
-   *  changes in the set of symbols sharing the name of `sym` among the
-   *  possible dependencies of this class.
-
-   *  @param includeSealedChildren  If true, the addition or removal of children
-   *                                to a sealed class also counts as a change.
-   *                                Note that this only has an effect if zinc's
-   *                                `IncOptions.useOptimizedSealed` is enabled (still off by
-   *                                default at the time this comment is written).
+   *  
+   *  @param includeSealedChildren  See documentation of `addUsedRawName`.
    */
   def addUsedName(sym: Symbol, includeSealedChildren: Boolean = false)(using Context): Unit =
     addUsedRawName(sym.zincMangledName, includeSealedChildren)
 
-  /** Record a reference to `name` from the current non-local enclosing class.
+  /** Record a reference to `name` from the current non-local enclosing class (aka, "from class").
    *
    *  Most of the time, prefer to use `addUsedName` which takes
    *  care of name mangling.
+   *
+   *  Zinc will use this information to invalidate the current non-local
+   *  enclosing class if something changes in the set of definitions named
+   *  `name` among the possible dependencies of the from class.
+   *
+   *  @param includeSealedChildren  If true, the addition or removal of children
+   *                                to a sealed class called `name` will also
+   *                                invalidate the from class.
+   *                                Note that this only has an effect if zinc's
+   *                                `IncOptions.useOptimizedSealed` is enabled (still off by
+   *                                default at the time this comment is written),
+   *                                otherwise the addition or removal of children
+   *                                always lead to invalidation.
    */
   def addUsedRawName(name: Name, includeSealedChildren: Boolean = false)(using Context): Unit = {
     val fromClass = resolveDependencySource
