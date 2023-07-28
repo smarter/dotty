@@ -108,29 +108,6 @@ object ExtractDependencies {
     report.error(em"Internal error in the incremental compiler while compiling ${ctx.compilationUnit.source}: $msg", pos)
 }
 
-/** An object that maintain the set of used names from within a class */
-private final class UsedNamesInClass {
-  private val _names = new mutable.HashMap[Name, EnumSet[UseScope]]
-  def names: collection.Map[Name, EnumSet[UseScope]] = _names
-
-  def update(name: Name, scope: UseScope): Unit = {
-    val scopes = _names.getOrElseUpdate(name, EnumSet.noneOf(classOf[UseScope]))
-    scopes.add(scope)
-  }
-
-  override def toString(): String = {
-    val builder = new StringBuilder
-    names.foreach { case (name, scopes) =>
-      builder.append(name.mangledString)
-      builder.append(" in [")
-      scopes.forEach(scope => builder.append(scope.toString))
-      builder.append("]")
-      builder.append(", ")
-    }
-    builder.toString()
-  }
-}
-
 /** Extract the dependency information of a compilation unit.
  *
  *  To understand why we track the used names see the section "Name hashing
@@ -144,7 +121,7 @@ private class ExtractDependenciesCollector(rec: DependencyRecorder) extends tpd.
 
   private def addMemberRefDependency(sym: Symbol)(using Context): Unit =
     if (!ignoreDependency(sym)) {
-      rec.addUsedName(sym, UseScope.Default)
+      rec.addUsedName(sym)
       // packages have class symbol. Only record them as used names but not dependency
       if (!sym.is(Package)) {
         val enclOrModuleClass = if (sym.is(ModuleVal)) sym.moduleClass else sym.enclosingClass
@@ -202,7 +179,7 @@ private class ExtractDependenciesCollector(rec: DependencyRecorder) extends tpd.
         for sel <- selectors if !sel.isWildcard do
           addImported(sel.name)
           if sel.rename != sel.name then
-            rec.addUsedRawName(sel.rename, UseScope.Default)
+            rec.addUsedRawName(sel.rename)
       case exp @ Export(expr, selectors) =>
         val dep = expr.tpe.classSymbol
         if dep.exists && selectors.exists(_.isWildcard) then
@@ -322,7 +299,7 @@ private class ExtractDependenciesCollector(rec: DependencyRecorder) extends tpd.
     val traverser = new TypeDependencyTraverser {
       def addDependency(symbol: Symbol) =
         if (!ignoreDependency(symbol) && symbol.is(Sealed)) {
-          rec.addUsedName(symbol, UseScope.PatMatTarget)
+          rec.addUsedName(symbol, includeSealedChildren = true)
         }
     }
     traverser.traverse(tpe)
@@ -347,28 +324,68 @@ class DependencyRecorder {
    */
   def usedNames: collection.Map[Symbol, UsedNamesInClass] = _usedNames
 
-  // Simpler to have a flag includeSealedChildren that adds names to another map? I guess not if we have to send the NameScope and if we can mutate it anyway.
-  // Though no need to mutate if we just replace. and we shouldn't mutate if we reuse objects actually.
-
-  /** Record a reference to the name of `sym` used according to `scope`
-   *  from the current non-local enclosing class.
-   */
-  def addUsedName(sym: Symbol, scope: UseScope)(using Context): Unit =
-    addUsedRawName(sym.zincMangledName, scope)
-
-  /** Record a reference to `name` used according to `scope`
-   *  from the current non-local enclosing class.
+  /** Record a reference to the name of `sym` from the current non-local
+   *  enclosing class.
    *
-   *  Most of the time, prefer to sue `addUsedName` which takes
-   *  care of name mangling.
+   *  @param includeSealedChildren  See the documentation of `addUsedRawName`.
    */
-  def addUsedRawName(name: Name, scope: UseScope)(using Context): Unit = {
+  def addUsedName(sym: Symbol, includeSealedChildren: Boolean = false)(using Context): Unit =
+    addUsedRawName(sym.zincMangledName, includeSealedChildren)
+
+  /** Record a reference to `name` from the current non-local enclosing class.
+   *
+   *  Most of the time, prefer to use `addUsedName` which takes
+   *  care of name mangling.
+   *
+   *  @param includeSealedChildren If true, the current class should also be invalidated if
+   *                               the list of children of classes named `name` changes.
+   *                               Note that this only has an effect if zinc's
+   *                               `IncOptions.useOptimizedSealed` is enabled (still off by
+   *                               default at the time this comment is written).
+   */
+  def addUsedRawName(name: Name, includeSealedChildren: Boolean = false)(using Context): Unit = {
     val fromClass = resolveDependencySource
     if (fromClass.exists) {
       val usedName = _usedNames.getOrElseUpdate(fromClass, new UsedNamesInClass)
-      usedName.update(name, scope)
+      usedName.update(name, includeSealedChildren)
     }
   }
+
+  // The two possible value of `UseScope`. To avoid unnecessary allocations,
+  // we use vals here, but that means we must be careful to never mutate these sets.
+  private val DefaultScopes = EnumSet.of(UseScope.Default)
+  private val PatmatScopes = EnumSet.of(UseScope.Default, UseScope.PatMatTarget)
+
+  /** An object that maintain the set of used names from within a class */
+  final class UsedNamesInClass {
+    /** Each key corresponds to a name used in the class. To understand the meaning
+     *  of the associated value, see the documentation of parameter `includeSealedChildren`
+     *  of `addUsedRawName`.
+     */
+    private val _names = new mutable.HashMap[Name, DefaultScopes.type | PatmatScopes.type]
+
+    def names: collection.Map[Name, EnumSet[UseScope]] = _names
+
+    private[DependencyRecorder] def update(name: Name, includeSealedChildren: Boolean): Unit = {
+      if (includeSealedChildren)
+        _names(name) = PatmatScopes
+      else
+        _names.getOrElseUpdate(name, DefaultScopes)
+    }
+
+    override def toString(): String = {
+      val builder = new StringBuilder
+      names.foreach { case (name, scopes) =>
+        builder.append(name.mangledString)
+        builder.append(" in [")
+        scopes.forEach(scope => builder.append(scope.toString))
+        builder.append("]")
+        builder.append(", ")
+      }
+      builder.toString()
+    }
+  }
+
 
   private val _classDependencies = new mutable.HashSet[ClassDependency]
 
