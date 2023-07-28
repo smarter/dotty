@@ -327,7 +327,15 @@ class DependencyRecorder {
   /** Record a reference to the name of `sym` from the current non-local
    *  enclosing class.
    *
-   *  @param includeSealedChildren  See the documentation of `addUsedRawName`.
+   *  Zinc will use this information to invalidate this class if something
+   *  changes in the set of symbols sharing the name of `sym` among the
+   *  possible dependencies of this class.
+
+   *  @param includeSealedChildren  If true, the addition or removal of children
+   *                                to a sealed class also counts as a change.
+   *                                Note that this only has an effect if zinc's
+   *                                `IncOptions.useOptimizedSealed` is enabled (still off by
+   *                                default at the time this comment is written).
    */
   def addUsedName(sym: Symbol, includeSealedChildren: Boolean = false)(using Context): Unit =
     addUsedRawName(sym.zincMangledName, includeSealedChildren)
@@ -336,12 +344,6 @@ class DependencyRecorder {
    *
    *  Most of the time, prefer to use `addUsedName` which takes
    *  care of name mangling.
-   *
-   *  @param includeSealedChildren If true, the current class should also be invalidated if
-   *                               the list of children of classes named `name` changes.
-   *                               Note that this only has an effect if zinc's
-   *                               `IncOptions.useOptimizedSealed` is enabled (still off by
-   *                               default at the time this comment is written).
    */
   def addUsedRawName(name: Name, includeSealedChildren: Boolean = false)(using Context): Unit = {
     val fromClass = resolveDependencySource
