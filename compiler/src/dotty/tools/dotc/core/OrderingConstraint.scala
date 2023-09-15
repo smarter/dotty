@@ -550,12 +550,22 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           case _ =>
             r1 & r2
       case tp: TypeParamRef =>
+        // println("param: " + param + " tp: " + tp + "isUpper: " + isUpper + " this: " + this.show)
+        // Thread.dumpStack
         if tp eq param then
           if isUpper then defn.AnyType else defn.NothingType
         else entry(tp) match
           case NoType => tp
-          case TypeBounds(lo, hi) => //if lo eq hi then recur(lo) else tp
-            if isUpper then recur(hi) else recur(lo)
+          case TypeBounds(lo, hi) => if lo eq hi then recur(lo) else tp
+            // if isUpper then
+            //   val hi1 = recur(hi)
+            //   if hi1 ne hi then
+            //     println("hi: " + hi)
+            //     println("hi1: " + hi1)
+            //   if hi1 ne hi then hi1 else tp
+            // else
+            //   val lo1 = recur(lo)
+            //   if lo1 ne lo then lo1 else tp
           case inst => recur(inst)
       case tp: TypeVar =>
         val underlying1 = recur(tp.underlying)
@@ -666,7 +676,19 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     updateEntry(this, param, tp).checkWellFormed()
 
   def addLess(param1: TypeParamRef, param2: TypeParamRef, direction: UnificationDirection)(using Context): This =
-    order(this, param1, param2, direction).checkWellFormed()
+    var current = order(this, param1, param2, direction)
+    current.entry(param2) match
+      case entry: TypeBounds =>
+        // Dual with other bound and param too?
+        // Do this in `order` instead to be recursive?
+        val newEntry = entry.derivedTypeBounds(entry.lo,
+          current.validBoundFor(param1, entry.hi, isUpper = true))
+        current = boundsLens.update(this, current, param2, newEntry)
+      case _ =>
+    // println("#param1: " + param1)
+    // println("#param2: " + param2 + " " + current.entry(param2))
+    // current.entry(param2)
+    current.checkWellFormed()
 
 // ---------- Replacements and Removals -------------------------------------
 
@@ -837,6 +859,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         (tp eq param) || entry(tp).match
           case NoType => false
           case TypeBounds(lo, hi) => (lo eq hi) && occurs(lo)
+          // case TypeBounds(lo, hi) =>
+          //   occurs(lo) || occurs(hi)
           case inst => occurs(inst)
       case tp: TypeVar =>
         occurs(tp.underlying)
@@ -952,7 +976,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
               foldOver(x, t)
       test(false, in)
 
-    if Config.checkConstraintsNonCyclic then
+    if Config.checkConstraintsNonCyclic || true then
       domainParams.foreach { param =>
         val inst = entry(param)
         assert(!isLess(param, param),

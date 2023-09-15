@@ -291,7 +291,10 @@ trait ConstraintHandling {
         // This is necessary for i8900-unflip.scala to typecheck.
         val v = if necessaryConstraintsOnly then -this.variance else this.variance
         atVariance(v)(super.legalVar(tp))
-    constraint.validBoundFor(param, approx(rawBound), isUpper)
+    val x = constraint.validBoundFor(param, approx(rawBound), isUpper)
+    // println(s"legal bound for $param: " + x)
+    // println(s"ctx: " + ctx.typerState.constraint.show)
+    x
   end legalBound
 
   protected def addOneBound(param: TypeParamRef, rawBound: Type, isUpper: Boolean)(using Context): Boolean =
@@ -388,12 +391,13 @@ trait ConstraintHandling {
         val up2 = p2 :: constraint.exclusiveUpper(p2, p1)
         val lo1 = constraint.nonParamBounds(p1).lo
         val hi2 = constraint.nonParamBounds(p2).hi
-        constr.println(i"adding $description down1 = $down1, up2 = $up2$location")
+        // Thread.dumpStack
+        // println(i"adding $description down1 = $down1, up2 = $up2$location")
         constraint = constraint.addLess(p1, p2)
         down1.forall(addOneBound(_, hi2, isUpper = true)) &&
         up2.forall(addOneBound(_, lo1, isUpper = false))
       }
-    constr.println(i"added $description = $res$location")
+    // println(i"added $description = $res$location")
     res
   }
 
