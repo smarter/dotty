@@ -554,7 +554,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           if isUpper then defn.AnyType else defn.NothingType
         else entry(tp) match
           case NoType => tp
-          case TypeBounds(lo, hi) => if lo eq hi then recur(lo) else tp
+          case TypeBounds(lo, hi) => //if lo eq hi then recur(lo) else tp
+            if isUpper then recur(hi) else recur(lo)
           case inst => recur(inst)
       case tp: TypeVar =>
         val underlying1 = recur(tp.underlying)
