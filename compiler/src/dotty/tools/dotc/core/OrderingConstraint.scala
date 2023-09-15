@@ -677,6 +677,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 
   def addLess(param1: TypeParamRef, param2: TypeParamRef, direction: UnificationDirection)(using Context): This =
     var current = order(this, param1, param2, direction)
+    // println("#param1: " + param1)
+    // println("#param2: " + param2 + " " + current.entry(param2))
     current.entry(param2) match
       case entry: TypeBounds =>
         // Dual with other bound and param too?
@@ -685,8 +687,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           current.validBoundFor(param1, entry.hi, isUpper = true))
         current = boundsLens.update(this, current, param2, newEntry)
       case _ =>
-    // println("#param1: " + param1)
-    // println("#param2: " + param2 + " " + current.entry(param2))
+    // println("Aparam1: " + param1)
+    // println("Aparam2: " + param2 + " " + current.entry(param2))
     // current.entry(param2)
     current.checkWellFormed()
 
@@ -852,25 +854,36 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
         case _ =>
 
   def occursAtToplevel(param: TypeParamRef, inst: Type)(using Context): Boolean =
-    def occurs(tp: Type)(using Context): Boolean = tp match
+    def occurs(tp: Type, isUpper: Boolean)(using Context): Boolean = tp match
       case tp: AndOrType =>
-        occurs(tp.tp1) || occurs(tp.tp2)
+        occurs(tp.tp1, isUpper) || occurs(tp.tp2, isUpper)
       case tp: TypeParamRef =>
-        (tp eq param) || entry(tp).match
+        (tp eq param) ||
+        (if isUpper then
+          upper(tp).exists(p => occurs(p, isUpper))
+         else
+          lower(tp).exists(p => occurs(p, isUpper))
+        ) ||
+        entry(tp).match
           case NoType => false
-          case TypeBounds(lo, hi) => (lo eq hi) && occurs(lo)
-          // case TypeBounds(lo, hi) =>
-          //   occurs(lo) || occurs(hi)
-          case inst => occurs(inst)
+          // case TypeBounds(lo, hi) => (lo eq hi) && occurs(lo)
+          case TypeBounds(lo, hi) =>
+            if isUpper then occurs(hi, isUpper) else occurs(lo, isUpper)
+          case inst => occurs(inst, isUpper)
       case tp: TypeVar =>
-        occurs(tp.underlying)
+        occurs(tp.underlying, isUpper)
       case TypeBounds(lo, hi) =>
-        occurs(lo) || occurs(hi)
+        occurs(lo, !isUpper) || occurs(hi, isUpper)
       case _ =>
         val tp1 = tp.dealias
-        (tp1 ne tp) && occurs(tp1)
+        (tp1 ne tp) && occurs(tp1, isUpper)
 
-    occurs(inst)
+    inst match
+      case TypeBounds(lo, hi) =>
+        occurs(lo, isUpper = false)
+        occurs(hi, isUpper = true)
+      case _ =>
+        occurs(inst, isUpper = true)
   end occursAtToplevel
 
 // ---------- Exploration --------------------------------------------------------
