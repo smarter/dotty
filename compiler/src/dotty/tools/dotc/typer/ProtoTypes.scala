@@ -467,7 +467,7 @@ object ProtoTypes {
 
           // We only need to propagate constraints if we typed the arguments in a different
           // TyperState and if that created additional constraints.
-          if (passedTyperState ne protoTyperState) && (oldConstraint ne newConstraint) then
+          if false && (passedTyperState ne protoTyperState) && (oldConstraint ne newConstraint) then
             // To respect the pre-condition of `mergeConstraintWith` and keep
             // `protoTyperState` committable we must ensure that it does not
             // contain any type variable which don't already exist in the passed
