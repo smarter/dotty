@@ -11,6 +11,6 @@ private class YZ(using ac: Async):
   private def test =
     Some(()).getOrElse:
       ac.support.suspend[scala.util.Try[Unit], Unit](k =>
-        k.resume(scala.util.Failure(Exception()))
+        k.resume(scala.util.Failure(Exception())) // error
         1
       )
