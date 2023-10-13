@@ -979,7 +979,7 @@ trait Applications extends Compatibility {
                 case SelectionProto(nme.asInstanceOf_, PolyProto(_, resTp), _, _, _) => resTp
                 case resTp if isFullyDefined(resTp, ForceDegree.all) => resTp
                 case _ => defn.ObjectType
-            val methType = MethodType(proto.typedArgs().map(_.tpe.widen), resultType)
+            val methType = MethodType(proto.typedArgsTpes().map(_.widen), resultType)
             val fun2 = Applications.retypeSignaturePolymorphicFn(fun1, methType)
             simpleApply(fun2, proto)
           case funRef: TermRef =>
@@ -2146,11 +2146,11 @@ trait Applications extends Compatibility {
           case pt @ FunProto(_, PolyProto(targs, resType)) =>
             // try to narrow further with snd argument list and following type params
             resolveMapped(candidates,
-              skipParamClause(pt.typedArgs().tpes, targs.tpes), resType)
+              skipParamClause(pt.typedArgsTpes(), targs.tpes), resType)
           case pt @ FunProto(_, resType: FunOrPolyProto) =>
             // try to narrow further with snd argument list
             resolveMapped(candidates,
-              skipParamClause(pt.typedArgs().tpes, Nil), resType)
+              skipParamClause(pt.typedArgsTpes(), Nil), resType)
           case _ =>
             // prefer alternatives that need no eta expansion
             val noCurried = alts.filterConserve(!resultIsMethod(_))

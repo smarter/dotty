@@ -496,6 +496,9 @@ object ProtoTypes {
           args1
         }
 
+    def typedArgsTpes(norm: (untpd.Tree, Int) => untpd.Tree = sameTree)(using Context): List[Type] =
+      typedArgs(norm)(using protoCtx).map(_.tpe)
+
     /** Type single argument and remember the unadapted result in `myTypedArg`.
      *  used to avoid repeated typings of trees when backtracking.
      */
@@ -577,17 +580,7 @@ object ProtoTypes {
       derivedFunProto(args, tm(resultType), typer)
 
     def fold[T](x: T, ta: TypeAccumulator[T])(using Context): T =
-      if ctx eq protoCtx then
-        ta(ta.foldOver(x, typedArgs().tpes), resultType)
-      else
-        val tpes = inContext(protoCtx):
-          val targs = typedArgs()
-          // println("targs: " + targs.map(_.show))
-          // println("targs.tpes: " + targs.tpes.map(_.show))
-          targs.tpes // .simplified for TypeParamRefs ?
-        // println("#tpes: " + tpes)
-        ta(ta.foldOver(x, typedArgs()(using protoCtx).tpes), resultType)
-        // this.withContext(ctx).fold(x, ta)
+      ta(ta.foldOver(x, typedArgsTpes()), resultType)
 
     override def deepenProto(using Context): FunProto =
       derivedFunProto(args, resultType.deepenProto)
