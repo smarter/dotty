@@ -1137,7 +1137,7 @@ trait Applications extends Compatibility {
   def ApplyTo(app: untpd.Apply, fun: tpd.Tree, methRef: TermRef, proto: FunProto, resultType: Type)(using Context): tpd.Tree =
     val typer = ctx.typer
     if (proto.allArgTypesAreCurrent())
-      typer.ApplyToTyped(app, fun, methRef, proto.typedArgs(), resultType, proto.applyKind).result
+      typer.ApplyToTyped(app, fun, methRef, proto.typedArgs()(using ctx.withTyperState(proto.protoCtx.typerState)), resultType, proto.applyKind).result
     else
       typer.ApplyToUntyped(app, fun, methRef, proto, resultType)(
         using fun.nullableInArgContext(using argCtx(app))).result
@@ -2063,7 +2063,7 @@ trait Applications extends Compatibility {
           else
             record("resolveOverloaded.narrowedByShape", alts2.length)
             pretypeArgs(alts2, pt)
-            narrowByTrees(alts2, pt.typedArgs(normArg(alts2, _, _)), resultType)
+            narrowByTrees(alts2, pt.typedArgs(normArg(alts2, _, _))(using ctx.withTyperState(pt.protoCtx.typerState)), resultType)
 
       case pt @ PolyProto(targs1, pt1) =>
         val alts1 = alts.filterConserve(pt.canInstantiate)

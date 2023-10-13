@@ -355,7 +355,7 @@ object ProtoTypes {
     typer: Typer,
     override val applyKind: ApplyKind,
     state: FunProtoState = new FunProtoState,
-    val constrainResultDeep: Boolean = false)(using protoCtx: Context)
+    val constrainResultDeep: Boolean = false)(using val protoCtx: Context)
   extends UncachedGroundType with ApplyingProto with FunOrPolyProto {
     override def resultType(using Context): Type = resType
 
