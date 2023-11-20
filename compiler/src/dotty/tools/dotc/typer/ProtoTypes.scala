@@ -807,10 +807,32 @@ object ProtoTypes {
            || ctx.mode.is(Mode.TypevarsMissContext)
            || !ref.underlying.widenExpr.isValueTypeOrWildcard
         then
-          WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
+          // println("ref: " + ref)
+          // println("ref.u: " + ref.underlying)
+          WildcardType(TypeBounds.upper(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType))))
         else
           newDepTypeVar(ref)
-      mt.resultType.substParams(mt, mt.paramRefs.map(replacement))
+      println("###mt.resultType: " + mt.resultType.show)
+      // println("paramRefs: " + mt.paramRefs)
+      val rep = mt.paramRefs.map(replacement)
+      println("rep: " + rep)
+      val res =
+        val res0 = mt.resultType.substParams(mt, rep)
+        println("res0: " + res0)
+        val avoid = new AvoidWildcardsMap:
+          variance = -1 // allow more arguments to typecheck.
+          override def apply(tp: Type): Type =
+            tp match
+              case tp: ParamRef =>
+                if (tp.binder == mt) apply(rep(tp.paramNum)) else tp
+              case _ =>
+                super.apply(tp)
+            
+        // if mt.resultType.toString.contains("nb.Elem[Wrapper[T]]") then
+        val res1 = avoid(mt.resultType)
+        // println("res1: " + res1)
+        res1
+      res
     else mt.resultType
 
   /** The normalized form of a type
@@ -829,13 +851,13 @@ object ProtoTypes {
    * of toString method. The problem is solved by dereferencing nullary method types if the corresponding
    * function type is not compatible with the prototype.
    */
-  def normalize(tp: Type, pt: Type, followIFT: Boolean = true)(using Context): Type = {
+  def normalize(tp: Type, pt: Type, followIFT: Boolean = true, wildcardOnly: Boolean = true)(using Context): Type = {
     Stats.record("normalize")
     tp.widenSingleton match {
       case poly: PolyType =>
         normalize(instantiateWithTypeVars(poly), pt)
       case mt: MethodType =>
-        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = true), pt)
+        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly), pt)
         else if (mt.isResultDependent) tp
         else {
           val rt = normalize(mt.resultType, pt)

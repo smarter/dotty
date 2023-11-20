@@ -488,6 +488,7 @@ trait Applications extends Compatibility {
           // overloading resolution might prune it.
           fail(TypeMismatch(methType.resultType, resultType, None))
 
+        println(s"matchArgs($orderedArgs, ${methType.paramInfos}")
         // match all arguments with corresponding formal parameters
         matchArgs(orderedArgs, methType.paramInfos, 0)
       case _ =>
@@ -716,7 +717,12 @@ trait Applications extends Compatibility {
             case SAMType(samMeth, samParent) => argtpe <:< samMeth.toFunctionType(isJava = samParent.classSymbol.is(JavaDefined))
             case _ => false
 
-        isCompatible(argtpe, formal)
+        { println(i"#isCompat($argtpe, $formal) BEF = ${ctx.typerState.constraint.show}")
+          // Thread.dumpStack
+          val z = isCompatible(argtpe, formal)
+          println(i"#isCompat($argtpe, $formal) AFT = ${ctx.typerState.constraint.show}")
+          z
+        }
         // Only allow SAM-conversion to PartialFunction if implicit conversions
         // are enabled. This is necessary to avoid ambiguity between an overload
         // taking a PartialFunction and one taking a Function1 because
@@ -1507,6 +1513,7 @@ trait Applications extends Compatibility {
    *  @param  resultType   The expected result type of the application
    */
   def isApplicableMethodRef(methRef: TermRef, args: List[Type], resultType: Type, argMatch: ArgMatch)(using Context): Boolean =
+    println(i"isApplicableMethodRef($methRef, $args, resultType)")
     explore(new ApplicableToTypes(methRef, args, resultType, argMatch).success)
 
   /** Is given type applicable to argument trees `args`, possibly after inserting an `apply`?
@@ -1521,6 +1528,7 @@ trait Applications extends Compatibility {
    *  @param  resultType   The expected result type of the application
    */
   def isApplicableType(tp: Type, args: List[Type], resultType: Type)(using Context): Boolean =
+    println(i"isApplicableType($tp, ${args.map(_.show)}, $resultType)")
     onMethod(tp, args.nonEmpty) {
       isApplicableMethodRef(_, args, resultType, ArgMatch.Compatible)
     }
@@ -1538,12 +1546,20 @@ trait Applications extends Compatibility {
    *  result matching `resultType`?
    */
   def hasExtensionMethodNamed(tp: Type, xname: TermName, argType: Type, resultType: Type)(using Context) = {
+    println(i"hasExtensionMethodNamed($tp, $xname, $argType, $resultType)")
     def qualifies(mbr: Denotation) =
       mbr.exists
-      && isApplicableType(
-            normalize(tp.select(xname, mbr), WildcardType),
+      && {
+        val s = tp.select(xname, mbr)
+        val n = normalize(s, WildcardType, wildcardOnly = false)
+        println("hasExtensionMethodNamedS: " + s.show)
+        println("hasExtensionMethodNamedN: " + n.show)
+        isApplicableType(n,
             argType :: Nil, resultType)
-    tp.memberBasedOnFlags(xname, required = ExtensionMethod).hasAltWithInline(qualifies)
+      }
+    val z = tp.memberBasedOnFlags(xname, required = ExtensionMethod).hasAltWithInline(qualifies)
+    println(i"hasExtensionMethodNamed($tp, $xname, $argType, $resultType) = $z")
+    z
   }
 
   /** Drop any leading type or implicit parameter sections */

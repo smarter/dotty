@@ -368,6 +368,8 @@ trait ConstraintHandling {
 
     def description = i"constraint $param ${if isUpper then "<:" else ":>"} $rawBound to\n$constraint"
     constr.println(i"adding $description$location")
+    // if rawBound.toString.contains("T") then
+    //   Thread.dumpStack
     if isUpper && rawBound.isRef(defn.NothingClass) && ctx.typerState.isGlobalCommittable then
       def msg = i"!!! instantiated to Nothing: $param, constraint = $constraint"
       if Config.failOnInstantiationToNothing

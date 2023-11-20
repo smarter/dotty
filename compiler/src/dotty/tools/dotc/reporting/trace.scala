@@ -17,7 +17,7 @@ import scala.compiletime.*
  * Tracing can be forced by replacing [[trace]] with [[trace.force]] or [[trace.log]] (see below).
  */
 object trace extends TraceSyntax:
-  inline def isEnabled = Config.tracingEnabled
+  inline def isEnabled = true//Config.tracingEnabled
   protected val isForced = false
 
   object force extends TraceSyntax:
