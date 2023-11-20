@@ -238,11 +238,7 @@ object ErrorReporting {
           case fail: NestedFailure => nested += fail
           case fail: FailedExtension => attempts += ((failure.tree, whyFailedStr(fail)))
           case fail: Implicits.NoMatchingImplicits => // do nothing
-          case _ =>
-            println("failure: " + failure)
-            println("failure.r: " + failure.reason)
-            println("failure.t: " + failure.tree)
-            attempts += ((failure.tree, ""))
+          case _ => attempts += ((failure.tree, ""))
       if foundWithoutNull then
         i""".
           |Since explicit-nulls is enabled, the selection is rejected because

@@ -1063,7 +1063,6 @@ trait Implicits:
    */
   def inferImplicit(pt: Type, argument: Tree, span: Span)(using Context): SearchResult =
     trace(s"search implicit ${pt.show}, arg = ${argument.show}: ${argument.tpe.show}", implicits, show = true) {
-      implicits.println("ctx: " + ctx.typerState.constraint.show)
       record("inferImplicit")
       assert(ctx.phase.allowsImplicitSearch,
         if (argument.isEmpty) i"missing implicit parameter of type $pt after typer at phase ${ctx.phase.phaseName}"
@@ -1194,8 +1193,6 @@ trait Implicits:
             case _ =>
               tryConversion
         }
-      println(i"typed implicit ${cand.ref} pt = $pt ==> $adapted [${adapted.tpe}")
-      println("err: " + ctx.reporter.allErrors)
       if ctx.reporter.hasErrors
          || !cand.ref.symbol.isAccessibleFrom(cand.ref.prefix)
       then

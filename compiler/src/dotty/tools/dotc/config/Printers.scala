@@ -26,7 +26,7 @@ object Printers {
     if ctx.settings.YccDebug.value then captDebugActive else noPrinter
   val captDebugActive = new Printer
 
-  val constr = new Printer//noPrinter
+  val constr = noPrinter
   val core = noPrinter
   val checks = noPrinter
   val config = noPrinter
@@ -39,7 +39,7 @@ object Printers {
   val gadts = noPrinter
   val gadtsConstr = noPrinter
   val hk = noPrinter
-  val implicits = new Printer//noPrinter
+  val implicits = noPrinter
   val implicitsDetailed = noPrinter
   val lexical = noPrinter
   val init = noPrinter
@@ -60,7 +60,7 @@ object Printers {
   val subtyping = noPrinter
   val tailrec = noPrinter
   val transforms = noPrinter
-  val typr = new Printer//noPrinter
+  val typr = noPrinter
   val unapp = noPrinter
   val variances = noPrinter
 }

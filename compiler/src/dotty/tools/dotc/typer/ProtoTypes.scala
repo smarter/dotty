@@ -812,13 +812,13 @@ object ProtoTypes {
           WildcardType(TypeBounds.upper(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType))))
         else
           newDepTypeVar(ref)
-      println("###mt.resultType: " + mt.resultType.show)
+      // println("###mt.resultType: " + mt.resultType.show)
       // println("paramRefs: " + mt.paramRefs)
       val rep = mt.paramRefs.map(replacement)
-      println("rep: " + rep)
+      // println("rep: " + rep)
       val res =
         val res0 = mt.resultType.substParams(mt, rep)
-        println("res0: " + res0)
+        // println("res0: " + res0)
         val avoid = new AvoidWildcardsMap:
           variance = -1 // allow more arguments to typecheck.
           override def apply(tp: Type): Type =
@@ -827,7 +827,6 @@ object ProtoTypes {
                 if (tp.binder == mt) apply(rep(tp.paramNum)) else tp
               case _ =>
                 super.apply(tp)
-            
         // if mt.resultType.toString.contains("nb.Elem[Wrapper[T]]") then
         val res1 = avoid(mt.resultType)
         // println("res1: " + res1)
@@ -851,13 +850,13 @@ object ProtoTypes {
    * of toString method. The problem is solved by dereferencing nullary method types if the corresponding
    * function type is not compatible with the prototype.
    */
-  def normalize(tp: Type, pt: Type, followIFT: Boolean = true, wildcardOnly: Boolean = true)(using Context): Type = {
+  def normalize(tp: Type, pt: Type, followIFT: Boolean = true)(using Context): Type = {
     Stats.record("normalize")
     tp.widenSingleton match {
       case poly: PolyType =>
         normalize(instantiateWithTypeVars(poly), pt)
       case mt: MethodType =>
-        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly), pt)
+        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = true), pt)
         else if (mt.isResultDependent) tp
         else {
           val rt = normalize(mt.resultType, pt)
