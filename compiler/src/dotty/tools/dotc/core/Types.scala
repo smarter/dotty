@@ -2788,6 +2788,8 @@ object Types {
           case WildcardType =>
             WildcardType.sameKindAs(this)
           case WildcardType(TypeBounds(lo, hi)) =>
+            assert(hi.member(name).exists, s"HI $this.derivedSelect($prefix)")
+            assert(lo.isExactlyNothing || lo.member(name).exists, s"LO $this.derivedSelect($prefix)")
             WildcardType(TypeBounds(this.derivedSelect(lo), this.derivedSelect(hi)))
           case _ =>
             withPrefix(prefix)
