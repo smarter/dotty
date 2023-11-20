@@ -819,18 +819,18 @@ object ProtoTypes {
       val res =
         val res0 = mt.resultType.substParams(mt, rep)
         // println("res0: " + res0)
-        val avoid = new AvoidWildcardsMap:
-          variance = -1 // allow more arguments to typecheck.
-          override def apply(tp: Type): Type =
-            tp match
-              case tp: ParamRef =>
-                if (tp.binder == mt) apply(rep(tp.paramNum)) else tp
-              case _ =>
-                super.apply(tp)
-        // if mt.resultType.toString.contains("nb.Elem[Wrapper[T]]") then
-        val res1 = avoid(mt.resultType)
+        // val avoid = new AvoidWildcardsMap:
+        //   variance = -1 // allow more arguments to typecheck.
+        //   override def apply(tp: Type): Type =
+        //     tp match
+        //       case tp: ParamRef =>
+        //         if (tp.binder == mt) apply(rep(tp.paramNum)) else tp
+        //       case _ =>
+        //         super.apply(tp)
+        // // if mt.resultType.toString.contains("nb.Elem[Wrapper[T]]") then
+        // val res1 = avoid(mt.resultType)
         // println("res1: " + res1)
-        res1
+        res0
       res
     else mt.resultType
 

@@ -2784,8 +2784,16 @@ object Types {
               case _ =>
             }
         }
-        if (prefix.isInstanceOf[WildcardType]) WildcardType.sameKindAs(this)
-        else withPrefix(prefix)
+        prefix match
+          case WildcardType =>
+            WildcardType.sameKindAs(this)
+          case WildcardType(TypeBounds(lo, hi)) =>
+            WildcardType(TypeBounds(this.derivedSelect(lo), this.derivedSelect(hi)))
+          case _ =>
+            withPrefix(prefix)
+        // if (prefix.isInstanceOf[WildcardType])
+        //   WildcardType.sameKindAs(this)
+        // else withPrefix(prefix)
       }
 
     /** A reference like this one, but with the given symbol, if it exists */
