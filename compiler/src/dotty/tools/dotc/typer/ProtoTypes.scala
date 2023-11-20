@@ -835,7 +835,8 @@ object ProtoTypes {
       case poly: PolyType =>
         normalize(instantiateWithTypeVars(poly), pt)
       case mt: MethodType =>
-        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = true), pt)
+        // TODO: instead decide wildcardOnly in resultTypeApprox? Or change param to wildcardFinalResult?
+        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = mt.resultType.isValueType), pt)
         else if (mt.isResultDependent) tp
         else {
           val rt = normalize(mt.resultType, pt)
