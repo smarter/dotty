@@ -57,7 +57,7 @@ object ProtoTypes {
     def normalizedCompatible(tp: Type, pt: Type, keepConstraint: Boolean)(using Context): Boolean =
 
       def testCompat(using Context): Boolean =
-        val normTp = normalize(tp, pt)
+        val normTp = normalize(tp, pt, allowWildcardOnly = !keepConstraint)
         isCompatible(normTp, pt) || pt.isRef(defn.UnitClass) && normTp.isParameterless
 
       if keepConstraint then
@@ -829,14 +829,13 @@ object ProtoTypes {
    * of toString method. The problem is solved by dereferencing nullary method types if the corresponding
    * function type is not compatible with the prototype.
    */
-  def normalize(tp: Type, pt: Type, followIFT: Boolean = true)(using Context): Type = {
+  def normalize(tp: Type, pt: Type, followIFT: Boolean = true, allowWildcardOnly: Boolean = true)(using Context): Type = {
     Stats.record("normalize")
     tp.widenSingleton match {
       case poly: PolyType =>
         normalize(instantiateWithTypeVars(poly), pt)
       case mt: MethodType =>
-        // TODO: instead decide wildcardOnly in resultTypeApprox? Or change param to wildcardFinalResult?
-        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = mt.resultType.isValueType), pt)
+        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = allowWildcardOnly && mt.resultType.isValueType), pt)
         else if (mt.isResultDependent) tp
         else {
           val rt = normalize(mt.resultType, pt)
