@@ -88,7 +88,7 @@ object ProtoTypes {
         case pt: FunProto =>
           mt match
             case mt: MethodType =>
-              constrainResult(resultTypeApprox(mt), pt.resultType)
+              constrainResult(resultTypeApprox(mt, wildcardOnly = true), pt.resultType)
               && {
                 if pt.constrainResultDeep
                    && mt.isImplicitMethod == (pt.applyKind == ApplyKind.Using)
@@ -835,8 +835,7 @@ object ProtoTypes {
       case poly: PolyType =>
         normalize(instantiateWithTypeVars(poly), pt)
       case mt: MethodType =>
-        // TODO: instead decide wildcardOnly in resultTypeApprox? Or change param to wildcardFinalResult?
-        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = mt.resultType.isValueType), pt)
+        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = true), pt)
         else if (mt.isResultDependent) tp
         else {
           val rt = normalize(mt.resultType, pt)
