@@ -818,7 +818,7 @@ object ProtoTypes {
       val approx = new TypeMap:
         override def apply(tp: Type): Type = tp match
           case tp @ TypeRef(prefix: TermParamRef, _)
-          if prefix.binder == mt && replacements.contains(prefix) =>
+          if !tp.symbol.isClass && prefix.binder == mt && replacements.contains(prefix) =>
             val memberVar = memberVars.getOrElseUpdate(tp.symbol, {
               // TODO: tp.info shoudl be traversed regularly since we might have type Elem <: this.Bla
               val newVar = newTypeVar(tp.info.bounds)
