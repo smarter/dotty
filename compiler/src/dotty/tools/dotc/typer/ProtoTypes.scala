@@ -802,15 +802,52 @@ object ProtoTypes {
    */
   def resultTypeApprox(mt: MethodType, wildcardOnly: Boolean = false)(using Context): Type =
     if mt.isResultDependent then
-      def replacement(ref: TermParamRef) =
-        if wildcardOnly
-           || ctx.mode.is(Mode.TypevarsMissContext)
-           || !ref.underlying.widenExpr.isValueTypeOrWildcard
-        then
-          WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
-        else
-          newDepTypeVar(ref)
-      mt.resultType.substParams(mt, mt.paramRefs.map(replacement))
+      // def replacement(ref: TermParamRef) =
+      //   if wildcardOnly
+      //      || ctx.mode.is(Mode.TypevarsMissContext)
+      //      || !ref.underlying.widenExpr.isValueTypeOrWildcard
+      //   then
+      //     WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
+      //   else
+      //     newDepTypeVar(ref)
+
+      val replacements = mt.paramRefs
+        .map(ref => (ref, ref.underlying.widenExpr)).to(collection.mutable.LinkedHashMap)
+
+      // TODO: Consider a SimpleIdentityMap[TermParamRef, MutableSymbolMap]
+      // and constructing the RefinedType at the end.
+
+      // This map is indexed by TypeRef and not by their Denotation, because
+      // of Config.reuseSymDenotations.
+      val memberVars = collection.mutable.LinkedHashMap[TypeRef, TypeVar]()
+      val approx = new TypeMap:
+        override def apply(tp: Type): Type = tp match
+          case tp @ TypeRef(prefix: TermParamRef, _)
+          if !tp.symbol.isClass && prefix.binder == mt && replacements.contains(prefix) =>
+            val origBounds = tp.info.bounds
+            val memberVar = memberVars.getOrElseUpdate(tp, {
+              // TODO: tp.info shoudl be traversed regularly since we might have type Elem <: this.Bla
+              val newVar = newTypeVar(TypeBounds.emptySameKindAs(origBounds.hi), name = tp.name.freshened)
+              replacements(prefix) = RefinedType(replacements(prefix), tp.name, TypeAlias(newVar))
+              newVar
+            })
+            apply(origBounds).asInstanceOf[TypeBounds].contains(memberVar)
+            memberVar
+          case _ => mapOver(tp)
+      val z = approx(mt.resultType).substParams(mt, //replacements.values.toList)
+        replacements
+          .map: (ref, repr) =>
+            repr match
+              // For summon, without breaking asMatchable (tests/run/i10930.scala)
+              // ... and without breaking tests/explicit-nulls/unsafe-common/unsafe-implicit.scala
+              case repr: TypeVar if mt.isImplicitMethod && mt.resultType.isInstanceOf[ValueType] =>
+                repr
+              case _ => newTypeVar(
+                TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef)),
+                  // represents = ref
+                )
+          .toList)
+      z
     else mt.resultType
 
   /** The normalized form of a type
@@ -835,7 +872,7 @@ object ProtoTypes {
       case poly: PolyType =>
         normalize(instantiateWithTypeVars(poly), pt)
       case mt: MethodType =>
-        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt, wildcardOnly = true), pt)
+        if (mt.isImplicitMethod) normalize(resultTypeApprox(mt/*, wildcardOnly = true*/), pt)
         else if (mt.isResultDependent) tp
         else {
           val rt = normalize(mt.resultType, pt)

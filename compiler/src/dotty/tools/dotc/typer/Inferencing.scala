@@ -802,6 +802,7 @@ trait Inferencing { this: Typer =>
     if tvar.origin.paramName.is(NameKinds.DepParamName) then
       representedParamRef(tvar.origin) match
         case ref: TermParamRef =>
+          assert(false, i"should be dead code: $tvar, $call")
           def findArg(tree: Tree)(using Context): Tree = tree match
             case Apply(fn, args) =>
               if fn.tpe.widen eq ref.binder then
