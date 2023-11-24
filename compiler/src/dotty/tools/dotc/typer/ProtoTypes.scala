@@ -802,15 +802,41 @@ object ProtoTypes {
    */
   def resultTypeApprox(mt: MethodType, wildcardOnly: Boolean = false)(using Context): Type =
     if mt.isResultDependent then
-      def replacement(ref: TermParamRef) =
-        if wildcardOnly
-           || ctx.mode.is(Mode.TypevarsMissContext)
-           || !ref.underlying.widenExpr.isValueTypeOrWildcard
-        then
-          WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
-        else
-          newDepTypeVar(ref)
-      mt.resultType.substParams(mt, mt.paramRefs.map(replacement))
+      // def replacement(ref: TermParamRef) =
+      //   if wildcardOnly
+      //      || ctx.mode.is(Mode.TypevarsMissContext)
+      //      || !ref.underlying.widenExpr.isValueTypeOrWildcard
+      //   then
+      //     WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
+      //   else
+      //     newDepTypeVar(ref)
+
+      val replacements = mt.paramRefs
+        .map(ref => (ref, ref.underlying.widenExpr)).to(collection.mutable.LinkedHashMap)
+
+      val memberVars = MutableSymbolMap[TypeVar]()
+      val approx = new TypeMap:
+        override def apply(tp: Type): Type = tp match
+          case tp @ TypeRef(prefix: TermParamRef, _)
+          if prefix.binder == mt && replacements.contains(prefix) =>
+            val memberVar = memberVars.getOrElseUpdate(tp.symbol, {
+              // TODO: tp.info shoudl be traversed regularly since we might have type Elem <: this.Bla
+              val newVar = newTypeVar(tp.info.bounds)
+              replacements(prefix) = RefinedType(replacements(prefix), tp.name, TypeAlias(newVar))
+              newVar
+            })
+            memberVar
+          case _ => mapOver(tp)
+      val z = approx(mt.resultType).substParams(mt, //replacements.values.toList)
+        replacements
+          .map: (ref, bounds) =>
+            newTypeVar(
+              TypeBounds.upper(AndType(bounds, defn.SingletonClass.typeRef)),
+                represents = ref)
+          .toList)
+      // println("z: " + z.show)
+      // println("ctx: " + ctx.typerState.constraint.show)
+      z
     else mt.resultType
 
   /** The normalized form of a type

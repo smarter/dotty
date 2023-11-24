@@ -280,7 +280,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
 
   override def dependsOn(tv: TypeVar, except: TypeVars, co: Boolean)(using Context): Boolean =
     def origin(tv: TypeVar) =
-      assert(!instType(tv).exists)
+      assert(!instType(tv).exists, s"$tv i: ${instType(tv)}")
       tv.origin
     val param = origin(tv)
     val excluded = except.map(origin)

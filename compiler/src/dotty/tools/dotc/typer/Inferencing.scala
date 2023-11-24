@@ -702,7 +702,9 @@ trait Inferencing { this: Typer =>
                   else
                     typr.println(i"no interpolation for nonvariant $tvar in $state")
                 )
-          buf.toList
+          end for
+          // Calls to `constrainIfDependentParamRef` might have instantiated some variables.
+          buf.filterNot(_._1.isInstantiated).toList
 
         def typeVarsIn(xs: ToInstantiate): TypeVars =
           xs.foldLeft(SimpleIdentitySet.empty: TypeVars)((tvs, tvi) => tvs + tvi._1)
