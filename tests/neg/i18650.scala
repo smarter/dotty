@@ -22,5 +22,5 @@ given [A](using l: Lam): Church[A] = Church()
 @main
 def churchTest =
   given Lam = LamInterpreter
-  val c: Church[Int] = summon
+  val c: Church[Int] = summon // summon[Church[Int]] works
   summon[c.Nat =:= ((Int => Int) => (Int => Int))] // error (not a compiler crash)
