@@ -475,7 +475,7 @@ trait Applications extends Compatibility {
 
     protected def init(): Unit = methType match {
       case methType: MethodType =>
-        val resultApprox = resultTypeApprox(methType)
+        val resultApprox = resultTypeApprox(methType, wildcardOnly = true)
         val sym = methRef.symbol
         if ctx.typerState.isCommittable then
           // Here we call `resultType` only to accumulate constraints (even if
@@ -1549,7 +1549,7 @@ trait Applications extends Compatibility {
   /** Drop any leading type or implicit parameter sections */
   def stripInferrable(tp: Type)(using Context): Type = tp match {
     case mt: MethodType if mt.isImplicitMethod =>
-      stripInferrable(resultTypeApprox(mt))
+      stripInferrable(resultTypeApprox(mt, wildcardOnly = true))
     case pt: PolyType =>
       stripInferrable(pt.resType)
     case _ =>
