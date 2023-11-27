@@ -831,9 +831,9 @@ object ProtoTypes {
         replacements
           .map: (ref, repr) =>
             repr match
-              // For summon
-              case repr: TypeVar if repr <:< defn.SingletonType =>
-                repr
+              // For summon, without breaking asMatchable (tests/run/i10930.scala)
+              case repr: TypeVar if mt.isImplicitMethod && mt.resultType.isInstanceOf[ValueType] =>
+                AndType(repr, defn.SingletonClass.typeRef)
               case _ => newTypeVar(
                 TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef)),
                   // represents = ref
