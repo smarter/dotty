@@ -829,10 +829,15 @@ object ProtoTypes {
           case _ => mapOver(tp)
       val z = approx(mt.resultType).substParams(mt, //replacements.values.toList)
         replacements
-          .map: (ref, bounds) =>
-            newTypeVar(
-              TypeBounds.upper(AndType(bounds, defn.SingletonClass.typeRef)),
-                represents = ref)
+          .map: (ref, repr) =>
+            repr match
+              // For summon
+              case repr: TypeVar if repr <:< defn.SingletonType =>
+                repr
+              case _ => newTypeVar(
+                TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef)),
+                  // represents = ref
+                )
           .toList)
       // println("z: " + z.show)
       // println("ctx: " + ctx.typerState.constraint.show)
