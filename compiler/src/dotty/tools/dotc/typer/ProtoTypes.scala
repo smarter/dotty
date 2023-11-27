@@ -61,18 +61,9 @@ object ProtoTypes {
         isCompatible(normTp, pt) || pt.isRef(defn.UnitClass) && normTp.isParameterless
 
       if keepConstraint then
-        tp.widenSingleton match
-          case poly: PolyType =>
-            val newctx = ctx.fresh.setNewTyperState()
-            val result = testCompat(using newctx)
-            typr.println(
-                i"""normalizedCompatible for $poly, $pt = $result
-                   |constraint was: ${ctx.typerState.constraint}
-                   |constraint now: ${newctx.typerState.constraint}""")
-            if result && (ctx.typerState.constraint ne newctx.typerState.constraint) then
-              newctx.typerState.commit()
-            result
-          case _ => testCompat
+        val savedConstraint = ctx.typerState.constraint
+        val res = testCompat
+        if !res then ctx.typerState.constraint = savedConstraint
       else explore(testCompat)
     end normalizedCompatible
 
