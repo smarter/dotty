@@ -814,13 +814,15 @@ object ProtoTypes {
       val replacements = mt.paramRefs
         .map(ref => (ref, ref.underlying.widenExpr)).to(collection.mutable.LinkedHashMap)
 
-      val memberVars = MutableSymbolMap[TypeVar]()
+      // This map is indexed by TypeRef and not by their Denotation, because
+      // of Config.reuseSymDenotations.
+      val memberVars = collection.mutable.LinkedHashMap[TypeRef, TypeVar]()
       val approx = new TypeMap:
         override def apply(tp: Type): Type = tp match
           case tp @ TypeRef(prefix: TermParamRef, _)
           if !tp.symbol.isClass && prefix.binder == mt && replacements.contains(prefix) =>
             val origBounds = tp.info.bounds
-            val memberVar = memberVars.getOrElseUpdate(tp.symbol, {
+            val memberVar = memberVars.getOrElseUpdate(tp, {
               // TODO: tp.info shoudl be traversed regularly since we might have type Elem <: this.Bla
               val newVar = newTypeVar(TypeBounds.emptySameKindAs(origBounds.hi), name = tp.name.freshened)
               replacements(prefix) = RefinedType(replacements(prefix), tp.name, TypeAlias(newVar))
