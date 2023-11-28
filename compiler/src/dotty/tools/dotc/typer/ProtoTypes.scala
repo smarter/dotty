@@ -834,15 +834,14 @@ object ProtoTypes {
           .map: (ref, repr) =>
             repr match
               // For summon, without breaking asMatchable (tests/run/i10930.scala)
+              // ... and without breaking tests/explicit-nulls/unsafe-common/unsafe-implicit.scala
               case repr: TypeVar if mt.isImplicitMethod && mt.resultType.isInstanceOf[ValueType] =>
-                AndType(repr, defn.SingletonClass.typeRef)
+                repr
               case _ => newTypeVar(
                 TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef)),
                   // represents = ref
                 )
           .toList)
-      // println("z: " + z.show)
-      // println("ctx: " + ctx.typerState.constraint.show)
       z
     else mt.resultType
 
