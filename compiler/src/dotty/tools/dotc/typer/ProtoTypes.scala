@@ -822,7 +822,7 @@ object ProtoTypes {
             val origBounds = tp.info.bounds
             val memberVar = memberVars.getOrElseUpdate(tp.symbol, {
               // TODO: tp.info shoudl be traversed regularly since we might have type Elem <: this.Bla
-              val newVar = newTypeVar(TypeBounds.emptySameKindAs(origBounds), name = tp.name.freshened)
+              val newVar = newTypeVar(TypeBounds.emptySameKindAs(origBounds.hi), name = tp.name.freshened)
               replacements(prefix) = RefinedType(replacements(prefix), tp.name, TypeAlias(newVar))
               newVar
             })
