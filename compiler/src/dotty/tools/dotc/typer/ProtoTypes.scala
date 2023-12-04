@@ -855,14 +855,12 @@ object ProtoTypes {
         override def apply(tp: Type): Type = tp match
           case tp @ TypeRef(prefix: TermParamRef, _)
           if !tp.symbol.isClass && prefix.binder == mt && replacements.contains(prefix) =>
-            // The bounds of `p.T` might refer to `p.S` which might indirectly refer back to `p.T`
-            // To avoid cycles, we first create a fresh type variable for `p.T` with empty bounds
-            // and record it in `replacements`, then construct its bounds by recursively calling `apply`.
-            val origBounds = tp.info.bounds
-            val memberVar = replacements(prefix).nn.getOrElseUpdate(tp.symbol,
-              newTypeVar(TypeBounds.emptySameKindAs(origBounds.hi), name = tp.name.freshened))
-            apply(origBounds).asInstanceOf[TypeBounds].contains(memberVar)
-            memberVar
+            replacements(prefix).nn.getOrElseUpdate(tp.symbol, {
+              // We don't bother trying to handle cycles in bounds since asSeenFrom
+              // doesn't handle them either.
+              val tvarBounds = apply(tp.info.bounds).asInstanceOf[TypeBounds]
+              newTypeVar(tvarBounds, name = tp.name.freshened)
+            })
           case _ => mapOver(tp)
 
       val replaced = replaceDepTypes(mt.resultType)
