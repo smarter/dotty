@@ -869,9 +869,19 @@ object ProtoTypes {
       replaced.substParams(mt,
         replacements.map2: (ref, memberVars) =>
           ref.underlying.widenExpr match
-            // For summon, without breaking asMatchable (tests/run/i10930.scala)
-            // ... and without breaking tests/explicit-nulls/unsafe-common/unsafe-implicit.scala
-            case tp: TypeVar if memberVars.isEmpty && mt.isImplicitMethod && mt.resultType.isInstanceOf[ValueType] =>
+            // We need one special case to support the following pattern:
+            //
+            //     def summon[T](using x: T): x.type = x
+            //     given Foo = ...
+            //     summon: Foo
+            //
+            // For the implicit search to succeed, we need to constrain `T <: Foo`,
+            // even though technically this is overconstraining since we can
+            // only infer `x.type <: Foo` from the expected type.
+            //
+            // We achieve this by simply substituting `x.type` by its underlying
+            // type instead of creating a fresh type variable.
+            case tp: TypeVar if memberVars.isEmpty && mt.isImplicitMethod =>
               tp
             case tp =>
               val repr = memberVars.iterator.foldLeft[Type](tp):
