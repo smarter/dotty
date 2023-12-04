@@ -853,9 +853,10 @@ object ProtoTypes {
        */
       val replaceDepTypes = new TypeMap:
         override def apply(tp: Type): Type = tp match
-          case tp @ TypeRef(prefix: TermParamRef, _)
-          if !tp.symbol.isClass && prefix.binder == mt && replacements.contains(prefix) =>
-            replacements(prefix).nn.getOrElseUpdate(tp.symbol, {
+          case tp @ TypeRef(param: TermParamRef, _)
+          if tp.info.isInstanceOf[RealTypeBounds]
+          && param.binder == mt && replacements.contains(param) =>
+            replacements(param).nn.getOrElseUpdate(tp.symbol, {
               // We don't bother trying to handle cycles in bounds since asSeenFrom
               // doesn't handle them either.
               val tvarBounds = apply(tp.info.bounds).asInstanceOf[TypeBounds]
