@@ -851,10 +851,10 @@ object ProtoTypes {
       // TODO: actually we wouldn't create ?X at all in this example
       // so we need a more complex example with multiple param lists.
 
-      if mt.resultType.isInstanceOf[ValueType] then
-        def replacement(ref: TermParamRef) =
-          WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
-        return mt.resultType.substParams(mt, mt.paramRefs.map(replacement))
+      // if mt.resultType.isInstanceOf[ValueType] then
+      //   def replacement(ref: TermParamRef) =
+      //     WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
+      //   return mt.resultType.substParams(mt, mt.paramRefs.map(replacement))
 
       // In a type like:
       //
