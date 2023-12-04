@@ -814,12 +814,14 @@ object ProtoTypes {
       // To propagate constraints, we substitute dependent parameters by fresh type variables,
       // this works fine in situations like:
       //
-      //     def foo(x: Int): List[x.type] = ...
-      //     foo(...): List[1]
+      //     def foo(x: Int)(y: x.type): List[x.type] = ...
+      //     foo(arg1)(arg2): List[1]
       //
-      //  where during overloading resolution we might end up running:
+      //  where we might end up running:
       //
       //     resultTypeApprox(foo) <:< List[1]
+      //
+      //  and then typecheck `arg2` with an expected type of `1`.
       //
       // but it is not enough in situations like:
       //
@@ -849,8 +851,10 @@ object ProtoTypes {
       // TODO: actually we wouldn't create ?X at all in this example
       // so we need a more complex example with multiple param lists.
 
-
-
+      if mt.resultType.isInstanceOf[ValueType] then
+        def replacement(ref: TermParamRef) =
+          WildcardType(ref.underlying.substParams(mt, mt.paramRefs.map(_ => WildcardType)).toBounds)
+        return mt.resultType.substParams(mt, mt.paramRefs.map(replacement))
 
       // In a type like:
       //
@@ -882,6 +886,8 @@ object ProtoTypes {
       // To avoid this issue we also create fresh type variables for x.T and return:
       //
       //     ?X_T  where ?X <: (HasT { type T = ?X_T }) & Singleton
+
+      // TODO: no TypeVars in Mode.TypevarsMissContext?
 
       /** For each dependent parameter `p` to be substituted, a map associating `p.T` with its substitution. */
       val replacements: SimpleIdentityMap[TermParamRef, MutableSymbolMap[TypeVar]] = 
