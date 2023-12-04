@@ -811,6 +811,47 @@ object ProtoTypes {
       //   else
       //     newDepTypeVar(ref)
 
+      // To propagate constraints, we substitute dependent parameters by fresh type variables,
+      // this works fine in situations like:
+      //
+      //     def foo(x: Int): List[x.type] = ...
+      //     foo(...): List[1]
+      //
+      //  where during overloading resolution we might end up running:
+      //
+      //     resultTypeApprox(foo) <:< List[1]
+      //
+      // but it is not enough in situations like:
+      //
+      //     trait Bar { type Elem }
+      //     def bar(x: Bar): List[x.Elem] = ...
+      //
+      //     bar(...): List[Int]
+      //
+      // because the type comparer will not succeed when checking
+      //
+      //     ?X#Elem <:< Int
+      //     where:
+      //       ?X <: Bar & Singleton
+      //
+      // Even though ?X can be constrained to make this true.
+      //
+      // To handle cases like this we addititionally substitute all
+      // path-dependent types `x.T` by fresh type variables while
+      // further constraining the original type variable. In our
+      // example this leads to:
+      //
+      //     resultTypeApprox(bar) = List[?Elem]
+      //     where:
+      //         ?Elem
+      //         ?X <: (Bar { type Elem = ?Elem }) & Singleton
+      //
+      // TODO: actually we wouldn't create ?X at all in this example
+      // so we need a more complex example with multiple param lists.
+
+
+
+
       // In a type like:
       //
       //     def foo(x: Int): List[x.type] = List(x)
