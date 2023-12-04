@@ -889,10 +889,13 @@ object ProtoTypes {
 
       // TODO: no TypeVars in Mode.TypevarsMissContext?
 
+      import util.EqHashMap
+
       /** For each dependent parameter `p` to be substituted, a map associating `p.T` with its substitution. */
-      val replacements: SimpleIdentityMap[TermParamRef, MutableSymbolMap[TypeVar]] = 
-        mt.paramRefs.foldLeft(SimpleIdentityMap.empty): (idMap, param) =>
-          idMap.updated(param, MutableSymbolMap())
+      val replacements: EqHashMap[TermParamRef, EqHashMap[TypeRef, TypeVar]] =
+        EqHashMap(initialCapacity = mt.paramRefs.length)
+      mt.paramRefs.foreach: param =>
+         replacements(param) = EqHashMap()
 
       /** If `p` is part of `replacements`, replace every path-dependent type `p.T`
        *  where `T` is an abstract type with a fresh type variable and record it
@@ -903,7 +906,7 @@ object ProtoTypes {
           case tp @ TypeRef(param: TermParamRef, _)
           if tp.info.isInstanceOf[RealTypeBounds]
           && param.binder == mt && replacements.contains(param) =>
-            replacements(param).nn.getOrElseUpdate(tp.symbol, {
+            replacements.lookup(param).nn.getOrElseUpdate(tp, {
               // We don't bother trying to handle cycles in bounds since asSeenFrom
               // doesn't handle them either.
               val tvarBounds = apply(tp.info.bounds).asInstanceOf[TypeBounds]
@@ -914,7 +917,7 @@ object ProtoTypes {
       val replaced = replaceDepTypes(mt.resultType)
 
       replaced.substParams(mt,
-        replacements.map2: (ref, memberVars) =>
+        replacements.iterator.map: (ref, memberVars) =>
           ref.underlying.widenExpr match
             // We need one special case to support the following pattern:
             //
@@ -934,7 +937,8 @@ object ProtoTypes {
               val repr = memberVars.iterator.foldLeft[Type](tp):
                 case (parent, (memberSym, memberVar)) =>
                   RefinedType(parent, memberSym.name, TypeAlias(memberVar))
-              newTypeVar(TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef))))
+              newTypeVar(TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef)))
+        .toList)
     else mt.resultType
   end resultTypeApprox
 
