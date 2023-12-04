@@ -811,6 +811,37 @@ object ProtoTypes {
       //   else
       //     newDepTypeVar(ref)
 
+      // In a type like:
+      //
+      //     def foo(x: Int): List[x.type] = List(x)
+      //
+      // We do not want to return the approximation `List[Int]`, because that
+      // would not conform to an expected type like `List[1]`. Instead, we
+      // create a fresh type variable to stand-in for the dependent parameter
+      // and return:
+      //
+      //     List[?X] where ?X <: Int & Singleton
+      //
+      // However, this substitution is not enough when path-dependent types are involved, for example:
+      //
+      //     def foo(x: HasT): x.T = x.elem
+      //
+      // The problem is that transitivity is broken for type projections, even though:
+      //
+      //     for all x: HasT,  x.T <: ?X#T
+      //
+      // and:
+      //
+      //     (x: HasT { type T = Int }) |- Int <: x.T
+      //
+      // We cannot prove:
+      //
+      //     (x: HasT { type T = Int }) |- Int <: HasT#T
+      //
+      // To avoid this issue we also create fresh type variables for x.T and return:
+      //
+      //     ?X_T  where ?X <: (HasT { type T = ?X_T }) & Singleton
+
       /** For each dependent parameter `p`, a map optionally associating `p.T` (represented by its symbol) to a type variable. */
       val replacements: SimpleIdentityMap[TermParamRef, MutableSymbolMap[TypeVar]] = 
         mt.paramRefs.foldLeft(SimpleIdentityMap.empty): (idMap, param) =>
@@ -835,10 +866,10 @@ object ProtoTypes {
             case tp: TypeVar if memberVars.isEmpty && mt.isImplicitMethod && mt.resultType.isInstanceOf[ValueType] =>
               tp
             case tp =>
-              val depVar = newTypeVar(TypeBounds.upper(AndType(tp, defn.SingletonClass.typeRef)))
-              memberVars.iterator.foldLeft[Type](depVar):
+              val repr = memberVars.iterator.foldLeft[Type](tp):
                 case (parent, (memberSym, memberVar)) =>
-                  RefinedType(parent, memberSym.name, TypeAlias(memberVar)))
+                  RefinedType(parent, memberSym.name, TypeAlias(memberVar))
+              newTypeVar(TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef))))
     else mt.resultType
 
   /** The normalized form of a type
