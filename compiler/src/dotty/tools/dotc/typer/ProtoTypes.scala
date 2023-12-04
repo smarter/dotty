@@ -842,22 +842,31 @@ object ProtoTypes {
       //
       //     ?X_T  where ?X <: (HasT { type T = ?X_T }) & Singleton
 
-      /** For each dependent parameter `p`, a map optionally associating `p.T` (represented by its symbol) to a type variable. */
+      /** For each dependent parameter `p` to be substituted, a map associating `p.T` with its substitution. */
       val replacements: SimpleIdentityMap[TermParamRef, MutableSymbolMap[TypeVar]] = 
         mt.paramRefs.foldLeft(SimpleIdentityMap.empty): (idMap, param) =>
           idMap.updated(param, MutableSymbolMap())
 
+      /** If `p` is part of `replacements`, replace every path-dependent type `p.T`
+       *  where `T` is an abstract type with a fresh type variable and record it
+       *  in `replacements`.
+       */
       val replaceDepTypes = new TypeMap:
         override def apply(tp: Type): Type = tp match
           case tp @ TypeRef(prefix: TermParamRef, _)
           if !tp.symbol.isClass && prefix.binder == mt && replacements.contains(prefix) =>
+            // The bounds of `p.T` might refer to `p.S` which might indirectly refer back to `p.T`
+            // To avoid cycles, we first create a fresh type variable for `p.T` with empty bounds
+            // and record it in `replacements`, then construct its bounds by recursively calling `apply`.
             val origBounds = tp.info.bounds
             val memberVar = replacements(prefix).nn.getOrElseUpdate(tp.symbol,
               newTypeVar(TypeBounds.emptySameKindAs(origBounds.hi), name = tp.name.freshened))
             apply(origBounds).asInstanceOf[TypeBounds].contains(memberVar)
             memberVar
           case _ => mapOver(tp)
+
       val replaced = replaceDepTypes(mt.resultType)
+
       replaced.substParams(mt,
         replacements.map2: (ref, memberVars) =>
           ref.underlying.widenExpr match
@@ -871,6 +880,7 @@ object ProtoTypes {
                   RefinedType(parent, memberSym.name, TypeAlias(memberVar))
               newTypeVar(TypeBounds.upper(AndType(repr, defn.SingletonClass.typeRef))))
     else mt.resultType
+  end resultTypeApprox
 
   /** The normalized form of a type
    *   - instantiate polymorphic types with fresh type variables in the current constraint
