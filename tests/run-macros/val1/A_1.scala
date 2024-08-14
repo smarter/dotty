@@ -16,7 +16,7 @@ object Macros:
   type Inv[S] <: S
   // transparent inline def myMacro[T, S <: T](x: T)(using Force[T], Force[S]): S = ${myMacroImpl[T, S]('x)}
 
-  transparent inline implicit def myMacro[T, S <: T](x: T): Inv[S] = ${Macros2.myMacroImpl[T, S]('x)}
+  // transparent inline implicit def myMacro[T, S <: T](x: T): Inv[S] = ${Macros2.myMacroImpl[T, S]('x)}
   // transparent inline implicit def myMacro[T >: Inv[S], S](x: T): S = ${Macros2.myMacroImpl[T, S]('x)}
 
 
@@ -33,11 +33,24 @@ object Macros2:
     '{ $x.asInstanceOf[Macros.Inv[S]] }
     // '{ $x.asInstanceOf[S] }
 
+  def valImpl[T: Type, S <: T : Type](using Quotes): Expr[Validator[T, Macros.Inv[S]]] =
+    import quotes.reflect.*
+    // we might have multiple layers of checks.
+    // TODO: use a plugin to strip annotations after typer to avoid compiler crash without Matthieu's branch?
+    // failsafe: give up if S isn't of the form X ::= RT[X @check] | T
+    // need other conv to handle List[T] to List[X]
+    // need to deal with invariance: Array[PosInt] vs Array[Int]
+    println(TypeRepr.of[S].show)
+    '{ Validator.identitySingleton.asInstanceOf[Validator[T, Macros.Inv[S]]] }
+    // '{ $x.asInstanceOf[S] }
+
+end Macros2
 
 trait Validator[From, To <: From]:
   extension (f: From) def validate(): To
 
 object Validator:
+  import Macros.Inv
   // given [T: Validator]: Validator[Array[T]]
   // transparent inline given [T: Validator]: Validator[RT[Array[T]]] = ???
 
@@ -50,15 +63,15 @@ object Validator:
    *
    *  but avoids unnecessary allocations.
    */
-  given identity[T]: Validator[T, T] = identitySingleton.asInstanceOf[Validator[T, T]]
-  private val identitySingleton: Validator[Any, Any] = new:
+  def identity[T]: Validator[T, T] = identitySingleton.asInstanceOf[Validator[T, T]]
+  val identitySingleton: Validator[Any, Any] = new:
     extension (f: Any) def validate(): Any = f
 
-  transparent inline given [T, S <: T]: Validator[T, Inv[S]] = ${Macros2.myMacroImpl[T, S]}
+  transparent inline given [T, S <: T]: Validator[T, Inv[S]] = ${Macros2.valImpl[T, S]}
 
-  given [T, S](using Validator[T, S]): Validator[Array[T], Array[S]] with
-    extension (f: Array[T])
-      def validate(): Array[S] = f.map(_.validate())
+  // given [T, S](using Validator[T, S]): Validator[Array[T], Array[S]] with
+  //   extension (f: Array[T])
+  //     def validate(): Array[S] = f.map(_.validate())
 
 object ValidatorConv:
   given [T, S <: T](using Validator[T, S]): Conversion[T, S] with
