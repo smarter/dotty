@@ -40,13 +40,21 @@ object Macros2:
     // failsafe: give up if S isn't of the form X ::= RT[X @check] | T
     // need other conv to handle List[T] to List[X]
     // need to deal with invariance: Array[PosInt] vs Array[Int]
+    val tpe = TypeRepr.of[S]
+    tpe match
+      case tp: AndType =>
+        println("failed")
+        report.error("blaaaaaa")
+        return '{ ??? }
+      case _ =>
+
     println(TypeRepr.of[S].show)
     '{ Validator.identitySingleton.asInstanceOf[Validator[T, Macros.Inv[S]]] }
     // '{ $x.asInstanceOf[S] }
 
 end Macros2
 
-trait Validator[From, To <: From]:
+trait Validator[From, To/* <: From*/]:
   extension (f: From) def validate(): To
 
 object Validator:
@@ -69,10 +77,13 @@ object Validator:
 
   transparent inline given [T, S <: T]: Validator[T, Inv[S]] = ${Macros2.valImpl[T, S]}
 
-  // given [T, S](using Validator[T, S]): Validator[Array[T], Array[S]] with
-  //   extension (f: Array[T])
-  //     def validate(): Array[S] = f.map(_.validate())
+  import scala.reflect.{classTag, ClassTag}
+  given [T: ClassTag, S <: T](using Validator[T, S]): Validator[Array[T], Array[S]] with
+    extension (f: Array[T])
+      def validate(): Array[S] = f.map(_.validate())(using classTag[T].asInstanceOf[ClassTag[S]])
 
 object ValidatorConv:
-  given [T, S <: T](using Validator[T, S]): Conversion[T, S] with
+  // Not S <: T because Array[PosInt] !:<:< Array[Int]
+  // alt: keep the subtype but use Array[S] & Array[T] ?
+  given [T, S /*<: T*/](using Validator[T, S]): Conversion[T, S] with
     def apply(t: T): S = t.validate()

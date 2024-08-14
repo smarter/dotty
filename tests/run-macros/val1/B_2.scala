@@ -9,7 +9,9 @@ package b {
   class A(a: Inv[Int @check[Int](x => Box(3).x == 3)])
   
   type PosInt = Inv[Int @check[Int](x => x > 0)]
-  class B(a: Inv[PosInt @check[PosInt](x => x % 2 == 0)])
+  // class B(a: Inv[PosInt @check[PosInt](x => x % 2 == 0)])
+
+  class B(a: Array[PosInt])
   
   
   // class A(a: Int @check[Int](x => Box(3).x == 3))
@@ -25,5 +27,6 @@ object Test:
     // new a.A(a.Macros.myMacro(1): Macros.Inv[Int @check[Int](x => Box(3).x == 3)])
     // new a.A(a.Macros.myMacro(1))
     // new A(1)
-    new B(1)
+    val x: Array[Int] = Array(1)
+    new B(x)
 
