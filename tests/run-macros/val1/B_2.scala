@@ -13,6 +13,9 @@ package b {
 
   class B(a: Array[PosInt])
   
+  class C(aa: Int, bb: Inv[Int @check[Int](x => x > aa)])
+
+  def dep(aa: Int)(bb: Inv[Int @check[Int](x => x > aa)]) = 0
   
   // class A(a: Int @check[Int](x => Box(3).x == 3))
 }
@@ -27,6 +30,7 @@ object Test:
     // new a.A(a.Macros.myMacro(1): Macros.Inv[Int @check[Int](x => Box(3).x == 3)])
     // new a.A(a.Macros.myMacro(1))
     // new A(1)
-    val x: Array[Int] = Array(1)
-    new B(x)
-
+    // val x: Array[Int] = Array(1)
+    // new B(x)
+    // new C(42, 1)
+    dep(42)(1)
