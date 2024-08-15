@@ -20,7 +20,8 @@ object Macros:
   // transparent inline implicit def myMacro[T >: Inv[S], S](x: T): S = ${Macros2.myMacroImpl[T, S]('x)}
 
 
-  // def myMacroImpl[T: Type, S <: T @checkBase : Type](x: Expr[T])(using Quotes): Expr[S] =
+  transparent inline def myMacro[T, S <: T](x: T): Inv[S] = ${Macros2.myMacroImpl[T, S]('x)}
+
 object Macros2:
   def myMacroImpl[T: Type, S <: T : Type](x: Expr[T])(using Quotes): Expr[Macros.Inv[S]] =
     import quotes.reflect.*
@@ -29,11 +30,11 @@ object Macros2:
     // failsafe: give up if S isn't of the form X ::= RT[X @check] | T
     // need other conv to handle List[T] to List[X]
     // need to deal with invariance: Array[PosInt] vs Array[Int]
-    println(TypeRepr.of[S].show)
+    println(TypeRepr.of[S])//.show)
     '{ $x.asInstanceOf[Macros.Inv[S]] }
     // '{ $x.asInstanceOf[S] }
 
-  def valImpl[T: Type, S <: T : Type](using Quotes): Expr[Validator[T, Macros.Inv[S]]] =
+  def valImpl[T: Type, S /*<: T*/ : Type](using Quotes): Expr[Validator[T, Macros.Inv[S]]] =
     import quotes.reflect.*
     // we might have multiple layers of checks.
     // TODO: use a plugin to strip annotations after typer to avoid compiler crash without Matthieu's branch?
@@ -75,7 +76,7 @@ object Validator:
   val identitySingleton: Validator[Any, Any] = new:
     extension (f: Any) def validate(): Any = f
 
-  transparent inline given [T, S <: T]: Validator[T, Inv[S]] = ${Macros2.valImpl[T, S]}
+  transparent inline given [T, S/* <: T*/]: Validator[T, Inv[S]] = ${Macros2.valImpl[T, S]}
 
   import scala.reflect.{classTag, ClassTag}
   given [T: ClassTag, S <: T](using Validator[T, S]): Validator[Array[T], Array[S]] with
