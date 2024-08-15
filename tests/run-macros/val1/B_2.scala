@@ -13,18 +13,26 @@ package b {
 
   class B(a: Array[PosInt])
   
-  class C(aa: Int, bb: Inv[Int @check[Int](x => x > aa)])
+  // class C(aa: Int, bb: Inv[Int @check[Int](x => x > aa)])
 
-  def dep(aa: Int)(bb: Inv[Int @check[Int](x => x > aa)]) = 0
+  def dep(aa: Int)(bb: Inv[Int @check[Int](x => x > aa )]) = 0
+
+// @check[x.type > 0]
+// @check[Log2[x.type + y.type] == 0]
+
+ // @range[0, 1000]
+
+ // @
   
   // class A(a: Int @check[Int](x => Box(3).x == 3))
 }
 
 object Test:
   import b.*
-  import ValidatorConv.given
+  // import ValidatorConv.given
   // transparent inline implicit def conv[T, S <: T @a.checkBase](x: T): S = a.Macros.myMacro[T, S](x)
   // transparent inline implicit def conv[T, S <: T](x: T): S = a.Macros.myMacro[T, S](x)
+  // def conv[T, S <: T](x: T): Macros.Inv[S] = ???
   def main(args: Array[String]): Unit =
     // import a.Macros.myMacro
     // new a.A(a.Macros.myMacro(1): Macros.Inv[Int @check[Int](x => Box(3).x == 3)])
@@ -33,4 +41,5 @@ object Test:
     // val x: Array[Int] = Array(1)
     // new B(x)
     // new C(42, 1)
-    dep(42)(1)
+    // dep(42)(conv(1))
+    dep(42)(Macros.myMacro(1))
