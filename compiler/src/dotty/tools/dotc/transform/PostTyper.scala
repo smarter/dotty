@@ -160,7 +160,7 @@ class PostTyper extends MacroTransform with InfoTransformer { thisPhase =>
       if (inJavaAnnot) checkValidJavaAnnotation(annot)
       try
         val res = transform(annot)
-        if res ne annot then
+        if false && (res ne annot) then
           // If the annotation has been transformed, we need to make sure that the
           // symbol are copied so that we don't end up with the same symbol in different
           // trees, which would lead to a crash in pickling.

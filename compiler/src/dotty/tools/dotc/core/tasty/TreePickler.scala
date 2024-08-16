@@ -283,6 +283,7 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
       }
     case tpe: AnnotatedType =>
       writeByte(ANNOTATEDtype)
+      println("~~~pickling: " + tpe.annot.tree + " " + tpe.annot.tree.uniqueId)
       withLength { pickleType(tpe.parent, richTypes); pickleTree(tpe.annot.tree) }
       annotatedTypeTrees += tpe.annot.tree
     case tpe: AndType =>
@@ -362,6 +363,8 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
       pickleType(tp)
 
   def pickleDef(tag: Int, mdef: MemberDef, tpt: Tree, rhs: Tree = EmptyTree, pickleParams: => Unit = ())(using Context): Unit = {
+    if mdef.name.toString.contains("anonfun") then
+      println("mdef: " + mdef.uniqueId)
     val sym = mdef.symbol
 
     def isDefSymPreRegisteredAndTreeHasCorrectStructure() =
@@ -369,7 +372,10 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
       !(tag == TYPEDEF && tpt.isInstanceOf[Template] && !tpt.symbol.exists) // in case this is a TEMPLATE, check if we are able to pickle it
 
     if passesConditionForErroringBestEffortCode(isDefSymPreRegisteredAndTreeHasCorrectStructure()) then
-      assert(symRefs(sym) == NoAddr, sym)
+      if sym.id == 8194 then
+        println("mdef: " + mdef)
+        // Thread.dumpStack
+      assert(symRefs(sym) == NoAddr, sym.toString + " " + sym.id)
       registerDef(sym)
       writeByte(tag)
       val addr = currentAddr
@@ -406,6 +412,7 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
   }
 
   def pickleParam(tree: Tree)(using Context): Unit = {
+    // println("###param: " + tree + "\n" + tree.show)
     registerTreeAddr(tree)
     tree match {
       case tree: ValDef  => pickleDef(PARAM, tree, tree.tpt)
@@ -745,6 +752,7 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
           pickleTree(tp)
         case Annotated(tree, annot) =>
           writeByte(ANNOTATEDtpt)
+          println("~~pickling: " + annot + " " + annot.uniqueId)
           withLength { pickleTree(tree); pickleTree(annot) }
         case LambdaTypeTree(tparams, body) =>
           writeByte(LAMBDAtpt)

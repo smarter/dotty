@@ -73,7 +73,8 @@ object Annotations {
           // If the annotation has been transformed, we need to make sure that the
           // symbol are copied so that we don't end up with the same symbol in different
           // trees, which would lead to a crash in pickling.
-          val mappedTree = TreeTypeMap(typeMap = tm, alwaysCopySymbols = true).transform(tree)
+          println("##TRANSFORMED: " + diff)
+          val mappedTree = TreeTypeMap(typeMap = tm/*, alwaysCopySymbols = true*/).transform(tree)
           derivedAnnotation(mappedTree)
         else this
 

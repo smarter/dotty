@@ -5692,6 +5692,8 @@ object Types extends TypeUtils {
 
   /** An annotated type tpe @ annot */
   abstract case class AnnotatedType(parent: Type, annot: Annotation) extends CachedProxyType, CaptureRef {
+    // println("##annot : " + annot)
+    // Thread.dumpStack
 
     override def underlying(using Context): Type = parent
 

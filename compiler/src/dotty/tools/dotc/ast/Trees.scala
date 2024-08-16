@@ -1022,6 +1022,8 @@ object Trees {
   /** arg @annot */
   case class Annotated[+T <: Untyped] private[ast] (arg: Tree[T], annot: Tree[T])(implicit @constructorOnly src: SourceFile)
     extends ProxyTree[T] {
+    // println("arg: " + arg)
+    // Thread.dumpStack
     type ThisTree[+T <: Untyped] = Annotated[T]
     def forwardTo: Tree[T] = arg
   }
