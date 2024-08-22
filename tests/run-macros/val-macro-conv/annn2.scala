@@ -1,3 +1,4 @@
+package a
 
 // def f(x: Int): Int @ann(() => x) = x
 

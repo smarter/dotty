@@ -1,3 +1,5 @@
+package a
+
 import scala.quoted.*
 
 class ann[T, Env](g: Target[T, Env]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation
@@ -33,8 +35,10 @@ object Macro:
       case '[env] =>
         val lit = Literal(StringConstant(f.show))
         // val z = '{ new StringTarget[T, env](${lit.asExprOf[String]}) }
+        val ClsTypeTree =
+          TypeTree.ref(Symbol.requiredClass("a.StringTarget"))
         val z =
-          Apply(Select.unique(New(Applied(TypeTree.of[StringTarget], List(TypeTree.of[T], Singleton(Ref.term(buf.head))))), "<init>"), List(lit))
+          Apply(Select.unique(New(Applied(ClsTypeTree, List(TypeTree.of[T], Singleton(Ref.term(buf.head))))), "<init>"), List(lit))
 
-        println("z: " + z.show)
+        println("z: " + z)
         z.asExprOf[Target[T, ?]]
