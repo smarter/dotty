@@ -6,6 +6,7 @@ class dummy[T](g: Boolean) extends annotation.StaticAnnotation with annotation.R
 
 object Test:
   // def foo(elem: Int, bla: Int @ann[Int, elem.type](Target.conv((x: Int) => elem == 0))) = bla
+  // def foo(elem: Int, bla: Int @ann(new StringTarget[Int, elem.type](""))) = bla
 
   // FIXED: WAS:
   // // We correctly infer `elem.type`, but because it's not a SingletonTypeTree(Ident) but instead a TermRef (transformed into TermParamRef),

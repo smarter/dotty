@@ -37,8 +37,13 @@ object Macro:
         // val z = '{ new StringTarget[T, env](${lit.asExprOf[String]}) }
         val ClsTypeTree =
           TypeTree.ref(Symbol.requiredClass("a.StringTarget"))
+        val targs = List(TypeTree.of[T], Singleton(Ref.term(buf.head)))
         val z =
-          Apply(Select.unique(New(Applied(ClsTypeTree, List(TypeTree.of[T], Singleton(Ref.term(buf.head))))), "<init>"), List(lit))
+          Apply(
+            TypeApply(
+              Select.unique(New(Applied(ClsTypeTree, targs)), "<init>"),
+              targs
+            ), List(lit))
 
         println("z: " + z)
         z.asExprOf[Target[T, ?]]
