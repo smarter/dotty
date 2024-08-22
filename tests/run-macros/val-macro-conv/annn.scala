@@ -11,7 +11,8 @@ object Target:
 object Macro:
   def convImpl[T: Type](using Quotes)(f: Expr[T => Boolean]): Expr[Target[T, ?]] =
     import quotes.reflect.*
-    val buf: collection.mutable.ListBuffer[TypeRepr] = collection.mutable.ListBuffer.empty
+    // At this point in Typer we see TermRef, but they get substituted by TermParamRef for the final MethodType
+    val buf: collection.mutable.ListBuffer[TermRef] = collection.mutable.ListBuffer.empty
     class MyTraverser extends TreeTraverser:
        override def traverseTree(tree: Tree)(owner: Symbol): Unit =
          tree match
@@ -30,6 +31,10 @@ object Macro:
     (new MyTraverser).traverseTree(f.asTerm)(Symbol.spliceOwner)
     buf.head.asType match
       case '[env] =>
-        val z = '{ new StringTarget[T, env](${Literal(StringConstant(f.show)).asExprOf[String]}) }
-        // println("z: " + z.show)
-        z
+        val lit = Literal(StringConstant(f.show))
+        // val z = '{ new StringTarget[T, env](${lit.asExprOf[String]}) }
+        val z =
+          Apply(Select.unique(New(Applied(TypeTree.of[StringTarget], List(TypeTree.of[T], Singleton(Ref.term(buf.head))))), "<init>"), List(lit))
+
+        println("z: " + z.show)
+        z.asExprOf[Target[T, ?]]
