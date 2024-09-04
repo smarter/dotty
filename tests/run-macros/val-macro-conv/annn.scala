@@ -19,6 +19,13 @@ class Self[T] extends Exp
 // ^-- need to keep track of whether we've seen "x" before to disambiguate,
 //     trees aren't guaranteed to respect shadowing (I think?)
 
+// x: Int with (_  > 0 && _ < 10)
+// =>
+// assert(x > 0, "failed assertion: x > 0 where x = $x and this = $this")
+// x: Int with (_  + y == 0)
+// =>
+// assert(x + y == 0, "failed assertion: x + y == 0 where x = $x and y = $y")
+
 class ann[E <: Exp](g: Target[E]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation
 object ann:
   def the[T]: T = ???
