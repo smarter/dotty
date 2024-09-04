@@ -5,7 +5,7 @@ import scala.quoted.*
 sealed trait Exp
 class App[Elem <: Exp, Args <: Tuple /* of Exp*/] extends Exp
 class Sel[Qual <: Exp, Name <: String] extends Exp
-class Id[T] extends Exp
+class Sngl[T] extends Exp
 class Self[T] extends Exp
 
 class ann[E <: Exp](g: Target[E]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation
@@ -31,11 +31,14 @@ object Macro:
             // i.tpe.asType match case '[t] => Type.of[Id[t]]
             i.tpe match
               case tp @ TermRef(_: NoPrefix, _) =>
-                val tptId = TypeTree.ref(Symbol.requiredClass("a.Id"))
-                Applied(tptId, List(Singleton(Ref.term(tp))))
+                val tptSngl = TypeTree.ref(Symbol.requiredClass("a.Sngl"))
+                Applied(tptSngl, List(Singleton(Ref.term(tp))))
               case _ =>
                 i.tpe.asType match
-                  case '[t] => TypeTree.of[Id[t]]
+                  case '[t] => TypeTree.of[Sngl[t]]
+          case l: Literal =>
+            l.tpe.asType match
+              case '[t] => TypeTree.of[Sngl[t]]
           case Select(qual, name) =>
             val qualTree = foldTree(acc, qual)(owner)
             val tptSel = TypeTree.ref(Symbol.requiredClass("a.Sel"))
@@ -49,7 +52,9 @@ object Macro:
             val tptSelf = TypeTree.ref(Symbol.requiredClass("a.Self"))
             Applied(tptSelf, args)
           case _ =>
-            foldOverTree(acc, tree)(owner)
+            // don't propagate acc to avoid misleading myself
+            // foldOverTree(acc, tree)(owner)
+            foldOverTree(TypeTree.of[Any], tree)(owner)
 
     val input = Expr.betaReduce('{$f(ann.the[T])}).asTerm
     println("input: " + input.show)
