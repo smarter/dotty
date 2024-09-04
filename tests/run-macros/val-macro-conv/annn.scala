@@ -6,6 +6,7 @@ sealed trait Exp
 class App[Elem <: Exp, Args <: Tuple /* of Exp*/] extends Exp
 class Sel[Qual <: Exp, Name <: String] extends Exp
 class Id[T] extends Exp
+class Self[T] extends Exp
 
 class ann[E <: Exp](g: Target[E]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation
 object ann:
@@ -35,6 +36,18 @@ object Macro:
               case _ =>
                 i.tpe.asType match
                   case '[t] => TypeTree.of[Id[t]]
+          case Select(qual, name) =>
+            val qualTree = foldTree(acc, qual)(owner)
+            val tptSel = TypeTree.ref(Symbol.requiredClass("a.Sel"))
+            Applied(tptSel, List(qualTree, Singleton(Literal(StringConstant(name)))))
+          case Apply(fun, args) =>
+            val funTree = foldTree(acc, fun)(owner)
+            val argsTrees = args.map(foldTree(acc, _)(owner))
+            val tptApp = TypeTree.ref(Symbol.requiredClass("a.App"))
+            Applied(tptApp, funTree :: argsTrees)
+          case TypeApply(fun, args) if fun.symbol eq Symbol.requiredMethod("a.ann.the") =>
+            val tptSelf = TypeTree.ref(Symbol.requiredClass("a.Self"))
+            Applied(tptSelf, args)
           case _ =>
             foldOverTree(acc, tree)(owner)
 
@@ -44,6 +57,7 @@ object Macro:
     val targs = List(targ)
 
     val dummyRef = Symbol.requiredMethod("a.Target.dummy")
+    // because subst doesn't work on trees, we'll need a conversion from @ann[E](...) to @ann[E](...)
     val z1 = Ref(dummyRef).appliedToTypeTrees(targs)
     println("z1: " + z1.show)
     z1.asExprOf[Target[?]]
