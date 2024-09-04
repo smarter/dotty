@@ -34,6 +34,13 @@ object Macros2:
     '{ $x.asInstanceOf[Macros.Inv[S]] }
     // '{ $x.asInstanceOf[S] }
 
+
+// List[Int] <~< RT[List[RT[Int @range(1,2)]] @length(1,2)]
+// strip(RT[List[RT[Int @range(1,2)]] @length(1,2)]) = List[RT[Int @range(1,2)]]
+//   summon[List[Int] <~< List[RT[Int @range(1,2)]]]
+//     summon[Int <~< RT[Int @range(1,2)]]
+
+
   def valImpl[T: Type, S /*<: T*/ : Type](using Quotes): Expr[Validator[T, Macros.Inv[S]]] =
     import quotes.reflect.*
     // we might have multiple layers of checks.

@@ -2,48 +2,58 @@ package a
 
 import scala.quoted.*
 
-class ann[T, Env](g: Target[T, Env]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation
+sealed trait Exp
+class App[Elem <: Exp, Args <: Tuple /* of Exp*/] extends Exp
+class Sel[Qual <: Exp, Name <: String] extends Exp
+class Id[T] extends Exp
 
-trait Target[T, Env]
-class StringTarget[T, Env](x: String) extends Target[T, Env]
+class ann[E <: Exp](g: Target[E]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation
+object ann:
+  def the[T]: T = ???
+end ann
+
+class Target[E <: Exp]
 object Target:
+  def dummy[E <: Exp]: Target[E] = ???
   // def apply(x: T): Boolean
   // given [T]: Conversion[T => Boolean, Target[T]]
-  transparent inline implicit def conv[T](inline f: T => Boolean): Target[T, ?] = ${Macro.convImpl[T]('f)}
+  transparent inline implicit def conv[T](inline f: T => Boolean): Target[?] = ${Macro.convImpl[T]('f)}
 object Macro:
-  def convImpl[T: Type](using Quotes)(f: Expr[T => Boolean]): Expr[Target[T, ?]] =
+  def convImpl[T: Type](using Quotes)(f: Expr[T => Boolean]): Expr[Target[?]] =
     import quotes.reflect.*
-    // At this point in Typer we see TermRef, but they get substituted by TermParamRef for the final MethodType
-    val buf: collection.mutable.ListBuffer[TermRef] = collection.mutable.ListBuffer.empty
-    class MyTraverser extends TreeTraverser:
-       override def traverseTree(tree: Tree)(owner: Symbol): Unit =
-         tree match
-           case tree: Term =>
-             tree.tpe match
-               case tp @ TermRef(_: NoPrefix, name) =>
-                 println("owner: " + Symbol.spliceOwner.owner.owner + " ")
-                 buf += tp
-               case tp =>
-                 // println("other: " + tp)
-           case _ =>
-             // println("hi: " + tree)
-         traverseTreeChildren(tree)(owner)
 
-    // println("#####")           
-    (new MyTraverser).traverseTree(f.asTerm)(Symbol.spliceOwner)
-    buf.head.asType match
-      case '[env] =>
-        val lit = Literal(StringConstant(f.show))
-        // val z = '{ new StringTarget[T, env](${lit.asExprOf[String]}) }
-        val ClsTypeTree =
-          TypeTree.ref(Symbol.requiredClass("a.StringTarget"))
-        val targs = List(TypeTree.of[T], Singleton(Ref.term(buf.head)))
-        val z =
-          Apply(
-            TypeApply(
-              Select.unique(New(Applied(ClsTypeTree, targs)), "<init>"),
-              targs
-            ), List(lit))
+    class ToExp extends TreeAccumulator[TypeTree]:
+      def foldTree(acc: TypeTree, tree: Tree)(owner: Symbol): TypeTree = //Type[? <: Exp] =
+        tree match
+          case i: Ident =>
+            // todo: need a typetree to workaround issue with refersToParam
+            // i.tpe.asType match case '[t] => Type.of[Id[t]]
+            i.tpe match
+              case tp @ TermRef(_: NoPrefix, _) =>
+                val tptId = TypeTree.ref(Symbol.requiredClass("a.Id"))
+                Applied(tptId, List(Singleton(Ref.term(tp))))
+              case _ =>
+                i.tpe.asType match
+                  case '[t] => TypeTree.of[Id[t]]
+          case _ =>
+            foldOverTree(acc, tree)(owner)
 
-        println("z: " + z)
-        z.asExprOf[Target[T, ?]]
+    val input = Expr.betaReduce('{$f(ann.the[T])}).asTerm
+    println("input: " + input.show)
+    val targ = ToExp().foldTree(TypeTree.of[Exp], input)(Symbol.spliceOwner)
+    val targs = List(targ)
+
+    val dummyRef = Symbol.requiredMethod("a.Target.dummy")
+    val z1 = Ref(dummyRef).appliedToTypeTrees(targs)
+    println("z1: " + z1.show)
+    z1.asExprOf[Target[?]]
+
+    // val ClsTypeTree = TypeTree.ref(Symbol.requiredClass("a.Target"))
+    // val z =
+    //   Apply(
+    //     TypeApply(
+    //       Select.unique(New(Applied(ClsTypeTree, targs)), "<init>"),
+    //       targs
+    //     ), List())
+    // println("z: " + z.show)
+    // z.asExprOf[Target[?]]
