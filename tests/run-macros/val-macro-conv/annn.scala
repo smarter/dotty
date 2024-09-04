@@ -8,6 +8,17 @@ class Sel[Qual <: Exp, Name <: String] extends Exp
 class Sngl[T] extends Exp
 class Self[T] extends Exp
 
+// No need for tracking type cause it can be inferred back?
+// class Plus[S <: Exp, T <: Exp] extends Exp
+
+// No need to track type for bindings either?
+// class Let[E <: Exp, U <: Exp]
+// class Ref[I <: Int]
+// Let[Foo, Plus[Ref[0], Ref[0]]]
+// Let["x", Foo, Plus[Ref["x"], Ref["x"]]]
+// ^-- need to keep track of whether we've seen "x" before to disambiguate,
+//     trees aren't guaranteed to respect shadowing (I think?)
+
 class ann[E <: Exp](g: Target[E]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation
 object ann:
   def the[T]: T = ???
