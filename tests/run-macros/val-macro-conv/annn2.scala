@@ -6,7 +6,7 @@ class dummy[T](g: Boolean) extends annotation.StaticAnnotation with annotation.R
 
 // transparent inline def mydef= 42
 // transparent inline def isPowerOfTwoOrig(x: Int) = x != 0 && (x & (x - 1)) == 0
-transparent inline def isPowerOfTwoIP(inline x: Int) = x != 0 && (x & (x - 1)) == 0
+// transparent inline def isPowerOfTwoIP(inline x: Int) = x != 0 && (x & (x - 1)) == 0
 
 // transparent inline def isMultipleOf(x: Int, y: Int) = x % y == 0
 // isMultipleOf(x, 2)
@@ -23,7 +23,9 @@ transparent inline def isPowerOfTwoIP(inline x: Int) = x != 0 && (x & (x - 1)) =
 // class foo(elem: Int, bla: Int @ann(Target.conv((x: Int) => isPowerOfTwoOrig(elem+1))))
 
 // OK
-class foo(elem: Int, bla: Int @ann(Target.conv((x: Int) => isPowerOfTwoIP(elem+1))))
+// class foo(elem: Int, bla: Int @ann(Target.conv((x: Int) => isPowerOfTwoIP(elem+1))))
+
+class foo(elem: Int, bla: Int @ann(Target.conv((x: Int) => (elem + 1) == 0)))
 
 object Test:
   // def foo(elem: Int, bla: Int @ann[Int, elem.type](Target.conv((x: Int) => elem == 0))) = bla
@@ -36,4 +38,15 @@ object Test:
 
   // def foo(elem: Int, bla: Int @dummy(elem == 0)) = bla
   // def foo(elem: Int, bla: Int @dummy[elem.type](0 == elem)) = bla
-  new foo(1, 3)
+  // val hi = new foo(1, 3)
+
+  // 
+  // val annInst = new ann(Target.conv((x: Int) => (x + 1) == 0))
+
+  def main(args: Array[String]): Unit = {
+    val haha = 42
+    val annInst = new ann(Target.conv((x: Int) => (haha + 1) == 43))
+
+    val reified = annInst.reifyExp()
+    println(reified)
+  }
