@@ -3,27 +3,35 @@ package a
 import scala.compiletime.erasedValue
 import scala.quoted.*
 
-sealed trait Exp[T]:
-  type Param = T
+// If we're covariant, then Exp.Param doesn't work anymore
+// If we're invariant, then Sngl[T] needs to be Sngl[T, U >: T] extends Exp[U]
+// - how do we choose the upper bound?
+//   - easy for primitives
+//   - if we're param by List[PosInt], this will end up being eq to List[Int]
+//     - List[PosInt] == List[Int] is ok even though the types don't match
+//   - ADTConstr(_) == OtherADTConstr(_) ok iff they're from the same ADT, for some def of ADT
+//
+// could also erase tparam
+sealed trait Exp[/*+*/T]
 object Exp:
   type Param[E <: Exp[?]] = E match
     case Exp[t] => t
 
-  inline def reifyPred[S, E <: Exp[Boolean]]: S => Boolean = ${reifyPredImpl[S, E]}
+  // inline def reifyPred[S, E <: Exp[Boolean]]: S => Boolean = ${reifyPredImpl[S, E]}
 
-  def reifyPredImpl[S: Type, E <: Exp[Boolean] : Type](using Quotes): Expr[S => Boolean] =
-    '{ (self: S) => ${reify[S, Boolean, E]('self)} }
+  // def reifyPredImpl[S: Type, E <: Exp[Boolean] : Type](using Quotes): Expr[S => Boolean] =
+  //   '{ (self: S) => ${reify[S, Boolean, E]('self)} }
 
-  def reify[S: Type, T: Type, E <: Exp[T] : Type](using Quotes)(self: Expr[S]): Expr[T] =
-    def go[E1 <: Exp[?] : Type](using Quotes): Expr[Exp.Param[E1]] =
-      Type.of[E1] match
-        case '[Plus[a, b]] =>
-          '{ ${go[a]} + ${go[b]} }.asExprOf[Exp.Param[E1]]
-        case '[Or[a, b]] => // a and b must be booleans
-          '{ ${go[a]} || ${go[b]} }.asExprOf[Exp.Param[E1]]
-        case '[type a <: S; Self[a]] =>
-          self.asExprOf[Exp.Param[E1]]
-    go[E]
+  // def reify[S: Type, T: Type, E <: Exp[T] : Type](using Quotes)(self: Expr[S]): Expr[T] =
+  //   def go[E1 <: Exp[?] : Type](using Quotes): Expr[Exp.Param[E1]] =
+  //     Type.of[E1] match
+  //       case '[Plus[a, b]] =>
+  //         '{ ${go[a]} + ${go[b]} }.asExprOf[Exp.Param[E1]]
+  //       case '[Or[a, b]] => // a and b must be booleans
+  //         '{ ${go[a]} || ${go[b]} }.asExprOf[Exp.Param[E1]]
+  //       case '[type a <: S; Self[a]] =>
+  //         self.asExprOf[Exp.Param[E1]]
+  //   go[E]
 
   // inline def reifyI[S, T, E <: Exp[T]](inline self: S): T =
   //   inline scala.compiletime.erasedValue[E] match
