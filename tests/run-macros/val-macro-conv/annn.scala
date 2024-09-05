@@ -30,19 +30,19 @@ object Exp:
   //     case _: Plus[a, b] =>
   //       reifyI[S, Int, a](self) + reifyI[S, Int, b](self)
   class Reifier[S](self: S):
-    // inline def reifyII[E <: Exp[Param[E]]]: Param[E] = reifyI[Param[E], E]
-    inline def reifyI[T, E <: Exp[T]]: T =
+    inline def reify[E <: Exp[?]]: Exp.Param[E] =
+      inline erasedValue[E] match
+        case _: Exp[aa] =>
+          reify1[aa, E & Exp[aa]]
+    // Helper method to help type inference
+    inline def reify1[T, E <: Exp[T]]: T =
       inline erasedValue[E] match
         case _: Plus[a, b] =>
-          reifyI[Int, a] + reifyI[Int, b]
+          reify[a] + reify[b]
         case _: Eq[a, b] =>
-          inline erasedValue[a] match
-            case _: Exp[aa] =>
-              inline erasedValue[b] match
-                case _: Exp[bb] =>
-                  reifyI[aa, a & Exp[aa]] == reifyI[bb, b & Exp[bb]]
+          reify[a] == reify[b]
         case _: Or[a, b] =>
-          reifyI[Boolean, a] || reifyI[Boolean, b]
+          reify[a] || reify[b]
         case _: Self[S] =>
           self.asInstanceOf[T] // cast because of FIXME on Self
         case _: Sngl[a] =>
@@ -88,10 +88,8 @@ class Or[S <: Exp[Boolean], T <: Exp[Boolean]] extends Exp[Boolean]
 
 class ann[E <: Exp[?]](g: Target[E]) extends annotation.StaticAnnotation with annotation.RefiningAnnotation:
   inline def reifyExp() =
-    inline erasedValue[E] match
-      case _: Exp[a] =>
-        val r = new Exp.Reifier(42)
-        r.reifyI[a, E & Exp[a]]
+    val r = new Exp.Reifier(42)
+    r.reify[E]
 object ann:
   def the[T]: T = ???
 end ann
