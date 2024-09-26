@@ -18,8 +18,7 @@ import collection.mutable
 
 import scala.annotation.constructorOnly
 
-abstract class TypeError(using creationContext: Context) extends Exception(""):
-
+trait StackTraceOnDebug extends Throwable:
   /** Will the stack trace of this exception be filled in?
    *  This is expensive and only useful for debugging purposes.
    */
@@ -34,6 +33,8 @@ abstract class TypeError(using creationContext: Context) extends Exception(""):
   override def fillInStackTrace(): Throwable =
     if computeStackTrace then super.fillInStackTrace().nn
     else this
+
+abstract class TypeError(using creationContext: Context) extends Exception("") with StackTraceOnDebug:
 
   /** Convert to message. This takes an additional Context, so that we
    *  use the context when the message is first produced, i.e. when the TypeError

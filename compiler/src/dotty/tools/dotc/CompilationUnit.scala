@@ -132,7 +132,7 @@ class CompilationUnit protected (val source: SourceFile, val info: CompilationUn
 
 object CompilationUnit {
 
-  class SuspendException extends Exception with NoStackTrace
+  class SuspendException extends Exception with StackTraceOnDebug
 
   /** Make a compilation unit for top class `clsd` with the contents of the `unpickled` tree */
   def apply(clsd: ClassDenotation, unpickled: Tree, forceTrees: Boolean)(using Context): CompilationUnit =
